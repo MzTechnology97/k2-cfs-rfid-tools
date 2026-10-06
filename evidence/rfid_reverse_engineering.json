@@ -223,12 +223,50 @@
       "0x0801970E",
       "0x08017F7E"
     ],
-    "raw_transceive_status": "deferred pending FIFO/error/collision/CRC/parity/timeout register mapping"
+    "raw_transceive_status": "deferred pending FIFO/error/collision/CRC/parity/timeout register mapping",
+    "stock_busy_guard_status": "implemented in v2.1 candidate using 0x200001F2; statically validated, hardware validation pending"
   },
   "open_questions": [
+    "atomic synchronization against a stock RFID transition that begins after the v2.1 state check",
     "exact FM17622 error/collision/IRQ register semantics used by this driver",
-    "safe synchronization against stock RFID polling task",
     "final normalized UID construction for cascade-level tags",
     "loader/application maximum accepted image size and integrity behavior, although vector/raw-image layout is known"
-  ]
+  ],
+  "stock_rfid_manager_state": {
+    "base_address": "0x200001f0",
+    "confidence": "high",
+    "fields": {
+      "0": {
+        "role": "authenticated-sector cache / invalidation byte used by low-level MIFARE helper",
+        "evidence": [
+          "0x0801A3AC read",
+          "0x0801A3C2 write",
+          "0x080195D2 writes 0x40 after successful reader probe"
+        ]
+      },
+      "1": {
+        "role": "stock state/gate byte used by 0x0801A7F8",
+        "confidence": "partial"
+      },
+      "2": {
+        "role": "active stock RFID logical slot",
+        "busy_when": "0..3",
+        "idle_when": ">=4",
+        "evidence": [
+          "0x0801AA0E writes requested slot index r5 to [0x200001F0+2]",
+          "0x0801ACA6 reads [0x200001F0+2] in the RFID manager task and 0x0801ACAA compares it with 4",
+          "0x0801A9B2 writes 4 to [0x200001F0+2] on manager completion/reset"
+        ]
+      }
+    },
+    "low_level_locking": {
+      "fm17622_bitbang_mutex_found": false,
+      "note": "No mutex/lock was identified in 0x08018C20..0x08018E3A. The driver directly toggles GPIO and uses short delays."
+    },
+    "diagnostic_guard": {
+      "candidate_revision": "2.1",
+      "behavior": "POLL/READ/READ_AUTH return status 7 when active-slot byte is <4; INFO/CACHE/STOCK_STATE remain passive",
+      "residual_risk": "state check is not an atomic mutex; a stock transition starting after the check remains a theoretical race"
+    }
+  }
 }
