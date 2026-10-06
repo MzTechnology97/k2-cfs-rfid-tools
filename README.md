@@ -11,6 +11,7 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 - [Experimental RFID protocol](docs/protocol.md)
 - [Stock RFID non-interference policy](docs/non-interference.md)
 - [Stock RFID manager state / v2.1 guard](docs/stock-rfid-state.md)
+- [v2.1 hardware validation and rollback runbook](docs/hardware-validation.md)
 - [Bambu Lab first-test plan](docs/bambu-lab-test-plan.md)
 - [Roadmap toward generic / third-party RFID support](docs/roadmap.md)
 
