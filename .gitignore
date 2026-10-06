@@ -1,0 +1,29 @@
+# Vendor and generated firmware images
+*.bin
+*.hex
+*.uf2
+
+# Local reverse-engineering workspaces
+ghidra_project/
+ghidra_out/
+reverse_engineering/
+work/
+scratch/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Local captures / tag dumps (may contain unique tag identifiers)
+captures/
+dumps/
+*.nfc
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
