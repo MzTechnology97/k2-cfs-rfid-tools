@@ -1,0 +1,234 @@
+{
+  "schema": 1,
+  "target": {
+    "name": "cfs0_050_G32-cfs0_000_153.bin",
+    "size": 175672,
+    "sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+    "application_base": "0x08010000",
+    "initial_msp": "0x20006EE8",
+    "reset_vector": "0x0801A969",
+    "architecture": "ARM Cortex-M / Thumb",
+    "rtos": "RT-Thread"
+  },
+  "hardware": {
+    "mcu": {
+      "value": "GD32F303VET6",
+      "confidence": "high",
+      "evidence": [
+        "firmware gd32_* drivers",
+        "independent CFS motherboard reverse engineering"
+      ]
+    },
+    "rfid_frontend": {
+      "value": "Fudan FM17622",
+      "confidence": "high",
+      "evidence": [
+        "firmware string fm176xx",
+        "independent reader-board identification"
+      ]
+    },
+    "reader_count_physical": 2,
+    "slots_per_reader": 2,
+    "logical_slot_count": 4,
+    "bus": {
+      "type": "two-wire I2C-like bit-banged",
+      "confidence": "high",
+      "firmware_primitives": [
+        "0x08018C3C",
+        "0x08018C74",
+        "0x08018CAE",
+        "0x08018D48"
+      ],
+      "address_bytes": {
+        "write": "0x50",
+        "read": "0x51"
+      },
+      "pcb_gpio_pairs": [
+        "PB10/PB11",
+        "PB8/PB9"
+      ],
+      "note": "embedded PB12..PB15 SPI test strings belong to another subsystem and are not the RFID reader transport"
+    },
+    "optional_security_chip": {
+      "value": "FM15L013",
+      "confidence": "high",
+      "role": "higher authentication/security layer, not RF frontend"
+    }
+  },
+  "rf_primitives": [
+    {
+      "address": "0x08018DD4",
+      "name": "inferred_fm176xx_set_reg",
+      "confidence": "high"
+    },
+    {
+      "address": "0x08018E3A",
+      "name": "inferred_fm176xx_get_reg",
+      "confidence": "high"
+    },
+    {
+      "address": "0x08018F0A",
+      "name": "inferred_rfid_soft_reset",
+      "confidence": "high"
+    },
+    {
+      "address": "0x080190E4",
+      "name": "inferred_rfid_reader_init",
+      "confidence": "high"
+    },
+    {
+      "address": "0x0801919A",
+      "name": "inferred_iso14443a_request",
+      "confidence": "high"
+    },
+    {
+      "address": "0x08019224",
+      "name": "inferred_anticollision_cl1",
+      "confidence": "high"
+    },
+    {
+      "address": "0x080192EA",
+      "name": "inferred_anticollision_cl2",
+      "confidence": "high"
+    },
+    {
+      "address": "0x080193B4",
+      "name": "inferred_select_cl1",
+      "confidence": "high"
+    },
+    {
+      "address": "0x08019478",
+      "name": "inferred_select_cl2",
+      "confidence": "high"
+    },
+    {
+      "address": "0x0801953C",
+      "name": "inferred_detect_select",
+      "confidence": "high"
+    },
+    {
+      "address": "0x0801959E",
+      "name": "inferred_reader_probe",
+      "confidence": "high"
+    },
+    {
+      "address": "0x080195D8",
+      "name": "inferred_mifare_auth_key_a",
+      "confidence": "high"
+    },
+    {
+      "address": "0x08019824",
+      "name": "inferred_mifare_read_block",
+      "confidence": "high"
+    },
+    {
+      "address": "0x080198E6",
+      "name": "inferred_mifare_read_block_variant",
+      "confidence": "high"
+    },
+    {
+      "address": "0x0801970E",
+      "name": "inferred_mifare_write_block_FORBIDDEN",
+      "confidence": "high"
+    }
+  ],
+  "stock_rf_commands": {
+    "request": [
+      "52"
+    ],
+    "anticollision_cl1": [
+      "93",
+      "20"
+    ],
+    "select_cl1": [
+      "93",
+      "70"
+    ],
+    "anticollision_cl2": [
+      "95",
+      "20"
+    ],
+    "select_cl2": [
+      "95",
+      "70"
+    ],
+    "auth_key_a": [
+      "60"
+    ],
+    "read_block": [
+      "30"
+    ],
+    "write_block_forbidden": [
+      "A0"
+    ]
+  },
+  "detection_status": {
+    "success": 0,
+    "request_failed": 1,
+    "anticollision_failed": 2,
+    "select_failed": 3
+  },
+  "card_cache": {
+    "record_size": 16,
+    "records_per_reader": 2,
+    "reader_stride": 32,
+    "offsets": {
+      "atqa": "0..1",
+      "cl1_uid_bytes": "2..5",
+      "cl2_uid_bytes": "6..9",
+      "bcc_work_byte": 13,
+      "final_sak": 14
+    },
+    "note": "BCC offset 13 is reused by the CL1/CL2 anticollision routines; exact final UID normalization remains a host/ABI design item"
+  },
+  "cfs_protocol": {
+    "parser": "0x0801C880",
+    "crc_verify": "0x0801BAA4",
+    "response_builder": "0x0801BAF2",
+    "length_validator": "0x0801BBC2",
+    "dispatcher_region": "0x0801C2A0..0x0801C812",
+    "framing": "F7 | address | length | status | opcode | data... | CRC",
+    "candidate_diagnostic_opcode": "0x57",
+    "candidate_reason": "invalid/fallback in 142, 150 and 153; no dedicated stock handler",
+    "opcode_5c_note": "16-byte BL24Cxx EEPROM write/readback diagnostic; not RFID raw"
+  },
+  "version_comparison": {
+    "113": {
+      "size": 151724,
+      "sha256": "386a1106391a332e6a97803c5ce00b87b6d3ddc4c3d61f6fe07fb19fd3125b76"
+    },
+    "142": {
+      "size": 174820,
+      "sha256": "e40c9971b2d487b6710c940ac831545f92fafc5b88a22fe4c7d9e35f0e086439",
+      "opcode_57": "invalid/fallback"
+    },
+    "150": {
+      "size": 175104,
+      "sha256": "bde552ef5056037989457e294f88cfa7590b4c9251cda5e40adf0a4fae46c5a3",
+      "opcode_57": "invalid/fallback"
+    },
+    "153": {
+      "size": 175672,
+      "sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+      "opcode_57": "invalid/fallback",
+      "change": "adds explicit opcode 0x52 high-range handling"
+    }
+  },
+  "safety": {
+    "phase": "A reverse engineering",
+    "flash_performed": false,
+    "live_command_test_performed": false,
+    "write_exposure_allowed": false,
+    "forbidden_internal_addresses": [
+      "0x0801970E",
+      "0x08017F7E"
+    ],
+    "raw_transceive_status": "deferred pending FIFO/error/collision/CRC/parity/timeout register mapping"
+  },
+  "open_questions": [
+    "exact FM17622 error/collision/IRQ register semantics used by this driver",
+    "safe synchronization against stock RFID polling task",
+    "final normalized UID construction for cascade-level tags",
+    "loader/application maximum accepted image size and integrity behavior, although vector/raw-image layout is known"
+  ]
+}
