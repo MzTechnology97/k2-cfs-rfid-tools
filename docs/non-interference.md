@@ -146,3 +146,29 @@ stock Creality RFID behavior remains unchanged
 ```
 
 Any regression in normal proprietary tag reading blocks further testing and requires rollback to the original CFS image.
+
+
+## v2.1 stock-state guard
+
+Further static analysis recovered the stock manager's active-slot state at:
+
+```text
+0x200001F2
+```
+
+Evidence:
+
+```text
+0x0801AA0E  writes the selected logical slot 0..3
+0x0801ACA6  stock manager task reads the byte
+0x0801ACAA  stock manager compares it with 4
+0x0801A9B2  completion/reset writes 4
+```
+
+The v2.1 candidate therefore rejects active diagnostic RF commands with status 7 while this byte is below 4.
+
+A new passive `STOCK_STATE` command allows this state to be observed during the first Creality regression test.
+
+This significantly reduces accidental overlap, but it is deliberately not described as full synchronization. The unmodified stock firmware does not participate in a shared diagnostic mutex, so a narrow check-to-use race remains possible.
+
+The hardware-validation rule remains: active diagnostic RFID commands are only used while the printer/CFS is mechanically idle and the stock state has been observed idle.
