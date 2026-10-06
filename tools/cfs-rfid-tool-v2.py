@@ -228,6 +228,11 @@ def main():
     ap.add_argument("--timeout",type=float,default=2.0)
     ap.add_argument("--format",choices=("human","json","hex"),default="human")
     ap.add_argument("--print-frame",action="store_true")
+    ap.add_argument(
+        "--allow-active-rf",
+        action="store_true",
+        help="explicitly allow commands that start an RF transaction; INFO/CACHE stay passive",
+    )
     sub=ap.add_subparsers(dest="cmd",required=True)
     for x in ("info","cache","poll","uid"): sub.add_parser(x)
     p=sub.add_parser("read-block"); p.add_argument("block",type=lambda x:int(x,0))
@@ -238,6 +243,11 @@ def main():
     sub.add_parser("raw-transceive")
     a=ap.parse_args()
     try:
+        active={"poll","uid","read-page","read-block","read-block-auth","read-range","dump"}
+        if a.cmd in active and not a.allow_active_rf and not a.print_frame:
+            raise RuntimeError(
+                "active RF command refused: rerun with --allow-active-rf after verifying stock CFS RFID is idle"
+            )
         if a.cmd=="raw-transceive":
             raise RuntimeError("RAW_TRANSCEIVE is intentionally disabled in diagnostic API v2 pending RF error/collision/CRC mapping")
         if a.cmd=="uid":
