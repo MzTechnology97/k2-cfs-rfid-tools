@@ -6,6 +6,7 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 
 ## Documentation
 
+- [RFID architecture](docs/architecture.md)
 - [Reverse-engineering status](docs/reverse-engineering.md)
 - [Experimental RFID protocol](docs/protocol.md)
 - [Roadmap toward generic / third-party RFID support](docs/roadmap.md)
