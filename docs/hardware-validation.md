@@ -119,6 +119,68 @@ The stock RS-485 updater owns flash placement; the host does not transmit an arb
 
 However, interrupted-update recovery has **not** been proven to be guaranteed. Therefore rollback preparation is mandatory before any write.
 
+## Flashing path on K2-OpenHost T113 bootstrap
+
+For this project, the CFS image is **not** flashed by a custom writer.
+
+The supported path is the stock Creality updater already present in the K2-OpenHost T113 bootstrap:
+
+```text
+k2oh-mcu-fw wrapper
+    |
+    +-- validates image SHA-256 and target identity
+    +-- obtains stock CFS discovery / UniID
+    +-- writes /tmp/cfs_update.json
+    |
+    v
+/usr/bin/mcu_reset.sh
+/etc/init.d/mcu_update
+/usr/bin/mcu_util_485
+```
+
+The bootstrap now supports same-version custom CFS images explicitly. This is required because the diagnostic candidate is still based on and reports `cfs0_000_153`, so normal version-comparison logic would otherwise skip it as already current.
+
+For the current v2.1 candidate, the intended command shape is:
+
+```bash
+k2oh-mcu-fw apply --cfs \
+  --cfs-image /path/cfs0_050_G32-cfs0_000_153-rfid-diag-ro-v2_1.bin \
+  --cfs-sha256 3cf3385dcbc56960c9fe3adcaff516a7d66a0f8ad2b43b5d47d40c341824549c \
+  --host-evidence '<fresh proof from the external host>'
+```
+
+Optional when needed:
+
+```text
+--cfs-uuid 'xx xx xx xx xx xx xx xx xx xx xx xx'
+```
+
+The UUID option becomes mandatory if stock discovery finds multiple CFS units exposing the same boot/application identity.
+
+The bootstrap path applies the following safety gates before the stock updater is allowed to write:
+
+- `--cfs` is mandatory;
+- `--cfs-image` and `--cfs-sha256` must both be present;
+- the supplied SHA-256 must match the source file;
+- boot token and source application revision are parsed from the filename;
+- the image is copied to a dedicated staged location;
+- the staged copy is hashed again and made read-only;
+- any pending non-CFS firmware difference blocks the custom CFS operation;
+- stock discovery must report exactly the expected boot token and application generation;
+- an ambiguous match requires an explicit CFS UniID;
+- the staged image is verified again immediately before `cfs_update.json` is written.
+
+For the present project this means the live stock discovery must match:
+
+```text
+boot/hardware : cfs0_050_G32
+application   : cfs0_000_153
+```
+
+The wrapper deliberately provides **no generic force option**. A G32/153 diagnostic image cannot be redirected to a G30 unit or to a CFS running another application generation through this path.
+
+The wrapper only selects and validates the target. Erase, firmware transfer, completion handling and application start remain performed by Creality's original `mcu_util_485`.
+
 ## Pre-flash gate
 
 Do not start a firmware write unless every item below is satisfied.
