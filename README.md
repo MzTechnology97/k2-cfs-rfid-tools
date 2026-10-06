@@ -10,6 +10,7 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 - [Reverse-engineering status](docs/reverse-engineering.md)
 - [Experimental RFID protocol](docs/protocol.md)
 - [Stock RFID non-interference policy](docs/non-interference.md)
+- [Stock RFID manager state / v2.1 guard](docs/stock-rfid-state.md)
 - [Bambu Lab first-test plan](docs/bambu-lab-test-plan.md)
 - [Roadmap toward generic / third-party RFID support](docs/roadmap.md)
 
@@ -159,6 +160,42 @@ hardware flash            NOT PERFORMED
 The v2 validator still proves that only the four dispatcher hook bytes differ inside the original stock image and that the original stock jump targets are preserved.
 
 The v2 host client refuses active RF commands unless `--allow-active-rf` is explicitly supplied. Passive `INFO` and `CACHED_TAG_INFO` do not require this flag.
+
+### API v2.1 guarded candidate
+
+The v2.1 candidate adds a passive view of the stock RFID manager state and a firmware-side busy check before active diagnostic RF operations.
+
+Recovered stock state:
+
+```text
+state base        0x200001F0
+active-slot byte  0x200001F2
+
+0..3  stock RFID manager is handling that logical slot
+>=4   no stock slot is currently managed
+```
+
+New diagnostic behavior:
+
+```text
+0x05  STOCK_STATE
+status 7 = stock RFID busy
+```
+
+`POLL`, unauthenticated reads and authenticated reads return status 7 instead of touching the RF frontend when the stock active-slot byte is below 4.
+
+Current local candidate:
+
+```text
+revision                 2.1
+protocol api_version     3
+SHA-256                  3cf3385dcbc56960c9fe3adcaff516a7d66a0f8ad2b43b5d47d40c341824549c
+static validator         PASS
+v2.1 offline tests       7/7 PASS
+hardware flash           NOT PERFORMED
+```
+
+This is a guard, not a shared atomic mutex; controlled-idle hardware testing is still required.
 
 ## Current capabilities
 
