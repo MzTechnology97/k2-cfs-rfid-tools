@@ -1,0 +1,53 @@
+{
+  "ok": true,
+  "errors": [],
+  "source_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "patched_sha256": "0ea0b638efd63b947783460867fe6211b9a150ce8b0ec78e959adef86aeb4357",
+  "source_size": 175672,
+  "patched_size": 176226,
+  "changed_original_offsets": [
+    "0xc3a0",
+    "0xc3a1",
+    "0xc3a2",
+    "0xc3a3"
+  ],
+  "hook": {
+    "address": "0x801c3a0",
+    "target": "0x803ae38"
+  },
+  "handler": {
+    "address": "0x803ae38",
+    "size": 554,
+    "instruction_count": 211
+  },
+  "external_calls": [
+    {
+      "address": "0x801914c",
+      "name": "rfid_mode_cleanup"
+    },
+    {
+      "address": "0x801959e",
+      "name": "reader_probe"
+    },
+    {
+      "address": "0x80195d8",
+      "name": "mifare_auth_key_a"
+    },
+    {
+      "address": "0x8019824",
+      "name": "mifare_read_block"
+    },
+    {
+      "address": "0x801baf2",
+      "name": "rs485_response"
+    }
+  ],
+  "stock_jumps": [
+    "0x801c704",
+    "0x801c7f8",
+    "0x801c808"
+  ],
+  "forbidden_targets": [],
+  "direct_external_bl": [],
+  "flash_performed": false
+}

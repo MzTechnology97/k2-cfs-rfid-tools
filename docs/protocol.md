@@ -270,3 +270,31 @@ When implemented, raw transceive should return the RF status metadata to the hos
 The application-level protocol described here is experimental and versioned independently of Creality's firmware version.
 
 A host tool should always query `INFO` before assuming the availability or semantics of later subcommands.
+
+
+## API v2 development candidate
+
+API v2 preserves the same application opcode and subcommand numbers as v1.
+
+The deliberate differences are:
+
+```text
+INFO api_version              2
+INFO max_read_index           0xFF
+READ_BLOCK unauth index       0x00..0xFF
+READ_BLOCK_AUTH_A block       0x00..0x3F
+```
+
+The authenticated path remains conservatively limited to the original 64-block range.
+
+No new external firmware calls were added. The allowlisted call set remains identical to v1 and still contains no write primitive.
+
+The v2 host tool adds an operator-side active-RF gate. Live commands that initiate a reader transaction require:
+
+```text
+--allow-active-rf
+```
+
+Passive `INFO` and `CACHED_TAG_INFO` remain available without that option.
+
+This guard is intended to prevent accidental interference during early hardware validation. It does not replace future firmware-side synchronization if a stock RFID concurrency condition is identified.
