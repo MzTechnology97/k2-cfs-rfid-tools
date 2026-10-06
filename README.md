@@ -4,6 +4,12 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 
 > **Project status:** research / experimental. No modified firmware published here should be considered production-ready unless explicitly marked as hardware-validated.
 
+## Documentation
+
+- [Reverse-engineering status](docs/reverse-engineering.md)
+- [Experimental RFID protocol](docs/protocol.md)
+- [Roadmap toward generic / third-party RFID support](docs/roadmap.md)
+
 ## Goal
 
 The project aims to make the RFID subsystem of the Creality K2 CFS observable and usable as a more generic RFID reader instead of limiting it to the proprietary spool/tag workflow implemented by the stock firmware.
