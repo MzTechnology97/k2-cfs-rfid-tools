@@ -298,3 +298,68 @@ The v2 host tool adds an operator-side active-RF gate. Live commands that initia
 Passive `INFO` and `CACHED_TAG_INFO` remain available without that option.
 
 This guard is intended to prevent accidental interference during early hardware validation. It does not replace future firmware-side synchronization if a stock RFID concurrency condition is identified.
+
+
+## API v2.1 / protocol v3
+
+The v2.1 candidate keeps application opcode `0x57` and extends the read-only API.
+
+```text
+INFO api_version              3
+INFO capability_flags         0x7F
+READ_BLOCK unauth index       0x00..0xFF
+READ_BLOCK_AUTH_A block       0x00..0x3F
+0x05 STOCK_STATE              passive
+status 7                      stock RFID busy
+```
+
+Two new capability bits are advertised:
+
+```text
+bit 5  passive STOCK_STATE available
+bit 6  stock active-slot guard enabled
+```
+
+### 0x05 STOCK_STATE
+
+Request:
+
+```text
+05
+```
+
+Success returns four bytes beginning at stock RAM address `0x200001F0`.
+
+The current host interpretation is:
+
+```text
+byte 0  low-level auth-sector cache/invalidation byte
+byte 1  stock state/gate byte; exact semantics not fully established
+byte 2  active stock RFID logical slot
+byte 3  additional stock state byte; currently exposed raw
+```
+
+For byte 2:
+
+```text
+0..3  stock RFID manager busy with the corresponding logical slot
+>=4   idle according to the stock manager rule
+```
+
+This command is passive and does not start an RF transaction.
+
+### Busy guard
+
+Before `POLL`, `READ_BLOCK` or `READ_BLOCK_AUTH_A`, the diagnostic handler reads `0x200001F2`.
+
+If the value is below 4, it returns:
+
+```text
+status 7  stock RFID busy
+```
+
+without calling the FM17622 reader-probe/read/authentication helpers.
+
+The guard does not modify the stock RFID manager.
+
+It is not an atomic mutex: a theoretical race still exists if the stock firmware begins a new RFID operation after the state check. Active diagnostics therefore remain restricted to controlled idle testing and still require the host-side `--allow-active-rf` opt-in.
