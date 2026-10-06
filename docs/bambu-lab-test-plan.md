@@ -32,6 +32,22 @@ Key derivation reference:
 
 - https://github.com/Bambu-Research-Group/RFID-Tag-Guide/blob/main/deriveKeys.py
 
+This repository also provides a host-side helper:
+
+```text
+python tools/bambu_keys.py <UID>
+python tools/bambu_keys.py <UID> --sector 0
+```
+
+It is covered by an offline fixture using the public Bambu dump UID `EAFE5CFC`, whose sector-0 keys are publicly visible in that dump:
+
+```text
+Key A 2FC5F17A68A4
+Key B 759F4DF068B6
+```
+
+The helper is not embedded into the CFS firmware.
+
 ## Why Bambu is a useful compatibility test
 
 The test can be divided into independent stages.
