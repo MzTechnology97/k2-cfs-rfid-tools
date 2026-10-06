@@ -9,6 +9,8 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 - [RFID architecture](docs/architecture.md)
 - [Reverse-engineering status](docs/reverse-engineering.md)
 - [Experimental RFID protocol](docs/protocol.md)
+- [Stock RFID non-interference policy](docs/non-interference.md)
+- [Bambu Lab first-test plan](docs/bambu-lab-test-plan.md)
 - [Roadmap toward generic / third-party RFID support](docs/roadmap.md)
 
 ## Goal
@@ -139,6 +141,24 @@ API v1:
 ```
 
 No tag-write operation is exposed.
+
+### API v2 development candidate
+
+A second locally built candidate keeps the same opcode and read-only call boundary while widening only the **unauthenticated** `0x30` read index to the full 8-bit range:
+
+```text
+API version              2
+unauthenticated index    0..255
+authenticated block      0..63
+output SHA-256            0ea0b638efd63b947783460867fe6211b9a150ce8b0ec78e959adef86aeb4357
+static validator          OK
+v2 offline tests          5/5 OK
+hardware flash            NOT PERFORMED
+```
+
+The v2 validator still proves that only the four dispatcher hook bytes differ inside the original stock image and that the original stock jump targets are preserved.
+
+The v2 host client refuses active RF commands unless `--allow-active-rf` is explicitly supplied. Passive `INFO` and `CACHED_TAG_INFO` do not require this flag.
 
 ## Current capabilities
 
