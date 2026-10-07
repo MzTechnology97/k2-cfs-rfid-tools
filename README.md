@@ -2,7 +2,7 @@
 
 Minimal repository for the hardware-validated **Creality K2 Pro CFS RFID v3.3 / API7 stock-capture** implementation.
 
-The project adds Bambu Lab RFID interoperability without replacing Creality's normal RFID worker and without exposing tag-write operations.
+The project adds Bambu Lab RFID interoperability without replacing Creality's normal RFID worker and without exposing tag-write operations. The firmware mechanism itself is deliberately more generic than the current Bambu host extra: API7 can temporarily supply MIFARE Classic Key-A values to Creality's original stock task and capture successful reads for host-side decoding. This creates a path for additional MIFARE Classic filament formats, but only Bambu has been implemented and hardware validated so far.
 
 ## Validated target
 
@@ -72,6 +72,7 @@ host/kalico/
 docs/
   v3.3-stock-capture.md
   standalone-implementation.md
+  third-party-tags.md
 ```
 
 Older experimental API revisions, obsolete test firmware, test suites and superseded builders have intentionally been removed from the main branch.
@@ -81,6 +82,8 @@ Older experimental API revisions, obsolete test firmware, test suites and supers
 For K2-OpenHost/Kalico, use the host extras in `host/kalico/` together with the matching integration now present in the `k2-pro-openhost` branch.
 
 For another firmware or host stack, follow [Standalone implementation guide](docs/standalone-implementation.md).
+
+For the current compatibility boundary and likely future targets such as QIDI, see [Third-party filament RFID/NFC compatibility](docs/third-party-tags.md).
 
 ## Safety boundary
 
