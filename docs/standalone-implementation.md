@@ -7,7 +7,9 @@ The intended audience is someone building a custom host stack, a different Klipp
 The design goal is intentionally narrow:
 
 - keep Creality's stock RFID task in control of the RF frontend;
-- support Bambu Lab MIFARE Classic tags as a fallback when Creality reports an unknown tag;
+- expose a format-neutral MIFARE Classic key-override/capture mechanism;
+- implement Bambu Lab as the first validated host-side decoder/fallback;
+- allow future MIFARE Classic formats to add their own host decoder without embedding vendor tables into CFS firmware where possible;
 - do not add tag writes;
 - do not require a second process to open the RS-485 port;
 - keep the CFS percentage/remaining-filament mechanism unchanged.
@@ -344,6 +346,14 @@ colour  -> #FFFFFF
 The host should normalize the material conservatively from the detailed type.
 
 API7 does not need Bambu block 14. The CFS's own remaining-filament percentage can continue to be used exactly as it is for normal CFS operation.
+
+### Other tag formats
+
+The API7 transport is not intrinsically Bambu-specific. A different MIFARE Classic format can use another Key-A strategy and another host parser while reusing the same stock-task/capture mechanism.
+
+QIDI Box is a particularly promising target because published reverse engineering identifies it as MIFARE Classic 1K with the factory Key A `FFFFFFFFFFFF`, and its material/colour/manufacturer payload begins in block 4, which API7 already captures. It still requires a dedicated host decoder and physical validation before it can be called supported.
+
+OpenSpool, Anycubic ACE, ELEGOO, TigerTag/OpenTag3D and OpenPrintTag use different tag/protocol families and are outside the currently validated API7 MIFARE Classic path. See [Third-party filament RFID/NFC compatibility](third-party-tags.md) for the current matrix and research boundary.
 
 ## 8. RS-485 integration requirements
 
