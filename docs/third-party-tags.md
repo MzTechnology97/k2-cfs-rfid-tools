@@ -1,8 +1,8 @@
 # Third-party filament RFID/NFC compatibility
 
-K2 CFS RFID v3.3 should be understood as a **generic MIFARE Classic stock-task enabler**, not as a Bambu-only firmware.
+I designed K2 CFS RFID v3.3 as a **generic MIFARE Classic stock-task enabler**, not as Bambu-only firmware.
 
-The firmware itself does not contain Bambu material tables or a Bambu parser. API7 gives the host a controlled way to:
+I deliberately kept Bambu material tables and parsing out of the firmware itself. API7 gives the host a controlled way to:
 
 - inspect the CFS-cached tag identity;
 - inject three temporary MIFARE Classic Key-A values into Creality's original RFID task;
@@ -10,7 +10,7 @@ The firmware itself does not contain Bambu material tables or a Bambu parser. AP
 - capture the successful stock reads of blocks 4 and 5 into scratch memory;
 - decode those bytes on the host.
 
-The current `box_rfid_bambu.py` extra is only one host-side decoder/orchestrator built on top of that mechanism.
+The current `box_rfid_bambu.py` extra is the first host-side decoder/orchestrator I built on top of that mechanism.
 
 ## Current support status
 
@@ -59,7 +59,7 @@ Creality result unknown
 -> clear override
 ```
 
-This has **not yet been tested on a physical QIDI spool in the K2 CFS**, so it must not be advertised as supported until hardware validation is completed.
+I have **not yet tested this on a physical QIDI spool in the K2 CFS**, so I do not consider QIDI supported until I complete hardware validation.
 
 ## Why Snapmaker U1 is also interesting
 
@@ -93,7 +93,7 @@ Creality result unknown
 -> clear override
 ```
 
-This remains **unimplemented and untested on K2 CFS hardware**.
+I have not implemented or tested this on K2 CFS hardware yet.
 
 References:
 - https://github.com/SnapmakerResearchGroup/RFID
@@ -168,7 +168,7 @@ The project does, however, establish the architectural pattern needed for future
 
 ## Design principle
 
-The firmware should remain format-neutral where possible.
+I want to keep the firmware format-neutral wherever possible.
 
 Vendor/open-format knowledge belongs on the host:
 
@@ -206,4 +206,4 @@ At the time of writing:
 - **Raise3D**: RFID read/write exists, but the public tag technology remains insufficiently documented.
 - **FlashForge**: no native spool-tag format was confirmed in the public material reviewed.
 
-Do not interpret the presence of a tag format in this document as a claim of working support.
+I do not consider a tag format supported simply because it appears in this document.
