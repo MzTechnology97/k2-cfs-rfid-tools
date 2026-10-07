@@ -1,6 +1,6 @@
 # CFS RFID v3.3 stock-capture firmware
 
-Hardware-validated experimental firmware for the Creality K2 Pro CFS.
+This is the experimental CFS firmware I hardware-validated on my Creality K2 Pro.
 
 ## Identity
 
@@ -17,7 +17,7 @@ handler address      0x0803AE38
 handler size         1072 bytes
 ```
 
-The exact stock source image used to build this patch has SHA-256 `5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea`.
+I built this patch from the exact stock source image with SHA-256 `5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea`.
 
 ## Purpose
 
@@ -49,7 +49,7 @@ This build deliberately exposes no tag writes, UID mutation, sector-trailer writ
 
 ## Hardware validation — 2026-10-07
 
-Tested on the reference K2 Pro with the external CM5/OpenHost architecture and a real Bambu Lab spool.
+I tested it on my K2 Pro with the external CM5/OpenHost architecture and a real Bambu Lab spool.
 
 ```text
 CFS RFID diag API=7 readers=2 slots/reader=2 caps=0xE8 max_index=3 cache_size=16
@@ -63,7 +63,7 @@ detail    PLA Matte
 colour    #FFFFFF
 ```
 
-The manual API7 read succeeded through the original Creality stock RFID task. The full automatic path was then validated:
+I first validated the manual API7 read through Creality's original stock RFID task, then I validated the full automatic path:
 
 ```text
 normal Creality read
@@ -72,7 +72,7 @@ normal Creality read
 -> Bambulab PLA Matte / #FFFFFF applied
 ```
 
-After the test the stock RFID manager returned idle and the shared RS-485 link was healthy with no pending request or consecutive timeout.
+After the test I verified that the stock RFID manager returned idle and that the shared RS-485 link was healthy, with no pending request or consecutive timeout.
 
 The CFS-reported remaining percentage remains authoritative for the slot. API7 v3.3 does not capture Bambu block 14 and does not write usage back to the RFID tag.
 
@@ -82,7 +82,7 @@ The CFS-reported remaining percentage remains authoritative for the slot. API7 v
 - `handler-v3_3.S` — appended handler source used for this candidate.
 - `static-validation.json` — pre-flash structural validation report.
 
-The `flash_performed` field inside `static-validation.json` reflects the state when that static report was generated. Hardware validation was subsequently completed as documented above.
+The `flash_performed` field inside `static-validation.json` reflects the state when that static report was generated. I subsequently completed the hardware validation documented above.
 
 ## Flashing
 
