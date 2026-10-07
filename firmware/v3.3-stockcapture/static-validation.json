@@ -1,0 +1,38 @@
+{
+  "revision": "3.3-stock-task-3key-capture",
+  "source_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "candidate_sha256": "5bab3acff49253a54089e779ea473d2cf587db09ab0d9c07c4d6c2e31b810388",
+  "size": 176744,
+  "declared_length": 176744,
+  "crc16": "0x97E9",
+  "handler_address": "0x0803AE38",
+  "handler_size": 1072,
+  "api": 7,
+  "capabilities": "0xE8",
+  "capture": "legacy stock blocks 4 detail[16] + block 5 RGBA[4] in scratch-only records",
+  "stock_data_fields_modified": false,
+  "direct_host_rf": false,
+  "tag_writes": false,
+  "patched_legacy_calls": [
+    "0x0801A4CC",
+    "0x0801A52C",
+    "0x0801A590"
+  ],
+  "patched_secure_calls": [
+    "0x080225D0",
+    "0x08022604",
+    "0x08022638"
+  ],
+  "changed_regions_original_image": [
+    "0x20C-0x20F",
+    "0xA4CC-0xA4CF",
+    "0xA52C-0xA52F",
+    "0xA590-0xA593",
+    "0xC3A0-0xC3A3",
+    "0x125D0-0x125D3",
+    "0x12604-0x12606",
+    "0x12638-0x1263A"
+  ],
+  "unexpected_existing_changes": 0,
+  "flash_performed": false
+}

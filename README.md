@@ -4,6 +4,13 @@ Reverse engineering, diagnostics, and experimental read-only RFID tooling for th
 
 > **Project status:** research / experimental. No modified firmware published here should be considered production-ready unless explicitly marked as hardware-validated.
 
+## Latest hardware-validated firmware
+
+The current hardware-validated candidate is **v3.3 / API7 stock capture** for `cfs0_050_G32` + `cfs0_000_153`. It keeps Creality's stock RFID task as RF owner and has been validated with a real Bambu Lab PLA Matte tag.
+
+- [v3.3 firmware directory](firmware/v3.3-stockcapture/)
+- [v3.3 stock-capture design and hardware result](docs/v3.3-stock-capture.md)
+
 ## Documentation
 
 - [RFID architecture](docs/architecture.md)
