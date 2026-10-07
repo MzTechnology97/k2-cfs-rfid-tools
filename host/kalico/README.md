@@ -1,11 +1,11 @@
 # Kalico host extras
 
-These are the exact host-side extras used by the K2-OpenHost/Kalico API7 implementation:
+These are the exact host-side extras I use in my K2-OpenHost/Kalico API7 implementation:
 
 - `box_rfid_diag.py` — opcode `0x57` transport, API7 decoding, internal-record access and key-arm/clear operations.
 - `box_rfid_bambu.py` — Bambu HKDF Key-A derivation, API7 stock-task orchestration and material/colour parsing.
 
-They are published here for reference and for porting to other Kalico/Klipper trees.
+I publish them here both as a reference and to make porting to other Kalico/Klipper trees easier.
 
 ## Dependencies
 
@@ -32,7 +32,7 @@ serial: serial485
 address: 1
 ```
 
-For the integrated K2 branch, `[box]` also enables:
+In my integrated K2 branch, `[box]` also enables:
 
 ```ini
 auto_bambu_rfid_fallback: true
