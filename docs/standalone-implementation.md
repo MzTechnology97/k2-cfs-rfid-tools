@@ -1,10 +1,10 @@
 # Standalone implementation guide
 
-This guide describes how to implement the **K2 CFS RFID v3.3 / API7 stock-capture design outside K2-OpenHost**.
+In this guide I describe how I implemented **K2 CFS RFID v3.3 / API7 stock capture** and what is required to reproduce the same approach outside K2-OpenHost.
 
-The intended audience is someone building a custom host stack, a different Klipper/Kalico fork, or another controller that already communicates with the Creality K2 CFS over RS-485.
+I wrote it for anyone building a custom host stack, a different Klipper/Kalico fork, or another controller that already communicates with the Creality K2 CFS over RS-485.
 
-The design goal is intentionally narrow:
+I intentionally kept the design goals narrow:
 
 - keep Creality's stock RFID task in control of the RF frontend;
 - expose a format-neutral MIFARE Classic key-override/capture mechanism;
@@ -16,7 +16,7 @@ The design goal is intentionally narrow:
 
 ## 1. Exact firmware target
 
-v3.3 is validated only for:
+I have validated v3.3 only for:
 
 ```text
 hardware token       cfs0_050_G32
@@ -199,7 +199,7 @@ byte 2  legacy read block 1
 byte 3  legacy read block 2
 ```
 
-The validated hardware returned:
+My validated K2 Pro returned:
 
 ```text
 00 04 05 06
@@ -253,7 +253,7 @@ sector 15 -> bytes 90..95
 
 API7 needs sector 1 for the stock legacy block sequence 4/5/6.
 
-The reference implementation is in `host/kalico/box_rfid_bambu.py`.
+The implementation I currently use is in `host/kalico/box_rfid_bambu.py`.
 
 ## 5. Stock-task capture flow
 
@@ -407,14 +407,14 @@ After Bambu profile identification, keep using the ordinary CFS remaining-percen
 
 ## 10. Kalico reference integration
 
-The exact extras used by the validated implementation are published under:
+I publish the exact extras I use on my validated setup under:
 
 ```text
 host/kalico/box_rfid_diag.py
 host/kalico/box_rfid_bambu.py
 ```
 
-The integrated Kalico branch also adds:
+In my integrated Kalico branch I also added:
 
 - `0x57: RFID_DIAG` to the shared RS-485 command description table;
 - `auto_bambu_rfid_fallback` to `[box]`;
@@ -466,7 +466,7 @@ When rebuilding from stock:
 11. explicitly reject known write primitives;
 12. compare all bytes inside the original image against the expected changed-region list.
 
-The known write functions that must not become reachable from the diagnostic handler include:
+During my validation I explicitly kept these known write functions unreachable from the diagnostic handler:
 
 ```text
 0x0801970E  stock MIFARE write block
