@@ -2,6 +2,9 @@
 *.bin
 *.hex
 *.uf2
+*.o
+*.elf
+*.dis
 
 # Local reverse-engineering workspaces
 ghidra_project/

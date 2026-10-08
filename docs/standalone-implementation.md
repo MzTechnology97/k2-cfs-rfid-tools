@@ -1,6 +1,6 @@
 # Standalone implementation guide
 
-In this guide I describe how I implemented **K2 CFS RFID v3.3 / API7 stock capture** and what is required to reproduce the same approach outside K2-OpenHost.
+In this guide I describe how I implemented **K2 CFS RFID v3.12 / API7** and what is required to reproduce the same approach outside K2-OpenHost.
 
 I wrote it for anyone building a custom host stack, a different Klipper/Kalico fork, or another controller that already communicates with the Creality K2 CFS over RS-485.
 
@@ -12,11 +12,11 @@ I intentionally kept the design goals narrow:
 - allow future MIFARE Classic formats to add their own host decoder without embedding vendor tables into CFS firmware where possible;
 - do not add tag writes;
 - do not require a second process to open the RS-485 port;
-- keep the CFS percentage/remaining-filament mechanism unchanged.
+- reuse the CFS stock geometry/remaining mechanism instead of inventing a host-side percentage.
 
 ## 1. Exact firmware target
 
-I have validated v3.3 only for:
+I have validated the current v3.12 release only for:
 
 ```text
 hardware token       cfs0_050_G32
@@ -27,17 +27,19 @@ stock SHA-256        5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c3
 
 Do not apply the patch logic to another CFS image by offset alone. Re-identify every symbol and callsite first.
 
-Published v3.3 image:
+Published v3.12 image:
 
 ```text
-size                 176744 bytes
-SHA-256              5bab3acff49253a54089e779ea473d2cf587db09ab0d9c07c4d6c2e31b810388
-container CRC16      0x97E9
+size                 177400 bytes
+SHA-256              fe436e33a3b86339673b559d345703593e1a8e9ec3237261027e9ae48d048198
+container CRC16      0x1609
 handler address      0x0803AE38
-handler size         1072 bytes
+handler size         1728 bytes
 API                   7
 capabilities          0xE8
 ```
+
+The published v3.12 builder rebuilds directly from my hardware-validated v3.3 binary, so none of the intermediate development candidates are required.
 
 ## 2. Firmware architecture
 
@@ -345,7 +347,7 @@ colour  -> #FFFFFF
 
 The host should normalize the material conservatively from the detailed type.
 
-API7 does not need Bambu block 14. The CFS's own remaining-filament percentage can continue to be used exactly as it is for normal CFS operation.
+v3.12 does not need Bambu block 14. I reuse the CFS's own geometry-derived remaining percentage. For a completed third-party capture the firmware carries a transient validity latch into the stock remaining phase, initializes stock runtime type 4 with a 330 m nominal reference, and leaves `CMD 0x03` as the host-facing interface.
 
 ### Other tag formats
 
@@ -403,7 +405,7 @@ This must invoke Creality's existing CFS force-read command, not a new host-side
 
 Keep the normal Creality/CFS result as primary. Only when the stock record is empty/unknown should Bambu fallback run.
 
-After Bambu profile identification, keep using the ordinary CFS remaining-percentage query. Do not infer remaining percentage from Bambu block 14 unless you intentionally implement a separate consumption estimator.
+After Bambu profile identification, keep using the ordinary CFS remaining-percentage query. With v3.12 the CFS itself initializes the third-party type-4 runtime from its stock geometry estimate, so the host still reads the ordinary `CMD 0x03` value. I do not infer remaining percentage from Bambu block 14.
 
 ## 10. Kalico reference integration
 
@@ -451,20 +453,26 @@ The published handler source is linked at:
 
 The validated image changes only the documented original-image regions plus the appended handler. The static validation report lists those regions.
 
-When rebuilding from stock:
+When rebuilding the cumulative v3.12 image:
 
-1. require the exact stock SHA-256;
+1. require the exact hardware-validated v3.3 base SHA-256;
 2. verify every expected original instruction before patching;
-3. patch the dispatcher at `0x0801C3A0` to reach the appended handler;
-4. replace the six stock auth/read callsites with the corresponding wrappers;
-5. preserve each original function ABI;
-6. append the handler at the expected aligned application end;
-7. update the CFS container's declared application length;
-8. recompute the container CRC16;
-9. verify reset vector/MSP remain valid;
-10. disassemble the final image and allowlist external calls;
-11. explicitly reject known write primitives;
-12. compare all bytes inside the original image against the expected changed-region list.
+3. repoint the six stock auth/read callsites to the relocated v3.12 wrappers;
+4. patch the guarded UID-consistency callsite at `0x08012DDC`;
+5. patch the guarded stock message-validation callsite at `0x08012E62`;
+6. patch the remaining gate at `0x08013380`;
+7. patch the remaining initializer call at `0x08013394`;
+8. patch only the `CMD 0x03` validity callsite at `0x0801BF9E`;
+9. preserve each original function ABI;
+10. append the handler at the expected aligned application end;
+11. update the CFS container's declared application length;
+12. recompute the container CRC16;
+13. verify reset vector/MSP remain valid;
+14. disassemble the final image and allowlist external calls;
+15. explicitly reject known write primitives;
+16. compare all bytes inside the original image against the expected changed-region list.
+
+The v3.3 base already contains the opcode-`0x57` dispatcher hook, so the published v3.12 builder does not need to patch that dispatcher again.
 
 During my validation I explicitly kept these known write functions unreachable from the diagnostic handler:
 
@@ -488,18 +496,19 @@ Before flashing:
 - no diagnostic path to tag-write/EEPROM-write functions;
 - rollback stock CFS image available.
 
-After flashing, test in this order:
+After flashing, I test in this order:
 
 ```text
 INFO -> expect API7 / 0xE8
 RUNTIME_INFO -> expect legacy backend and blocks 4,5,6
 STOCK_STATE -> idle
 INTERNAL_RECORD -> valid UID/ATQA/SAK
-normal Creality spool -> unchanged behavior
-Bambu spool -> stock result unknown
-manual API7 capture -> complete masks 07/07/00
+normal Creality spool -> unchanged RFID behavior
+Bambu spool -> API7 capture complete masks 07/07/00
 automatic fallback -> material/colour applied
-remaining percentage -> still supplied by CFS
+CMD 0x03 after Bambu reread -> value in 1..100
+Kalico object -> rfid_reported_percent matches CFS value
+normal Creality reread -> stock CMD 0x03 still returns a valid percentage
 reboot/power cycle -> firmware remains installed unless your updater reflashes CFS
 ```
 
@@ -530,9 +539,21 @@ K2-OpenHost slot B explicitly suppresses automatic CFS reflashing; a standalone 
 
 ## 15. Reference files
 
-- firmware image: `firmware/v3.3-stockcapture/cfs0_050_G32-cfs0_000_153-rfid-stockcapture-v3_3.bin`
-- firmware handler: `firmware/v3.3-stockcapture/handler-v3_3.S`
-- static validation: `firmware/v3.3-stockcapture/static-validation.json`
+Current v3.12 release:
+
+- firmware image: `firmware/v3.12-remaining/cfs0_050_G32-cfs0_000_153-rfid-remaining-v3_12.bin`
+- firmware handler: `firmware/v3.12-remaining/handler-v3_12.S`
+- reproducible builder: `firmware/v3.12-remaining/build-v3_12.py`
+- static validation: `firmware/v3.12-remaining/static-validation.json`
+- remaining design/validation: `docs/v3.12-remaining.md`
+
+Host reference:
+
 - Kalico transport extra: `host/kalico/box_rfid_diag.py`
 - Kalico Bambu extra: `host/kalico/box_rfid_bambu.py`
-- design summary: `docs/v3.3-stock-capture.md`
+- generic MIFARE/QIDI extra: `host/kalico/box_rfid_mifare.py`
+
+Historical/rebuild base:
+
+- v3.3 image: `firmware/v3.3-stockcapture/cfs0_050_G32-cfs0_000_153-rfid-stockcapture-v3_3.bin`
+- v3.3 design summary: `docs/v3.3-stock-capture.md`

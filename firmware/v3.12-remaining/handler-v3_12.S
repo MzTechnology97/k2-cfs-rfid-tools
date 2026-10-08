@@ -5,6 +5,13 @@
 .equ SEND_RESPONSE,      0x0801BAF2
 .equ LEGACY_AUTH_READ,   0x0801A39E
 .equ ALT_AUTH_READ,      0x08022082
+.equ STOCK_MEMCMP,        0x0803393C
+.equ STOCK_MSG_VALIDATE,  0x0801A670
+.equ STOCK_REMAIN_INIT,   0x0801AA14
+.equ STOCK_REMAIN_VALID,  0x0801245C
+.equ STOCK_REMAIN_GATE,   0x080102E2
+.equ REMAIN_SET,          0x080123E4
+.equ REMAIN_RUNTIME,      0x20004590
 .equ STOCK_51,           0x0801C704
 .equ STOCK_INVALID,      0x0801C7F8
 .equ STOCK_DONE,         0x0801C808
@@ -12,13 +19,12 @@
 .equ BLOCK_TABLE,        0x200001F8
 .equ HW_FLAG,            0x20000000
 .equ INTERNAL_RECORD,    0x20004460
-.equ STOCK_DB_BASE,      0x2000391C
-.equ REMAIN_RUNTIME,     0x20004590
 .equ RECORD_SIZE,        76
 .equ OVERRIDE_MAGIC,     0x324F324B  @ "K2O2"
 .equ NEIGH_MAGIC,        0x324E324B  @ "K2N2"
 .equ CAP1_MAGIC,         0x3343324B  @ "K2C3"
 .equ CAP2_MAGIC,         0x3344324B  @ "K2D3"
+.equ REMAIN_LATCH_MAGIC, 0x4C52324B  @ "K2RL"
 
 @ API7
 @ 0 INFO
@@ -27,7 +33,6 @@
 @ 7 ARM_KEYS3: reader,slot,key0[6],key1[6],key2[6]
 @ 8 CLEAR_KEYS: reader,slot
 @ 9 RUNTIME_INFO: hw_flag, legacy_block0, legacy_block1, legacy_block2
-@ 10 REMAIN_STATE: reader,slot -> 40-byte read-only stock remaining snapshot
 @
 @ No RFID operation is started from opcode 0x57. The six patched stock read
 @ callsites remain inside Creality's original RFID worker/task:
@@ -48,6 +53,11 @@
 .global legacy_read1_wrapper
 .global legacy_read2_wrapper
 .global alt_read_wrapper
+.global uid_compare_wrapper
+.global msg_validate_wrapper
+.global remaining_init_wrapper
+.global remaining_valid_wrapper
+.global remaining_gate_wrapper
 .type handler_start,%function
 .thumb_func
 handler_start:
@@ -57,7 +67,7 @@ handler_start:
     bne     stock_invalid
 
     push    {r5-r7, lr}
-    sub     sp, #40
+    sub     sp, #8
     ldrb    r5, [r4, #4]
     cmp     r5, #0
     beq     op_info
@@ -71,8 +81,6 @@ handler_start:
     beq     op_clear
     cmp     r5, #9
     beq     op_runtime
-    cmp     r5, #10
-    beq     op_remain_state
     b       status_bad
 
 op_info:
@@ -190,102 +198,6 @@ op_runtime:
     movs    r1, #0
     b       send
 
-op_remain_state:
-    @ body length = 3 common + payload(subcommand,reader,slot) = 6
-    @ Payload layout (all read-only):
-    @   0 stock state byte, 1 stock remaining byte, 2 internal byte75,
-    @   3 runtime type(+99), 4 initial percent(+20), 5 flag(+21),
-    @   6 mode(+22), 7 valid(+23), 8 secondary percent(+32),
-    @   9 stock record first byte, 10 runtime record first byte, 11 reserved,
-    @   12 used/count(+0) u32 LE, 16 total_mm(+4) u32 LE,
-    @   20 alternate_total(+28) u32 LE, 24 usage(+36) u32 LE,
-    @   28 status(+40) u32 LE, 32 runtime len[4], 36 stock len[4].
-    ldrb    r0, [r4, #1]
-    cmp     r0, #6
-    bne     status_bad
-    bl      validate_slot
-
-    @ logical slot = reader*2 + local
-    lsls    r5, r6, #1
-    adds    r5, r5, r7
-
-    @ Zero whole response first.
-    movs    r0, #0
-    str     r0, [sp, #0]
-    str     r0, [sp, #4]
-    str     r0, [sp, #8]
-    str     r0, [sp, #12]
-    str     r0, [sp, #16]
-    str     r0, [sp, #20]
-    str     r0, [sp, #24]
-    str     r0, [sp, #28]
-    str     r0, [sp, #32]
-    str     r0, [sp, #36]
-
-    @ Stock state / remaining table at 0x2000391c.
-    ldr     r0, stock_db_base_ptr
-    add.w   r1, r0, #2
-    ldrb    r1, [r1, r5]
-    strb    r1, [sp, #0]
-    add.w   r1, r0, #0x58
-    ldrb    r1, [r1, r5]
-    strb    r1, [sp, #1]
-
-    @ Stock 40-byte record: first byte + 4-byte nominal length field.
-    mov     r2, r5
-    movs    r3, #40
-    muls    r2, r3
-    adds    r2, r2, r0
-    add.w   r2, r2, #0x5c
-    ldrb    r3, [r2, #0]
-    strb    r3, [sp, #9]
-    ldr     r3, [r2, #24]
-    str     r3, [sp, #36]
-
-    @ INTERNAL_RECORD byte75.
-    bl      internal_ptr
-    ldrb    r0, [r2, #75]
-    strb    r0, [sp, #2]
-
-    @ Runtime = 0x20004590 + logical_slot*100.
-    mov     r0, r5
-    movs    r1, #100
-    muls    r0, r1
-    ldr     r1, remain_runtime_ptr
-    adds    r0, r0, r1
-
-    ldrb    r1, [r0, #99]
-    strb    r1, [sp, #3]
-    ldrb    r1, [r0, #20]
-    strb    r1, [sp, #4]
-    ldrb    r1, [r0, #21]
-    strb    r1, [sp, #5]
-    ldrb    r1, [r0, #22]
-    strb    r1, [sp, #6]
-    ldrb    r1, [r0, #23]
-    strb    r1, [sp, #7]
-    ldrb    r1, [r0, #32]
-    strb    r1, [sp, #8]
-    ldrb    r1, [r0, #24]
-    strb    r1, [sp, #10]
-    ldr     r1, [r0, #0]
-    str     r1, [sp, #12]
-    ldr     r1, [r0, #4]
-    str     r1, [sp, #16]
-    ldr     r1, [r0, #28]
-    str     r1, [sp, #20]
-    ldr     r1, [r0, #36]
-    str     r1, [sp, #24]
-    ldr     r1, [r0, #40]
-    str     r1, [sp, #28]
-    ldr     r1, [r0, #68]
-    str     r1, [sp, #32]
-
-    mov     r2, sp
-    movs    r3, #40
-    movs    r1, #0
-    b       send
-
 op_arm3:
     @ body length = 3 common + payload(21) = 24
     ldrb    r0, [r4, #1]
@@ -370,7 +282,7 @@ send_empty:
 send:
     movs    r0, #0x57
     bl      SEND_RESPONSE
-    add     sp, #40
+    add     sp, #8
     pop     {r5-r7, lr}
     b.w     STOCK_DONE
 
@@ -552,6 +464,8 @@ update_result:
     bne     update_done
     mov     r0, r4
     bl      disarm_preserve_capture
+    ldr     r0, remain_latch_magic_word
+    str     r0, [r4, #12]          @ pre-geometry K2RL latch
     b       update_done
 update_fail:
     ldrb    ip, [r4, #11]
@@ -560,6 +474,422 @@ update_fail:
     mov     r0, r4
     bl      disarm_preserve_result
 update_done:
+    pop     {r4-r6, pc}
+
+@ -----------------------------------------------------------------------
+@ Stock UID-consistency wrapper used only by the spool-positioning state
+@ machine at 0x08012DDC.
+@
+@ ABI is memcmp(a,b,len). The stock comparison is always executed first.
+@ A mismatch is suppressed only when:
+@   - len is exactly the four-byte MIFARE UID used by this state machine;
+@   - an API7 target record has hitmask=07, okmask=07, failmask=00;
+@   - CAP1/CAP2 contain the K2C3/K2D3 legacy-capture markers;
+@   - the completed record is the stock task's current active logical slot;
+@   - that completed target's current cached UID matches either compared UID.
+@
+@ This makes a completed third-party stock-task capture terminal for the
+@ current read cycle, while leaving Creality reads and genuine RF failures
+@ untouched. No stock record, odometer field, motor state or RFID tag is
+@ modified here.
+@ -----------------------------------------------------------------------
+.thumb_func
+uid_compare_wrapper:
+    push    {r4-r7, lr}
+    sub     sp, #8
+    mov     r4, r0                  @ uid A
+    mov     r5, r1                  @ uid B
+    mov     r6, r2                  @ length
+    bl      STOCK_MEMCMP
+    str     r0, [sp]
+    cbz     r0, uidcmp_return
+    cmp     r6, #4
+    bne     uidcmp_return
+
+    ldr     r6, internal_base
+    movs    r7, #4
+    movs    r0, #0
+    str     r0, [sp, #4]           @ logical record index
+uidcmp_scan:
+    @ Only the record for the stock task's current active logical slot may
+    @ terminate its UID consistency retry.
+    ldr     r0, state_base
+    ldrb    r0, [r0, #2]           @ STOCK_STATE.active_slot_raw
+    ldr     r2, [sp, #4]
+    cmp     r0, r2
+    bne     uidcmp_next
+
+    ldrb    r0, [r6, #9]           @ hitmask
+    cmp     r0, #7
+    bne     uidcmp_next
+    ldrb    r0, [r6, #10]          @ okmask
+    cmp     r0, #7
+    bne     uidcmp_next
+    ldrb    r0, [r6, #11]          @ failmask
+    cmp     r0, #0
+    bne     uidcmp_next
+
+    @ Require the two legacy-capture markers as well. This deliberately
+    @ excludes secure-backend result masks and any partial/stale scratch.
+    mov     r0, r6
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr            @ target+2 = CAP1
+    ldr     r0, [r1, #4]
+    ldr     r2, cap1_magic_word
+    cmp     r0, r2
+    bne     uidcmp_next
+    mov     r0, r1
+    bl      neighbor_ptr            @ target+3 = CAP2
+    ldr     r0, [r1, #4]
+    ldr     r2, cap2_magic_word
+    cmp     r0, r2
+    bne     uidcmp_next
+
+    add.w   r0, r6, #62            @ cached four-byte UID
+    mov     r1, r4
+    movs    r2, #4
+    bl      STOCK_MEMCMP
+    cbz     r0, uidcmp_accept
+
+    add.w   r0, r6, #62
+    mov     r1, r5
+    movs    r2, #4
+    bl      STOCK_MEMCMP
+    cbz     r0, uidcmp_accept
+
+uidcmp_next:
+    ldr     r0, [sp, #4]
+    adds    r0, r0, #1
+    str     r0, [sp, #4]
+    add.w   r6, r6, #RECORD_SIZE
+    subs    r7, r7, #1
+    bne     uidcmp_scan
+
+uidcmp_return:
+    ldr     r0, [sp]
+    add     sp, #8
+    pop     {r4-r7, pc}
+
+uidcmp_accept:
+    movs    r0, #0
+    add     sp, #8
+    pop     {r4-r7, pc}
+
+@ -----------------------------------------------------------------------
+@ Stock message-validation wrapper used by the five-attempt read-message loop
+@ at 0x08012E62.
+@
+@ ABI is identical to 0x0801A670 (reader, reader_slot, max_attempts).
+@ The original stock validator always runs first.
+@
+@ If stock returns success, preserve it unchanged.
+@ If stock returns failure, convert it to success only when the active logical
+@ slot now contains a complete legacy API7 capture:
+@   hitmask=07, okmask=07, failmask=00, K2C3/K2D3 markers.
+@
+@ This terminates only the redundant "read message" retry loop after a
+@ third-party capture has already succeeded. No motor state, stock record,
+@ remaining/odometer state, EEPROM, or RFID tag is modified.
+@ -----------------------------------------------------------------------
+.thumb_func
+msg_validate_wrapper:
+    push    {r4-r7, lr}
+    sub     sp, #4
+    bl      STOCK_MSG_VALIDATE
+    str     r0, [sp]
+    cbz     r0, msgval_return
+
+    ldr     r4, state_base
+    ldrb    r5, [r4, #2]           @ active logical slot
+    cmp     r5, #4
+    bcs     msgval_return
+
+    ldr     r6, internal_base
+    movs    r7, #RECORD_SIZE
+    muls    r5, r7
+    adds    r6, r6, r5
+
+    ldrb    r0, [r6, #9]
+    cmp     r0, #7
+    bne     msgval_return
+    ldrb    r0, [r6, #10]
+    cmp     r0, #7
+    bne     msgval_return
+    ldrb    r0, [r6, #11]
+    cmp     r0, #0
+    bne     msgval_return
+
+    mov     r0, r6
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr            @ active+2 = CAP1
+    ldr     r0, [r1, #4]
+    ldr     r2, cap1_magic_word
+    cmp     r0, r2
+    bne     msgval_return
+    mov     r0, r1
+    bl      neighbor_ptr            @ active+3 = CAP2
+    ldr     r0, [r1, #4]
+    ldr     r2, cap2_magic_word
+    cmp     r0, r2
+    bne     msgval_return
+
+    movs    r0, #0                 @ API7 capture is terminal success
+    add     sp, #4
+    pop     {r4-r7, pc}
+
+msgval_return:
+    ldr     r0, [sp]
+    add     sp, #4
+    pop     {r4-r7, pc}
+
+@ -----------------------------------------------------------------------
+@ Remaining helpers for a completed third-party API7 capture.
+@
+@ The stock RFID positioning code already computes circumference_percent and
+@ area_percent before calling STOCK_REMAIN_INIT(slot, area_percent). For a
+@ third-party tag the only missing input is the Creality ASCII nominal-length
+@ field. Keep the stock geometric area_percent and seed a type-4 runtime with
+@ the reference Creality nominal length of 330 m.
+@
+@ No tag or EEPROM write occurs. A later RFID scan recalibrates the initial
+@ percent from the stock geometry again.
+@ -----------------------------------------------------------------------
+capture_complete_record:
+    @ r0=target record. Return r0=1 for complete legacy API7 capture.
+    push    {r4-r7, lr}
+    mov     r4, r0
+    ldrb    r0, [r4, #9]
+    cmp     r0, #7
+    bne     caprec_no
+    ldrb    r0, [r4, #10]
+    cmp     r0, #7
+    bne     caprec_no
+    ldrb    r0, [r4, #11]
+    cmp     r0, #0
+    bne     caprec_no
+
+    mov     r0, r4
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr
+    ldr     r0, [r1, #4]
+    ldr     r2, cap1_magic_word
+    cmp     r0, r2
+    bne     caprec_no
+    mov     r0, r1
+    bl      neighbor_ptr
+    ldr     r0, [r1, #4]
+    ldr     r2, cap2_magic_word
+    cmp     r0, r2
+    bne     caprec_no
+
+    movs    r0, #1
+    pop     {r4-r7, pc}
+caprec_no:
+    movs    r0, #0
+    pop     {r4-r7, pc}
+
+capture_complete_slot:
+    @ r0=logical slot. Live-capture checker requiring stock active slot match.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     capslot_no
+
+    ldr     r5, state_base
+    ldrb    r5, [r5, #2]
+    cmp     r5, r4
+    bne     capslot_no
+
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    mov     r0, r5
+    bl      capture_complete_record
+    pop     {r4-r6, pc}
+capslot_no:
+    movs    r0, #0
+    pop     {r4-r6, pc}
+
+thirdparty_ready_slot:
+    @ r0=logical slot. Accept either live complete capture or pre-geometry K2RL.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     thirdready_no
+
+    mov     r0, r4
+    bl      capture_complete_slot
+    cbnz    r0, thirdready_yes
+
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    ldr     r0, [r5, #12]
+    ldr     r1, remain_latch_magic_word
+    cmp     r0, r1
+    bne     thirdready_no
+thirdready_yes:
+    movs    r0, #1
+    pop     {r4-r6, pc}
+thirdready_no:
+    movs    r0, #0
+    pop     {r4-r6, pc}
+
+clear_remaining_latch:
+    @ r0=logical slot. Clear only K2RL if present.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     clearlatch_done
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    ldr     r0, [r5, #12]
+    ldr     r1, remain_latch_magic_word
+    cmp     r0, r1
+    bne     clearlatch_done
+    movs    r0, #0
+    str     r0, [r5, #12]
+clearlatch_done:
+    pop     {r4-r6, pc}
+
+.thumb_func
+remaining_gate_wrapper:
+    push    {r4, lr}
+    bl      STOCK_REMAIN_GATE
+    cmp     r0, #1
+    beq     remain_gate_return
+
+    mov     r0, r8                  @ RFID manager logical slot
+    cmp     r0, #4
+    bcs     remain_gate_zero
+    bl      thirdparty_ready_slot
+    cbz     r0, remain_gate_zero
+
+    movs    r0, #1
+    pop     {r4, pc}
+
+remain_gate_zero:
+    movs    r0, #0
+remain_gate_return:
+    pop     {r4, pc}
+
+remaining_runtime_ptr:
+    @ r0=slot -> r0=REMAIN_RUNTIME + slot*100
+    movs    r1, #100
+    muls    r0, r1
+    ldr     r1, remain_runtime_ptr
+    adds    r0, r0, r1
+    bx      lr
+
+.thumb_func
+remaining_init_wrapper:
+    @ ABI identical to STOCK_REMAIN_INIT(slot, initial_percent).
+    push    {r4-r7, lr}
+    mov     r4, r0
+    mov     r5, r1
+
+    mov     r0, r4
+    bl      thirdparty_ready_slot
+    cbz     r0, remain_init_stock
+
+    @ For third-party tags the stock RFID manager may replace the already
+    @ calculated area_percent with 0xFF when its Creality-record gate (r9)
+    @ is not satisfied. The geometric percent was written immediately before
+    @ that gate to state_base + 0x58 + slot. Recover exactly that stock value.
+    cmp     r5, #255
+    bne     remain_init_validate
+    ldr     r0, remain_percent_base
+    ldrb    r5, [r0, r4]
+
+remain_init_validate:
+    @ Accept only a sane stock geometry percentage.
+    cmp     r5, #1
+    blo     remain_init_stock
+    cmp     r5, #100
+    bhi     remain_init_stock
+
+    mov     r0, r4
+    bl      remaining_runtime_ptr
+    mov     r6, r0
+
+    @ Never overwrite a live runtime of another stock type.
+    ldrb    r0, [r6, #23]
+    cbz     r0, remain_init_proxy
+    ldrb    r0, [r6, #99]
+    cmp     r0, #4
+    bne     remain_init_stock
+
+remain_init_proxy:
+    movs    r0, #0
+    str     r0, [r6, #0]           @ used mm since geometric calibration
+    ldr     r1, default_total_mm
+    str     r1, [r6, #4]           @ nominal total = 330000 mm
+    str     r0, [r6, #8]
+    str     r0, [r6, #12]
+    str     r0, [r6, #16]
+    strb    r5, [r6, #20]          @ stock geometry area_percent
+    strb    r0, [r6, #21]
+    strb    r0, [r6, #22]
+    movs    r1, #1
+    strb    r1, [r6, #23]
+    movs    r1, #4
+    strb    r1, [r6, #99]
+
+    mov     r0, r4
+    mov     r1, r5
+    bl      REMAIN_SET
+    mov     r0, r4
+    bl      clear_remaining_latch
+    movs    r0, #0
+    pop     {r4-r7, pc}
+
+remain_init_stock:
+    mov     r0, r4
+    mov     r1, r5
+    bl      STOCK_REMAIN_INIT
+    pop     {r4-r7, pc}
+
+.thumb_func
+remaining_valid_wrapper:
+    @ Used only by CMD_RFID_REMAINING at 0x0801BF9E.
+    @ Preserve stock validity first; additionally accept our live type-4
+    @ runtime when the Creality 40-byte record is intentionally absent.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    bl      STOCK_REMAIN_VALID
+    cbnz    r0, remain_valid_done
+
+    mov     r0, r4
+    bl      remaining_runtime_ptr
+    mov     r5, r0
+    ldrb    r0, [r5, #23]
+    cbz     r0, remain_valid_no
+    ldrb    r0, [r5, #99]
+    cmp     r0, #4
+    bne     remain_valid_no
+    ldr     r0, [r5, #4]
+    movw    r6, #10000
+    cmp     r0, r6
+    blo     remain_valid_no
+    ldrb    r0, [r5, #20]
+    cmp     r0, #1
+    blo     remain_valid_no
+    cmp     r0, #100
+    bhi     remain_valid_no
+
+    mov     r0, r5                  @ caller only tests zero/non-zero
+    pop     {r4-r6, pc}
+
+remain_valid_no:
+    movs    r0, #0
+remain_valid_done:
     pop     {r4-r6, pc}
 
 @ -----------------------------------------------------------------------
@@ -681,14 +1011,15 @@ state_base:       .word STOCK_STATE
 internal_base:    .word INTERNAL_RECORD
 hw_flag_ptr:      .word HW_FLAG
 block_table_ptr:  .word BLOCK_TABLE
-stock_db_base_ptr: .word STOCK_DB_BASE
-remain_runtime_ptr: .word REMAIN_RUNTIME
 magic_word:       .word OVERRIDE_MAGIC
 neigh_magic_word: .word NEIGH_MAGIC
 cap1_magic_word:  .word CAP1_MAGIC
 cap2_magic_word:  .word CAP2_MAGIC
-@ API7: bit3=three-key override, bit4=remaining-state diagnostics,
-@ bit5=state, bit6=stock capture, bit7=internal.
-info_payload: .byte 7, 2, 2, 0xF8, 3, 16
+remain_runtime_ptr: .word REMAIN_RUNTIME
+default_total_mm:   .word 330000
+remain_percent_base: .word 0x20003974
+remain_latch_magic_word: .word REMAIN_LATCH_MAGIC
+@ API7: bit3=three-key override, bit5=state, bit6=stock capture, bit7=internal.
+info_payload: .byte 7, 2, 2, 0xE8, 3, 16
 handler_end:
 .size handler_start, .-handler_start

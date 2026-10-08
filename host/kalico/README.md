@@ -96,3 +96,20 @@ identity=QIDI:PET-CF
 ```
 
 The tag then matched my existing `90003 / Qidi PET-CF` library profile, preserving the profile's pressure advance, maximum flow and temperature while taking the live colour from RFID.
+
+
+## Remaining percentage with CFS v3.12
+
+I did **not** add a new CM5-side remaining algorithm for v3.12.
+
+The CFS firmware now initializes its own stock type-4 remaining runtime for a successful third-party API7 capture. Kalico continues to query the normal CFS `CMD_RFID_REMAINING (0x03)` path and applies any returned value in the normal `0..100` range.
+
+On my hardware validation the Bambu PETG HF slot returned `12`, and the existing object immediately exposed:
+
+```text
+rfid_reported_percent  = 12
+rfid_percent           = 12.0
+rfid_estimated_percent = 12.0
+```
+
+So I do not need an additional host protocol or cache workaround for the v3.12 remaining feature.

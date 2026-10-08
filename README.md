@@ -1,103 +1,171 @@
-# K2 CFS RFID v3.3
+# K2 CFS RFID v3.12
 
-This repository contains my hardware-validated **Creality K2 Pro CFS RFID v3.3 / API7 stock-capture** implementation.
+This repository contains my current hardware-validated **Creality K2 Pro CFS RFID v3.12 / API7** firmware and the host-side work I use with K2-OpenHost/Kalico.
 
-I developed this firmware to add Bambu Lab RFID interoperability without replacing Creality's normal RFID worker and without exposing tag-write operations. I intentionally kept the firmware mechanism more generic than the current Bambu host extra: API7 can temporarily supply MIFARE Classic Key-A values to Creality's original stock task and capture successful reads for host-side decoding. This also gives me a path to support additional MIFARE Classic filament formats; at the moment I have implemented and hardware-validated only Bambu.
+I started this project to add third-party filament RFID interoperability while keeping Creality's original CFS worker in control of the RF frontend. I do not replace the stock RFID task and I do not expose tag-write operations.
 
-## Validated target
+The current v3.12 release includes three pieces of functionality that I have validated on hardware:
 
-```text
-CFS hardware        cfs0_050_G32
-stock application   cfs0_000_153
-stock SHA-256       5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea
-patched size        176744 bytes
-patched SHA-256     5bab3acff49253a54089e779ea473d2cf587db09ab0d9c07c4d6c2e31b810388
-container CRC16     0x97E9
-diagnostic opcode   0x57
-API                 7
-capabilities        0xE8
-```
+- the API7 MIFARE Classic Key-A override/capture path introduced in v3.3;
+- guarded fast-accept handling that removes redundant third-party retry rotations;
+- stock-style **remaining-filament estimation for third-party API7 captures**, using the CFS's own geometry calculation and type-4 runtime odometer.
 
-## What v3.3 does
+Bambu material/colour recognition is hardware validated. QIDI PET-CF recognition through the generic MIFARE decoder is also hardware validated. The new v3.12 remaining path has so far been hardware validated with Bambu.
 
-Creality's original CFS RFID task remains the RF owner.
+## Validated firmware target
 
-For a Bambu-compatible MIFARE Classic 1K tag the host:
-
-1. reads the UID already discovered by the CFS;
-2. derives Bambu sector Key A values;
-3. arms a one-shot API7 key override;
-4. asks the **normal Creality force-read path** to reread that slot;
-5. the firmware substitutes the derived Key A only at the three original stock authentication/read calls;
-6. successful stock reads copy block 4 material detail and block 5 RGBA into scratch bytes;
-7. the host reads those scratch bytes and clears the override.
-
-The ordinary Creality RFID record fields are not modified.
-
-The CFS remains authoritative for the slot's remaining-filament percentage. v3.3 intentionally does not use Bambu block 14 for that purpose.
-
-## Hardware result
-
-I validated this build on 2026-10-07 on my K2 Pro with a real Bambu Lab spool:
+I built and tested this release only against:
 
 ```text
-UID       233A111D
-ATQA      0400
-SAK       08
-material  PLA
-detail    PLA Matte
-colour    #FFFFFF
+CFS hardware          cfs0_050_G32
+stock application     cfs0_000_153
+stock SHA-256         5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea
+
+v3.3 base SHA-256     5bab3acff49253a54089e779ea473d2cf587db09ab0d9c07c4d6c2e31b810388
+v3.12 size            177400 bytes
+v3.12 SHA-256         fe436e33a3b86339673b559d345703593e1a8e9ec3237261027e9ae48d048198
+container CRC16       0x1609
+handler address       0x0803AE38
+handler size          1728 bytes
+diagnostic opcode     0x57
+API                   7
+capabilities          0xE8
 ```
 
-I also validated the complete automatic path:
+I do not recommend applying these offsets to another CFS firmware version. I would re-identify every symbol and callsite first.
+
+## What v3.12 does
+
+### Third-party RFID capture
+
+For a supported MIFARE Classic tag I let the host derive or select the required Key A values, arm API7, and then ask Creality's normal force-read path to perform the RF transaction.
+
+The firmware substitutes the temporary keys only at the original stock authentication/read callsites. Successful reads are copied into API7 scratch for host-side decoding.
+
+The normal Creality record remains untouched.
+
+### Faster third-party reads
+
+I found two independent retry paths in the stock RFID state machine. I added guarded terminal-success handling only after a complete API7 capture, so genuine RF failures and normal Creality reads retain the stock behavior.
+
+This substantially reduced unnecessary spool rotations in my hardware tests.
+
+### Remaining filament
+
+The most important v3.12 change is that I now reuse the **stock CFS geometry calculation** for a third-party spool instead of inventing a host-side percentage.
+
+The CFS already computes an `area_percent` while rotating the spool and stores the current remaining byte at:
 
 ```text
-Creality stock read -> unknown -> API7 Bambu fallback -> Bambulab PLA Matte / #FFFFFF
+0x20003974 + slot
 ```
+
+For a completed third-party API7 read I create a short-lived internal latch before the geometry phase. This lets the stock remaining branch continue even though the tag does not contain a valid Creality 40-byte record.
+
+I then initialize the existing stock type-4 runtime with:
+
+```text
+initial_percent = stock CFS area_percent
+nominal_total   = 330000 mm
+runtime type    = 4
+```
+
+I chose 330 m because the genuine Creality RFID record I recovered from hardware contains `len=0330`.
+
+The existing stock `CMD_RFID_REMAINING (0x03)` then reports the value normally. No Bambu block 14 parsing is required and no new Kalico remaining protocol is needed.
+
+## Hardware validation
+
+On 2026-10-08 I validated the complete v3.12 remaining path on my K2 Pro with a real Bambu PETG HF spool.
+
+After a complete API7 read:
+
+```text
+CMD 0x03 payload      0CFFFFFF
+Bambu slot remaining  12%
+```
+
+The existing Kalico/GUI path received the same value:
+
+```text
+rfid_reported_percent  = 12
+rfid_percent           = 12.0
+rfid_estimated_percent = 12.0
+```
+
+I then reread a genuine Creality RFID spool as a regression check. The stock path remained functional and returned:
+
+```text
+CMD 0x03 payload      FF21FFFF
+Creality slot         33%
+```
+
+An earlier scan of the same Creality spool had returned 38%, which is consistent with this being an approximate geometry-based estimate rather than an absolute measurement.
 
 ## Repository layout
 
 ```text
-firmware/v3.3-stockcapture/
-  cfs0_050_G32-cfs0_000_153-rfid-stockcapture-v3_3.bin
-  handler-v3_3.S
-  static-validation.json
-  README.md
+firmware/
+  v3.12-remaining/
+    cfs0_050_G32-cfs0_000_153-rfid-remaining-v3_12.bin
+    handler-v3_12.S
+    build-v3_12.py
+    link.ld
+    static-validation.json
+
+  v3.3-stockcapture/
+    ... historical hardware-validated API7 base
 
 host/kalico/
   box_rfid_diag.py
   box_rfid_bambu.py
-  README.md
+  box_rfid_mifare.py
 
 docs/
+  v3.12-remaining.md
   v3.3-stock-capture.md
   standalone-implementation.md
   third-party-tags.md
 ```
 
-I removed the older experimental API revisions, obsolete test firmware, test suites and superseded builders from the main branch to keep the repository focused on the current implementation.
+## Rebuilding v3.12
 
-## Using it
+I made the published builder reproducible directly from the **published v3.3 binary**, so the intermediate development builds are not required.
 
-For my K2-OpenHost/Kalico setup, I use the host extras in `host/kalico/` together with the matching integration in the `k2-pro-openhost` branch.
+```text
+cd firmware/v3.12-remaining
 
-If you want to port the same approach to another firmware or host stack, I documented the required steps in the [Standalone implementation guide](docs/standalone-implementation.md).
+python3 build-v3_12.py \
+  --base ../v3.3-stockcapture/cfs0_050_G32-cfs0_000_153-rfid-stockcapture-v3_3.bin \
+  --out cfs0_050_G32-cfs0_000_153-rfid-remaining-v3_12.bin
+```
 
-I keep the current compatibility boundary and the most promising future targets, such as QIDI and Snapmaker, in [Third-party filament RFID/NFC compatibility](docs/third-party-tags.md).
+A clean rebuild produces exactly:
+
+```text
+fe436e33a3b86339673b559d345703593e1a8e9ec3237261027e9ae48d048198
+```
+
+## Documentation
+
+- [v3.12 stock-geometry remaining implementation](docs/v3.12-remaining.md)
+- [Standalone implementation guide](docs/standalone-implementation.md)
+- [Third-party RFID/NFC compatibility](docs/third-party-tags.md)
+- [v3.3 API7 stock-capture history](docs/v3.3-stock-capture.md)
 
 ## Safety boundary
 
-v3.3 has no host-exposed tag-write operation and does not add UID mutation, sector-trailer writes, lock/OTP writes or EEPROM writes. The API7 Bambu path does not perform direct host RF transactions.
+I intentionally keep the third-party path read-only.
 
-This is my independent interoperability/reverse-engineering work and is not affiliated with Creality or Bambu Lab.
+v3.12 does not add:
 
-## Experimental remaining-state research
+- RFID tag writes;
+- UID mutation;
+- sector-trailer writes;
+- lock/OTP writes;
+- EEPROM writes;
+- direct host ownership of the CFS RF frontend.
 
-I am reverse-engineering the stock CFS `CMD_RFID_REMAINING (0x03)` path for Bambu/QIDI tags. The current hardware-validated release remains **v3.3/API7**.
+The known stock MIFARE write routine at `0x0801970E` and EEPROM write routine at `0x08017F7E` are not referenced by the appended handler.
 
-My current findings and the separate **read-only v3.4 diagnostic candidate** are documented in:
-
-- [CFS 1.5.3 remaining-filament reverse engineering](docs/cfs-remaining-reverse-engineering.md)
-- [v3.4 REMAIN_STATE experimental candidate](firmware/v3.4-remainstate-experimental/README.md)
-
-The v3.4 directory intentionally does not replace the v3.3 release. Its hardware-validation status is `pending`, and the stable installer manifest remains pinned to v3.3.
+This is my independent interoperability/reverse-engineering work and is not affiliated with Creality, Bambu Lab or QIDI.

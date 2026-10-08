@@ -1,0 +1,94 @@
+{
+  "base_v33_sha256": "5bab3acff49253a54089e779ea473d2cf587db09ab0d9c07c4d6c2e31b810388",
+  "sha256": "fe436e33a3b86339673b559d345703593e1a8e9ec3237261027e9ae48d048198",
+  "size": 177400,
+  "handler_size": 1728,
+  "crc16": "0x1609",
+  "handler_addr": "0x0803AE38",
+  "nominal_total_mm": 330000,
+  "initial_percent_source": "stock area_percent; K2RL pre-geometry latch + gate override at 0x08013380 + recover 0x20003974+slot when r9 passes 0xFF",
+  "runtime_type": 4,
+  "patches": [
+    {
+      "callsite": "0x0801A4CC",
+      "symbol": "legacy_read0_wrapper",
+      "target": "0x0803B3E8",
+      "before": "20f04cfe",
+      "after": "20f08cff"
+    },
+    {
+      "callsite": "0x0801A52C",
+      "symbol": "legacy_read1_wrapper",
+      "target": "0x0803B3EE",
+      "before": "20f01ffe",
+      "after": "20f05fff"
+    },
+    {
+      "callsite": "0x0801A590",
+      "symbol": "legacy_read2_wrapper",
+      "target": "0x0803B3F4",
+      "before": "20f0f0fd",
+      "after": "20f030ff"
+    },
+    {
+      "callsite": "0x080225D0",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B45A",
+      "before": "18f003fe",
+      "after": "18f043ff"
+    },
+    {
+      "callsite": "0x08022604",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B45A",
+      "before": "18f0e9fd",
+      "after": "18f029ff"
+    },
+    {
+      "callsite": "0x08022638",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B45A",
+      "before": "18f0cffd",
+      "after": "18f00fff"
+    },
+    {
+      "callsite": "0x08012DDC",
+      "symbol": "uid_compare_wrapper",
+      "target": "0x0803B182",
+      "before": "20f0aefd",
+      "after": "28f0d1f9"
+    },
+    {
+      "callsite": "0x08012E62",
+      "symbol": "msg_validate_wrapper",
+      "target": "0x0803B214",
+      "before": "07f005fc",
+      "after": "28f0d7f9"
+    },
+    {
+      "callsite": "0x08013380",
+      "symbol": "remaining_gate_wrapper",
+      "target": "0x0803B31A",
+      "before": "fcf7afff",
+      "after": "27f0cbff"
+    },
+    {
+      "callsite": "0x08013394",
+      "symbol": "remaining_init_wrapper",
+      "target": "0x0803B342",
+      "before": "07f03efb",
+      "after": "27f0d5ff"
+    },
+    {
+      "callsite": "0x0801BF9E",
+      "symbol": "remaining_valid_wrapper",
+      "target": "0x0803B3AE",
+      "before": "f6f75dfa",
+      "after": "1ff006fa"
+    }
+  ],
+  "unexpected_changed_bytes": 0,
+  "tag_writes_added": false,
+  "eeprom_writes_added": false,
+  "host_extra_changes_required": false
+}

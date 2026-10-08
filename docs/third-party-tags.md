@@ -1,6 +1,6 @@
 # Third-party filament RFID/NFC compatibility
 
-I designed K2 CFS RFID v3.3 as a **generic MIFARE Classic stock-task enabler**, not as Bambu-only firmware.
+I designed K2 CFS RFID v3.12 as a **generic MIFARE Classic stock-task enabler**, not as Bambu-only firmware.
 
 I deliberately kept Bambu material tables and parsing out of the firmware itself. API7 gives the host a controlled way to:
 
@@ -14,7 +14,7 @@ The current `box_rfid_bambu.py` extra is the first host-side decoder/orchestrato
 
 ## Current support status
 
-| Format / ecosystem | Tag technology | Current v3.3 status | Notes |
+| Format / ecosystem | Tag technology | Current v3.12 status | Notes |
 | --- | --- | --- | --- |
 | Creality CFS | MIFARE Classic 1K | **Native / unchanged** | Creality's original path remains primary. |
 | Bambu Lab | MIFARE Classic 1K | **Implemented and hardware validated** | API7 + `box_rfid_bambu.py`; material detail and RGBA are captured from blocks 4/5. |
@@ -198,14 +198,14 @@ For now FlashForge should remain unclassified as a CFS RFID-format target.
 
 OpenSpool uses NTAG215/216 Type-2 NFC tags carrying an NDEF JSON payload. That is not the same memory/authentication model as MIFARE Classic 1K.
 
-The current v3.3 firmware hooks Creality's authenticated MIFARE Classic stock read path. It does not implement:
+The current v3.12 firmware still uses Creality's authenticated MIFARE Classic stock read path for this part of the project. It does not implement:
 
 - NTAG page enumeration;
 - NDEF TLV parsing;
 - Type-2 tag memory capture;
 - ISO 15693 / NFC-V access.
 
-So v3.3 **does not currently make the CFS an OpenSpool reader**.
+So v3.12 **does not currently make the CFS an OpenSpool reader**.
 
 The project does, however, establish the architectural pattern needed for future expansion: keep the CFS hardware as the RF frontend, add a narrowly scoped firmware bridge, and decode vendor/open formats on the host. Before adding NTAG/OpenSpool support, the CFS reader IC and stock firmware must first be verified to support the required Type-2 operations.
 
