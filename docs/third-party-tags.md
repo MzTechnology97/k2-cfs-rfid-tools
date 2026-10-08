@@ -18,7 +18,7 @@ The current `box_rfid_bambu.py` extra is the first host-side decoder/orchestrato
 | --- | --- | --- | --- |
 | Creality CFS | MIFARE Classic 1K | **Native / unchanged** | Creality's original path remains primary. |
 | Bambu Lab | MIFARE Classic 1K | **Implemented and hardware validated** | API7 + `box_rfid_bambu.py`; material detail and RGBA are captured from blocks 4/5. |
-| QIDI Box | MIFARE Classic 1K | **Strong candidate; not yet implemented/tested** | Uses factory Key A `FFFFFFFFFFFF`; material, colour and manufacturer are stored in the first three bytes of sector 1 block 4. API7 already captures block 4, so a QIDI host decoder should likely require no new CFS firmware changes. |
+| QIDI Box | MIFARE Classic 1K | **Implemented and hardware validated** | `box_rfid_mifare.py` includes the QIDI decoder. I validated PET-CF on my K2 Pro with the existing v3.3/API7 firmware and no CFS firmware change. |
 | Snapmaker U1 | MIFARE Classic 1K | **Strong candidate; not yet implemented/tested** | Public KDF is available. Material type/subtype are in block 4 and primary RGB begins in block 5, which matches the existing API7 capture window unusually well. Official tags also carry an RSA signature, relevant to authenticity/creation but not basic decoding of a genuine tag. |
 | Anycubic ACE Pro | NTAG213 / MIFARE Ultralight family | **Not supported by current API7 path** | Working third-party generators use NTAG213; requires a Type-2/Ultralight page-read path rather than Classic sector authentication. |
 | ELEGOO filament tags | NTAG213 / NFC Type 2 | **Not supported by current API7 path** | ELEGOO publishes the layout openly, but it is page-based NTAG213 with password/access configuration. |
@@ -80,7 +80,29 @@ The first three block-4 bytes match the published QIDI layout:
 0x01  manufacturer QIDI
 ```
 
-This validates the **RF/authentication/capture path** on real QIDI hardware without any CFS firmware change. I have not yet implemented the QIDI host decoder/profile mapping, so I still do not advertise automatic QIDI spool recognition as supported.
+This validates the **RF/authentication/capture path** on real QIDI hardware without any CFS firmware change.
+
+I subsequently implemented QIDI as the first provider in the generic `box_rfid_mifare.py` host extra. On the same PET-CF spool I validated:
+
+```text
+QIDI PET-CF / Black
+UID             37101573
+identity        QIDI:PET-CF
+library profile 90003 / Qidi PET-CF
+pressure advance 0.034
+max flow         8.0 mm3/s
+target temp      290 C
+```
+
+The normal `_BOX_RFID_READ_SLOT SLOT=0` path also completes successfully after the UID has been classified as QIDI. I persist the UID-to-decoder choice as a routing hint, so a known QIDI tag bypasses the Bambu KDF path on later reads.
+
+I deliberately do **not** try every vendor key strategy automatically on an unknown MIFARE tag. My tests showed that chaining a failed Bambu stock-task capture immediately followed by a QIDI stock-task capture is unnecessarily slow and can leave the second scratch capture incomplete. The first unknown third-party tag is therefore identified explicitly with:
+
+```text
+BOX_RFID_MIFARE_READ SLOT=<global-slot>
+```
+
+After that successful read, future rereads of the same UID are routed directly to the QIDI decoder.
 
 ## Why Snapmaker U1 is also interesting
 
@@ -201,17 +223,18 @@ host extra:
   format detection + authentication/key derivation + field decoding + profile mapping
 ```
 
-This means additional MIFARE Classic formats may be added as separate host extras without embedding brand-specific material tables into the CFS firmware.
-
-Possible future extras:
+I now use `box_rfid_mifare.py` as a generic host-side decoder registry rather than creating one complete RF stack per vendor. QIDI is the first registered decoder. A future Snapmaker decoder can reuse the same API7 transport while providing its own key derivation and parser.
 
 ```text
-box_rfid_qidi.py        # likely reusable with current API7 firmware
-box_rfid_snapmaker.py   # basic material/colour likely reusable with current API7 firmware
-box_rfid_anycubic.py    # requires new Type-2/Ultralight firmware path
-box_rfid_elegoo.py      # requires new Type-2/NTAG firmware path
-box_rfid_openspool.py   # requires new Type-2/NDEF firmware path
-box_rfid_openprinttag.py # production Prusament requires ISO15693/NFC-V support
+box_rfid_mifare.py
+  -> QIDI decoder        # implemented + hardware validated
+  -> Snapmaker decoder   # future provider, same transport
+
+future separate transports:
+  box_rfid_anycubic.py    # requires Type-2/Ultralight firmware path
+  box_rfid_elegoo.py      # requires Type-2/NTAG firmware path
+  box_rfid_openspool.py   # requires Type-2/NDEF firmware path
+  box_rfid_openprinttag.py # production Prusament requires ISO15693/NFC-V
 ```
 
 ## Support wording
@@ -220,7 +243,7 @@ At the time of writing:
 
 - **Creality**: stock/native.
 - **Bambu Lab**: implemented and hardware validated.
-- **QIDI**: API7 authentication and raw block capture are now hardware-validated on a real PET-CF spool; automatic host decoding/profile mapping is still to be implemented.
+- **QIDI**: generic host decoding, profile matching and subsequent automatic rereads are hardware-validated on a real PET-CF spool.
 - **Snapmaker U1**: excellent technical match for basic material/subtype/primary-colour capture; KDF/parser implementation and hardware testing are still required.
 - **Anycubic ACE Pro / ELEGOO**: formats are known, but they use Type-2/Ultralight/NTAG media and require a firmware extension.
 - **Prusa / OpenPrintTag**: open and attractive format, but production Prusament tags use a different RF protocol and require separate reader support.
