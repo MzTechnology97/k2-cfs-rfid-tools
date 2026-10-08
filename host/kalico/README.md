@@ -39,3 +39,28 @@ auto_bambu_rfid_fallback: true
 ```
 
 Automatic fallback is deliberately restricted to API7. Older direct-auth diagnostic APIs are not used automatically.
+
+
+## Structured tag diagnostics
+
+The Bambu extra emits the decoded values through Klipper's G-code responder so they are visible in both the console and `klippy.log`: UID, ATQA/SAK, detailed type, normalized material, expected profile name, colour/RGBA and raw captured block 4 / block 5 bytes.
+
+This is useful when a tag is decoded correctly but the local filament-library naming does not match the tag exactly.
+
+## Persistent association to an existing profile
+
+The integrated K2 branch adds:
+
+```text
+_BOX_RFID_ASSOCIATE SLOT=<global-slot> FILAMENT_ID=<library-id>
+```
+
+The RFID identity is stored in the mapping layer and points to the selected library profile. The library profile remains authoritative for temperatures, pressure advance and max-flow; the live tag remains authoritative for its colour.
+
+## Generic API7 third-party capture
+
+```text
+BOX_RFID_DIAG_STOCK_CAPTURE SLOT=<0..3> KEY0=<12hex> KEY1=<12hex> KEY2=<12hex> CONFIRM=1
+```
+
+This diagnostic keeps RF ownership in the stock CFS worker and returns UID, capture masks, block 4 and the first four bytes of block 5. I use it to investigate additional MIFARE Classic spool formats without embedding vendor-specific parsing into the CFS firmware.
