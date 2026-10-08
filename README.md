@@ -90,3 +90,14 @@ I keep the current compatibility boundary and the most promising future targets,
 v3.3 has no host-exposed tag-write operation and does not add UID mutation, sector-trailer writes, lock/OTP writes or EEPROM writes. The API7 Bambu path does not perform direct host RF transactions.
 
 This is my independent interoperability/reverse-engineering work and is not affiliated with Creality or Bambu Lab.
+
+## Experimental remaining-state research
+
+I am reverse-engineering the stock CFS `CMD_RFID_REMAINING (0x03)` path for Bambu/QIDI tags. The current hardware-validated release remains **v3.3/API7**.
+
+My current findings and the separate **read-only v3.4 diagnostic candidate** are documented in:
+
+- [CFS 1.5.3 remaining-filament reverse engineering](docs/cfs-remaining-reverse-engineering.md)
+- [v3.4 REMAIN_STATE experimental candidate](firmware/v3.4-remainstate-experimental/README.md)
+
+The v3.4 directory intentionally does not replace the v3.3 release. Its hardware-validation status is `pending`, and the stable installer manifest remains pinned to v3.3.
