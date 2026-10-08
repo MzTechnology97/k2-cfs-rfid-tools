@@ -59,7 +59,28 @@ Creality result unknown
 -> clear override
 ```
 
-I have **not yet tested this on a physical QIDI spool in the K2 CFS**, so I do not consider QIDI supported until I complete hardware validation.
+I hardware-tested this path on my K2 Pro with a genuine QIDI PET-CF spool. Using the existing v3.3/API7 firmware and `FFFFFFFFFFFF` for all three stock-task Key A overrides, the capture completed with:
+
+```text
+UID      37101573
+ATQA     0400
+SAK      08
+hitmask  0x07
+okmask   0x07
+failmask 0x00
+block4   25020100000000000000000000000000
+block5   00000000
+```
+
+The first three block-4 bytes match the published QIDI layout:
+
+```text
+0x25  material     PET-CF
+0x02  colour code
+0x01  manufacturer QIDI
+```
+
+This validates the **RF/authentication/capture path** on real QIDI hardware without any CFS firmware change. I have not yet implemented the QIDI host decoder/profile mapping, so I still do not advertise automatic QIDI spool recognition as supported.
 
 ## Why Snapmaker U1 is also interesting
 
@@ -199,7 +220,7 @@ At the time of writing:
 
 - **Creality**: stock/native.
 - **Bambu Lab**: implemented and hardware validated.
-- **QIDI**: excellent technical match for the existing API7 capture mechanism, but not implemented or hardware tested.
+- **QIDI**: API7 authentication and raw block capture are now hardware-validated on a real PET-CF spool; automatic host decoding/profile mapping is still to be implemented.
 - **Snapmaker U1**: excellent technical match for basic material/subtype/primary-colour capture; KDF/parser implementation and hardware testing are still required.
 - **Anycubic ACE Pro / ELEGOO**: formats are known, but they use Type-2/Ultralight/NTAG media and require a firmware extension.
 - **Prusa / OpenPrintTag**: open and attractive format, but production Prusament tags use a different RF protocol and require separate reader support.
