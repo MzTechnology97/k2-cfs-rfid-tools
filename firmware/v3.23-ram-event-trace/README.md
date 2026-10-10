@@ -40,6 +40,33 @@ Test coverage: deterministic ring wrap, chronological readback, freeze, size ass
 - [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) documents why we currently treat `0x0803B800` as an **empirical** maximum: earlier oversized v3.15/v3.16 builds returned invalid advanced defaults, while compact v3.18 and currently installed v3.22 passed on-device verification.
 - No flashable v3.23 BIN has been generated. The only correct next release gate is **verified application flash bounds and RAM/stack mapping**, together with full real logger + IRQ/motor hook validation.
 
+## Connected ring/logger synthetic ARM test
+
+[abi/integrated/](abi/integrated/) goes one step beyond the dummy-register
+callback: a synthetic motor-entry trampoline calls the **actual compiled C
+ring logger** and `cfs_trace_push`, records one fixed-format 16-byte event
+in the 512-byte RAM model, then returns to the *real stock* continuation.
+
+Local Unicorn differential results (2026-10-11): **30/30 cases passed**,
+with an exact header/event record, no memory writes outside the modeled
+ring and stack, and identical caller-visible registers/CPSR/SP/live stack
+versus the stock path. The integrated code footprint is **380 ARM bytes**
+at `-Os`, including the logger and ring helpers; a 4-byte stock redirect
+is built separately. The 380 bytes are intentionally linked at a **fake**
+`0x08050000` address inside the emulator. This is **not** a new safe MCU
+code address or an application image.
+
+To repeat offline, run `sh abi/integrated/run_integrated_offline.sh`. The
+GitHub Actions workflow runs this alongside the earlier dummy callback
+and standalone ring tests.
+
+**Important:** this test does not measure worst-case task stack headroom,
+real-time motor jitter, DMA/IRQ nesting, or event hook coverage. It
+records only a synthetic command event (not independently verified motor
+activity) and uses a ring RAM address that has not been proven safe on
+real hardware. Flash partition boundaries remain unverified, so the
+v3.23 build is NOT installable.
+
 The independent MCU safety issue remains open: https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9
 ## Follow-up forensics (2026-10-11)
 
