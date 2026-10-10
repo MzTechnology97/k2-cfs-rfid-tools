@@ -12,6 +12,12 @@ The current v3.12 release includes three pieces of functionality that I have val
 
 Bambu material/colour recognition is hardware validated. QIDI PET-CF recognition through the generic MIFARE decoder is also hardware validated. The new v3.12 remaining path has so far been hardware validated with Bambu.
 
+## Experimental v3.19 CFS runtime-parameter firmware (2026-10-10)
+
+A **separate, NOT production-ready** v3.19 volatile-RAM bench image is now published under [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md). On an actual K2 Pro CFS the 28 default GET values and feature marker `0xF7` passed; one manual SET/GET/RESET of advanced ID 18 also passed. All other advanced writes and any movement effects remain unvalidated. Advanced motor/RFID movement hooks are disabled. Do not use the v3.19 image for regular CFS operations.
+
+The directory contains a reproducible patched-v3.13 base, the full v3.19 assembly and builder, offline tests, exact SHA-256 and rollback guidance. The companion [Kalico extra](https://github.com/MzTechnology97/kalico-k2pro) and [installer helper manifest](https://github.com/MzTechnology97/k2-openhost-installer-helper) are updated separately. **v3.12 remains the most recently independently validated RFID/motion release.**
+
 ## Validated firmware target
 
 I built and tested this release only against:

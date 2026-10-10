@@ -1,0 +1,14 @@
+{
+  "info": {
+    "status": 0,
+    "payload": "021c01f7"
+  },
+  "default_get_count": 28,
+  "set_get_reset_individual_count": 21,
+  "stock_parameter_writes_rejected": 7,
+  "invalid_bounds_rejected": 42,
+  "corrupt_runtime_value_guarded": true,
+  "get_does_not_modify_storage": true,
+  "busy_state_rejects_set": true,
+  "no_live_hardware_operations": true
+}
