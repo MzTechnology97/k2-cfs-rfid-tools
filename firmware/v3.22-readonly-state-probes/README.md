@@ -1,8 +1,8 @@
 # CFS v3.22 — read-only internal-state probes
 
-**EXPERIMENTAL · NOT FLASHED · NOT A FIX FOR THE INDEPENDENT MCU MOTION GUARD**
+**EXPERIMENTAL · HARDWARE BOOT/READ-ONLY/LOAD/UNLOAD VALIDATED · NOT A FIX FOR THE INDEPENDENT MCU MOTION GUARD**
 
-This branch adds four read-only diagnostic IDs to the existing CFS v3.21 code. It does not change physical motor control, the two v3.20 timing hooks or the firmware's existing SET/RESET guard. The printer remains on v3.21 until a controlled diagnostic installation is explicitly validated.
+This branch adds four read-only diagnostic IDs to the existing CFS v3.21 code. It does not change physical motor control, the two v3.20 timing hooks or the firmware's existing SET/RESET guard. The reference CFS was subsequently flashed with v3.22 `0xD7`, and normal communications and physical operations were validated on 2026-10-10.
 
 Target: `cfs0_050_G32`, application `cfs0_000_153`. The normal CONFIG API is still v2 with **28 configurable parameters**; v3.22 identifies itself through a unique feature byte **`0xD7`**. The paired Kalico host requires this exact signature to read the four diagnostic IDs.
 
@@ -42,6 +42,17 @@ sha256sum CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin
 python3 emulate_v3_22.py
 ```
 
-**No flash, reset, motion or heating was performed while developing the diagnostic firmware.** Any future on-device validation must verify the exact image SHA, installer identity checks, Kalico feature handling, rollback and serial stability before physically correlating candidate bytes with movement. Even successful correlation does not automatically establish an atomic MCU motor-activity interlock.
+**During the offline design and build stage no flash, reset, motion or heating was performed.** Subsequently the operator flashed v3.22 and a heater-free physical load/unload test completed successfully. Any future on-device validation must verify the exact image SHA, installer identity checks, Kalico feature handling, rollback and serial stability before physically correlating candidate bytes with movement. Even successful correlation does not automatically establish an atomic MCU motor-activity interlock.
 
 Tracking issue: [independent motor-activity guard #9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9).
+## 2026-10-10 on-device validation and G-code sampling limitation
+
+After the operator flashed v3.22, initial Klipper startup displayed `NO_RESPONSE` / timeouts. Klipper had been stopped by the updater; starting it and one controlled MCU-rail cycle did not immediately clear the condition. Later the CFS **recovered normal RS485 communications** (exact recovery mechanism not determined). A manual `BOX_CFS_CONFIG_INFO` showed API2/28 with expected feature **`0xD7`** and no runtime error. This supersedes the initial suspected flash failure; there is **no confirmed flash corruption**.
+
+- Eight CFS `IDLE` diagnostic snapshots stable: `motor_candidate=0000:0000`, `task_candidate=0001:0000`.
+- Bambu PLA Basic slot1 physical load **11.435 s**, unload **14.681 s**, both without heater commands, status/sensor checks passed.
+- Final device state: Klipper `ready/standby`, CFS `IDLE`, loaded slot `-1`, head sensor false, feature `0xD7`, 28 normal values, ID7=3200, ID8=700, targets 0, runtime error null.
+- **Sampling caveat:** calls to `BOX_CFS_CONFIG_SNAPSHOT` dispatched at ~0.65s during load/unload were queued by Klipper/Moonraker until the operations completed. They took **10.545 s** and **13.797 s**, respectively, and returned just *after* the movement finished. Their values are therefore **POST-motion samples only**; they cannot establish an independent MCU motor-active predicate.
+- Firmware still has the original v3.21 `BOX_STATE`-based write guard, which was already shown to be insufficient alone during early `feeding_to_buffer`. Keep Kalico's motion/write interlock enabled, auto-apply off, and issue #9 open until an independently timestamped MCU-side activity flag is validated.
+
+Evidence is stored locally on the CM5 as `~/cfs-rfid-v322-readonly-probe-lab/V322_IDLE_BASELINE_HARDWARE.json` and `V322_PHYSICAL_SNAPSHOT_20261010.json`. These device snapshots were not published in full. An event-driven read-only MCU/serial trace is needed to observe candidate bytes *during* movement; another G-code-queued request will not provide valid in-motion data.
