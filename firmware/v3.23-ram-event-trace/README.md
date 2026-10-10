@@ -71,3 +71,63 @@ The independent MCU safety issue remains open: https://github.com/MzTechnology97
 ## Follow-up forensics (2026-10-11)
 
 See [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) for the archived on-device comparison: oversized v3.15/v3.16 firmware returned 65535 for advanced parameters, whereas compact v3.18 and the currently running v3.22 read correctly. This supports a conservative effective address ceiling of `0x0803B800` but does not prove the bootloader's partition map. See [TRAMPOLINE_ABI_STATIC_REVIEW.md](TRAMPOLINE_ABI_STATIC_REVIEW.md) for the proposed motor-entry hook's limited *static* calling-convention analysis; no differential ARM emulator or real firmware hook was validated. The v3.22 linked ELF already omits disabled advanced motor hook wrappers, so removing those wrappers offers no additional image space.
+
+## New memory-map findings and hard build gate (2026-10-11)
+
+The original CFS v3.13 firmware includes a literal pair adjacent to the MCU
+RTOS initialization path at **`0x0802795C` and `0x08027960`**:
+
+- `0x0802795C` contains **`0x20010000`**, the apparent heap upper bound
+- `0x08027960` originally contains **`0x20006EE8`**, the heap start
+- The v3.22 build patches only the second literal to **`0x20006F28`**,
+  reserving `0x20006EE8..0x20006F27` (64 bytes) for volatile overrides
+- A *possible* 512-byte ring reservation would move the heap start forward
+  to **`0x20007128`** (ring `0x20006F28..0x20007127`)
+
+This suggests a structurally coherent reservation but does **not** prove
+available *peak* dynamic heap capacity (37,080 bytes currently vs 36,568
+after the proposed change), RTOS task stack high-water marks, DMA/IRQ safety,
+heap fragmentation or motor activity timing. **No heap-pointer patch for
+v3.23 has been built.**
+
+Added [`memory_gate.py`](memory_gate.py) and
+[`test_memory_gate.py`](test_memory_gate.py), executed by CI.
+`memory_gate.py` checks conservative app size, firmware declared length,
+reset vector and initial SP. Its output **always marks bootloader bounds
+and actual RAM reservation unverified and flash approval false**. It can
+optionally inspect an *already acquired* SWD flash dump and report aligned
+literal values and SHA-256 **without reproducing the raw bytes**. Literal
+occurrences are hypotheses for reverse engineering, **not proof of a
+bootloader app boundary**.
+
+Example read-only usage:
+
+```shell
+python3 memory_gate.py \
+  --app /path/to/existing/CFS-v322-PROBE-UNFLASHED.tmp \
+  --json-out memory_report.json
+
+# Optional ONLY after obtaining a flash dump by an independently vetted
+# physical SWD read-only process; this script never operates the debugger:
+python3 memory_gate.py \
+  --swd-dump /path/to/private_cfs_flash_dump.bin \
+  --dump-base 0x08000000 \
+  --json-out private_flash_literal_report.json
+```
+
+Actual on-CM5 test against the byte-exact v3.22 flash image:
+**178,140 bytes**, SHA-256
+`40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`,
+start `0x08010000`, end `0x0803B7DC`, correct header length
+178,140, plausible SP `0x20006EE8`, Thumb reset vector
+`0x0801A969`. Remaining margin **36 bytes** to the
+**empirically motivated but not bootloader-proven** limit
+`0x0803B800`. The check passed but, correctly, reports
+`safe_to_flash=false`.
+
+Independent community protocol reconstruction documents bootloader
+commands for version, transfer-block size, erase, update and start-app,
+**not an authenticated readout of the flash partition map**:
+https://github.com/Lamar1007/CFSTool/blob/main/PROTOCOL.md .
+A bootloader probe is not a substitute for a safe image/partition readback;
+do not switch the active CFS into bootloader mode simply to infer a maximum.
