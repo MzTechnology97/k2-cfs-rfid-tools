@@ -1,0 +1,107 @@
+{
+  "date_local": "2026-10-10",
+  "hardware": "Creality K2 Pro CFS cfs0_050_G32, app cfs0_000_153",
+  "firmware": "experimental v3.22 0xD7",
+  "objective": "Verify whether a separate Klipper Python worker can read MCU raw diagnostic GET IDs 28–31 during stock physical CFS load/unload while the Moonraker G-code request is blocked",
+  "experiment": "Opt-in Klipper-side capture 1 Hz, fixed four read-only GET requests through existing serial485 worker, no direct /dev access, no SET/RESET, no firmware change, RFID guard exclusion, 36 max samples and timeout stops",
+  "offline_tests": "PASS: fixed GET IDs, no writes, simulated transport failure stops capture and releases RFID owner, standby fail-closed, firmware 0xD7 gating",
+  "idle_pilot": {
+    "pass": true,
+    "samples": 5,
+    "unique_motor_words": [
+      [
+        0,
+        0
+      ]
+    ],
+    "unique_task_words": [
+      [
+        1,
+        0
+      ]
+    ],
+    "read_duration_ms_range": [
+      7.84,
+      9.57
+    ],
+    "errors": 0
+  },
+  "physical": {
+    "load_seconds": 11.299,
+    "unload_seconds": 14.475,
+    "motion_success": true,
+    "slot": 1,
+    "filament": "PLA",
+    "head_sensor_after_unload": false,
+    "records": [
+      {
+        "phase": "idle before load",
+        "query_duration_ms": 7.97,
+        "words": [
+          0,
+          0,
+          1,
+          0
+        ],
+        "operation_active_at_dispatch": false,
+        "operation_active_at_reply": false
+      },
+      {
+        "phase": "load",
+        "query_duration_ms": 10679.96,
+        "words": [
+          0,
+          0,
+          1,
+          0
+        ],
+        "operation_active_at_dispatch": true,
+        "stage_dispatch": "feeding_to_buffer",
+        "operation_active_at_reply": true,
+        "stage_reply": "verifying",
+        "note": "GET response delayed nearly to movement end; not a valid synchronous motor-state sample"
+      },
+      {
+        "phase": "unload",
+        "query_duration_ms": 13567.06,
+        "words": [
+          0,
+          0,
+          1,
+          0
+        ],
+        "operation_active_at_dispatch": true,
+        "stage_dispatch": "retracting_to_cfs",
+        "operation_active_at_reply": false,
+        "stage_reply": null,
+        "note": "GET response after movement completion; definitely not a motor-active sample"
+      }
+    ],
+    "samples_safely_inside_same_motor_stage": 0,
+    "additional_serial_timeouts": 0,
+    "additional_crc_errors": 0,
+    "override_values_changed": false
+  },
+  "root_cause": "serial485 driver itself preserves an exclusive request session for the physical CFS move. A separate host thread waits on the serial request queue even when G-code is independent. A host worker cannot assume serial GETs are sampled while the motors move. Do not bypass session exclusivity.",
+  "state_after_revert": {
+    "klipper": "ready/standby",
+    "cfs": "IDLE",
+    "firmware": "0xD7",
+    "normal_parameters": 28,
+    "id7": 3200,
+    "id8": 700,
+    "loaded_slot": -1,
+    "head_sensor": false,
+    "heaters_off": true
+  },
+  "host_change": "Temporary asynchronous sampler and supplemental RFID threading lock were deployed for tests, then both Python files were atomically reverted to proven v3.22 versions and full Klipper service restarted. No MCU flash was performed.",
+  "next_method": "Prototype ON-MCU in-RAM event ring capture invoked from independently audited original motor-task event hook(s), drained via GET ONLY after movement. This is a new experimental firmware design, not a validated implementation.",
+  "gates_before_any_new_flash": [
+    "Verify MCU SRAM address reservation and stack/heap interactions",
+    "Locate original motor callback execution timing and preserve ABI/interrupt safety",
+    "Validate flash code placement; v3.22 image ends only 36 bytes below hypothesized cap 0x0803B800",
+    "Make ring-buffer writes bounded, monotonic and nonblocking, no EEPROM writes, no host SET authorization by diagnostic values",
+    "Full ARM emulator regression plus recovery/rollback image checks",
+    "Keep v3.22 operational until separately approved real hardware testing"
+  ]
+}
