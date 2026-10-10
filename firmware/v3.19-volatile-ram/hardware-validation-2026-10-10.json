@@ -51,15 +51,36 @@
       "motor_startup": "success on first attempt",
       "active_cfs_loaded_slot": -1,
       "last_error": null
+    },
+    "physical_mcu_rail_power_cycle": {
+      "ok": true,
+      "mechanism": "T113 k2oh-ctl-managed MCU GPIO rail physical power OFF (2 seconds) then ON, followed by Klipper firmware restart; CM5 and T113 remained powered",
+      "gpio_off_observed": true,
+      "gpio_on_observed": true,
+      "controller_cycle_action": "ok",
+      "parameter_id": 18,
+      "default_before": 400,
+      "temporary_ram_override_before": 405,
+      "first_successful_real_cfs_readback_after_reset": 400,
+      "all_28_parameters_restored_to_pre_cycle_baseline": true,
+      "final_printer": "ready/standby",
+      "final_cfs": "IDLE",
+      "firmware_feature_marker": "0xF7",
+      "startup_caveats": [
+        "Initial CFS auto-probe timed out; a subsequent read-only CONFIG_INFO returned correctly.",
+        "Motor control discovery failed on the first attempt and succeeded on the second attempt.",
+        "Transient serial/RS485 timeouts occurred during boot; no remaining runtime CFS error after recovery."
+      ],
+      "hardware_motion_or_heater_commands_executed": false
     }
   },
   "note": "One transient RS-485 timeout occurred during controller discovery after Klipper restart; startup recovered, motor-control completed and follow-up communications succeeded.",
   "unvalidated": [
-    "electrical power-cycle or MCU reset and subsequent RAM boot-clear",
     "real CFS filament load/unload motor behaviour under physical load",
     "RFID spool movement and motion-hook implementation (v3.19 does not enable advanced hooks)",
     "direct MCU range-rejection bypassing host validation",
-    "other firmware and hardware generations"
+    "other firmware and hardware generations",
+    "long-term physical MCU cycling reliability, including serial/motor startup retries observed on the first tested power cycle"
   ],
   "safety": "Use v3.13 for known-good rollback; v3.19 remains experimental."
 }
