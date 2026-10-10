@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-10",
+  "scope": "single Creality K2 Pro CFS; cfs0_050_G32 / cfs0_000_153",
+  "release": "v3.19 volatile RAM bench, experimental not production",
+  "sha256": "6af3ac668f36a81f9d403f10bacfa2124737574307049d502bd2ba44ca959f74",
+  "feature_signature": "0xF7",
+  "hardware_tests": {
+    "first_boot": {
+      "ok": true,
+      "parameter_get": 28
+    },
+    "individual_advanced_set_get_reset": {
+      "ok": true,
+      "passed": 21,
+      "total": 21,
+      "param_ids": "7..27",
+      "status": "each transient override restored to default"
+    },
+    "multi_parameter": {
+      "ok": true,
+      "overrides_simultaneously": 4,
+      "reset_all": true,
+      "restored_values": 28
+    },
+    "host_guard_rejections": {
+      "ok": true,
+      "rejected": 5,
+      "baseline_unchanged": true,
+      "scope": "Kalico host, not direct MCU out-of-range protocol tests"
+    },
+    "read_stress": {
+      "ok": true,
+      "full_catalogue_scans": 60,
+      "device_get_total": 1680,
+      "errors": 0,
+      "mean_scan_seconds": 0.0653,
+      "p95_scan_seconds": 0.0701
+    },
+    "host_restart": {
+      "ok": true,
+      "type": "Klipper host only",
+      "id18_before": 400,
+      "id18_override": 402,
+      "id18_after_reconnect": 402,
+      "id18_restored": 400,
+      "other_values_unchanged": true
+    },
+    "final": {
+      "printer": "ready / standby",
+      "cfs": "IDLE",
+      "motor_startup": "success on first attempt",
+      "active_cfs_loaded_slot": -1,
+      "last_error": null
+    }
+  },
+  "note": "One transient RS-485 timeout occurred during controller discovery after Klipper restart; startup recovered, motor-control completed and follow-up communications succeeded.",
+  "unvalidated": [
+    "electrical power-cycle or MCU reset and subsequent RAM boot-clear",
+    "real CFS filament load/unload motor behaviour under physical load",
+    "RFID spool movement and motion-hook implementation (v3.19 does not enable advanced hooks)",
+    "direct MCU range-rejection bypassing host validation",
+    "other firmware and hardware generations"
+  ],
+  "safety": "Use v3.13 for known-good rollback; v3.19 remains experimental."
+}
