@@ -30,12 +30,14 @@ The firmware reserves `0x20006EE8..0x20006F27` (64 bytes) at the former heap bou
 - **PASS read stability:** 60 full-catalogue scans, **1,680 actual GET requests**, with zero errors or data changes; mean scan response approximately 0.065 s.
 - **PASS host reconnect:** restarting **Klipper only** preserved a temporary ID18 RAM override (400 → 402), and a subsequent RESET returned it to 400 with all 28 baseline values intact. This does **not** validate power cycling the CFS MCU.
 - **PASS in ARM emulation only:** 21 single-ID SET/GET/RESET cycles; 42 out-of-range values rejected; stock IDs 0–6 reject writes; corrupted RAM candidate ignored; busy-state SET rejected; boot-wrapper init contract verified.
-- **NOT YET TESTED:** power cycling/resetting the actual CFS MCU (volatile RAM boot-clear), long-running real filament load/unload and RFID spool movement, motor safety under physical load, firmware bounds rejection bypassing Kalico's host checks, and alternative CFS hardware/firmware generations.
+- **PASS physical MCU rail power-cycle:** via T113 the MCU supply was observed `ON → OFF (2 seconds) → ON`, and `mcu_cycle` returned success. ID 18 was preset `400 → 405`, then read back as **400** after power restoration without issuing RESET; all **28 values** matched their original baseline. CM5/T113 remained powered, Klipper and CFS recovered to `ready/IDLE`.
+- **POST-POWER-CYCLE STARTUP CAVEAT:** CFS startup read initially timed out; a read-only `BOX_CFS_CONFIG_INFO` re-probe succeeded. Motor control discovery succeeded on the **second** startup attempt, with transient RS-485 timeouts. Further boot/reconnect hardening is advisable.
+- **NOT YET TESTED:** repeated/long-term physical MCU power-cycle reliability, real filament load/unload and RFID spool movement, motor safety under physical load, firmware bounds rejection bypassing Kalico's host checks, and alternative CFS hardware/firmware generations.
 
 The `HOST_EXPECTED` label in `BOX_CFS_CONFIG_DIAG` is intentional: default/min/max/type come from Kalico, while GET values come from the CFS. The former v3.15/v3.17 `0xFFFF` incident may involve read access to data beyond the validated firmware footprint; **a specific Creality flash-writer size limit is NOT proven**. The current 178068-byte image has a code end at `0x0803B794` and lies below the hypothesized `0x0803B800` boundary, which is likewise not a verified hardware flash-region limit.
 
 
-The hardware test details are summarized in [`hardware-validation-2026-10-10.json`](hardware-validation-2026-10-10.json). A non-fatal RS-485 discovery timeout was observed once during post-restart motor startup; motor initialization completed on the first attempt, the CFS returned to IDLE and follow-up communication was successful.
+The hardware test details are summarized in [`hardware-validation-2026-10-10.json`](hardware-validation-2026-10-10.json). Following the earlier **Klipper-only** restart, motor startup succeeded on the first attempt. Following the later **electrical MCU rail** cycle, motor startup succeeded on the second attempt after transient serial-discovery timeouts; the CFS returned to IDLE and subsequent communication was successful.
 
 ## Source files and deterministic build
 
