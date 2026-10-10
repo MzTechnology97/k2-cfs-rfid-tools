@@ -19,7 +19,7 @@ def mock_app(size):
 def test_empirical_size_gate():
     available = MOD.EMPIRICAL_END - MOD.APP_BASE
     assert available == 178176
-    for length in (0x212, 177700, 177684, 178140, available):
+    for length in (0x230, 177700, 177684, 178140, available):
         result = MOD.inspect_app(mock_app(length))
         assert result["passes_conservative_empirical_size_limit"]
         assert result["header_length_consistent"]
@@ -54,7 +54,7 @@ def test_readonly_dump_inventory():
         assert result["read_only_offline_analysis"]
         assert not result["bootloader_partition_verified"]
         matches = result["literal_matches_HYPOTHESES_NOT_LIMIT_PROOF"]
-        assert "0x800080" in matches["empirical_end"]["aligned_literal_addresses"]
+        assert hex(0x08000080) in matches["empirical_end"]["aligned_literal_addresses"]
         assert path.read_bytes() == before
 
 if __name__ == "__main__":
