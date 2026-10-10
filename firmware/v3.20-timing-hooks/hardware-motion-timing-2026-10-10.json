@@ -1,0 +1,93 @@
+{
+  "date": "2026-10-10",
+  "firmware": "CFS v3.20, API2/28, feature 0xB7",
+  "target": "Creality K2 Pro CFS cfs0_050_G32 / cfs0_000_153",
+  "setup": {
+    "material": "PLA",
+    "cfs_slot": 1,
+    "heater_targets_celsius": {
+      "nozzle": 0,
+      "bed": 0
+    },
+    "load_command": "BOX_LOAD SLOT=1",
+    "unload_command": "BOX_UNLOAD MANUAL=1",
+    "sampling": "Moonraker box status and printhead filament sensor, approximately 0.25 s resolution",
+    "samples_per_load": [
+      46,
+      46,
+      45
+    ],
+    "samples_per_unload": [
+      59,
+      59,
+      59
+    ]
+  },
+  "data": {
+    "stock": {
+      "id7_ms": 3200,
+      "id8_ms": 700,
+      "load_total_s": 11.531,
+      "feeding_to_printhead_phase_s": 4.42,
+      "printhead_sensor_on_s": 10.941,
+      "unload_total_s": 14.781,
+      "unload_sensor_off_s": 1.16
+    },
+    "id7_changed": {
+      "id7_ms": 6400,
+      "id8_ms": 700,
+      "load_total_s": 11.531,
+      "feeding_to_printhead_phase_s": 7.682,
+      "printhead_sensor_on_s": 11.19,
+      "unload_total_s": 14.782,
+      "unload_sensor_off_s": 1.16
+    },
+    "id8_changed": {
+      "id7_ms": 3200,
+      "id8_ms": 1400,
+      "load_total_s": 11.286,
+      "feeding_to_printhead_phase_s": 4.421,
+      "printhead_sensor_on_s": 10.941,
+      "unload_total_s": 14.779,
+      "unload_sensor_off_s": 0.91
+    }
+  },
+  "deltas": {
+    "id7_phase_transition_seconds": 3.262,
+    "id7_sensor_on_seconds": 0.249,
+    "id7_total_load_seconds": 0,
+    "id8_phase_transition_seconds": 0.001,
+    "id8_sensor_on_seconds": 0,
+    "id8_total_load_seconds": -0.245
+  },
+  "physical_success": {
+    "loaded_and_unloaded_all_three_times": true,
+    "printhead_sensor_verified_each_cycle": true,
+    "heater_or_toolhead_moves_requested": false
+  },
+  "telemetry_limit": "Encoder position remains unchanged in per-poll CFS snapshots during a load/unload, so the time of actual encoder onset was not independently measured. 'feeding_to_printhead' is an application phase marker, not a direct encoder signal. One sample per configuration, so timing jitter/repeatability are not statistically characterized.",
+  "important_bug": {
+    "status": "REPRODUCED, FIX REQUIRED BEFORE MERGE",
+    "symptom": "After a physical load/unload cycle, CONFIG_V2_SET and CONFIG_V2_RESET return 'rejected while stock CFS task is busy' even though box.state is IDLE, loaded_slot=-1 and printhead sensor false",
+    "observed_after": "stock cycle and both changed-parameter cycles",
+    "implication": "Cannot change or clear volatile runtime parameter until true MCU power cycle; host-side IDLE does not match firmware-side write guard.",
+    "safety_action": "Did not bypass busy guard, performed controlled T113 MCU rail cycles to clear volatile overrides; verified default values after each recovery."
+  },
+  "final_condition": {
+    "klipper": "ready/standby",
+    "cfs": "IDLE",
+    "loaded_slot": -1,
+    "printhead_sensor": false,
+    "id7_ms": 3200,
+    "id8_ms": 700,
+    "parameter_count": 28,
+    "last_runtime_error": null,
+    "heater_targets_off": true
+  },
+  "recommendations": [
+    "Keep v3.20 PR draft and do not declare release stable.",
+    "Investigate firmware SET/RESET busy guard transition across real load/unload; compare internal task-state byte after boot vs after load and select a safety-verified idle predicate.",
+    "Expose high-rate encoder samples or firmware phase events for precise encoder-to-printhead-sensor latency measurement.",
+    "Repeat baseline / ID7 / ID8 at least three times after the guard fix; speed experiments require activating separate controlled motor-speed hooks."
+  ]
+}
