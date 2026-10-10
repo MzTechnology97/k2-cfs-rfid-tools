@@ -33,6 +33,13 @@ Test coverage: deterministic ring wrap, chronological readback, freeze, size ass
 5. Implement a GET-only event drain usable **after** movement with no configuration-write permission granted by these diagnostic bytes.
 6. Run complete ARM differential emulation and rollback checks; only then consider controlled hardware tests.
 
+## 2026-10-11 verified offline follow-up
+
+- The synthetic Thumb trampoline's **30 differential ARM ABI test cases passed** locally and in GitHub Actions. Original registers, CPSR, SP and currently live stack bytes matched after rejoining the stock function. The trampoline leaves freed scratch stack bytes modified because it temporarily consumes **32 additional stack bytes**. The test uses a mock register-clobbering callback, *not* the real RAM logger. See [TRAMPOLINE_ABI_STATIC_REVIEW.md](TRAMPOLINE_ABI_STATIC_REVIEW.md) and [ABI sources](abi/).
+- Cross-compiling the independent buffer at `-Os` instead of `-O2` reduces ARM code size from **320 to 280 bytes**, without removing model features. However this remains far too large for the **36-byte** conservative image headroom; any real telemetry hook, clock and readback require still more code.
+- [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) documents why we currently treat `0x0803B800` as an **empirical** maximum: earlier oversized v3.15/v3.16 builds returned invalid advanced defaults, while compact v3.18 and currently installed v3.22 passed on-device verification.
+- No flashable v3.23 BIN has been generated. The only correct next release gate is **verified application flash bounds and RAM/stack mapping**, together with full real logger + IRQ/motor hook validation.
+
 The independent MCU safety issue remains open: https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9
 ## Follow-up forensics (2026-10-11)
 
