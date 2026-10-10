@@ -1,0 +1,23 @@
+{
+  "pass": true,
+  "checks": {
+    "known_baseline": true,
+    "no_advanced_motor_hooks": true,
+    "boot_heap_lower_bound_relocated": true,
+    "boot_header_init_hook": true,
+    "original_heap_limit": true,
+    "original_stack_vector": true,
+    "ram_reserved_64": true,
+    "28_get_values": true,
+    "stock_speed_writes_rejected": true,
+    "strict_bounds": true,
+    "volatile_mask_is_used": true,
+    "no_nvram_writes": true,
+    "t113_existing_flash_area_cap": true,
+    "no_tag_ops_changed": true,
+    "within_hypothesized_2k_last_sector": true
+  },
+  "image_end": "0x803b794",
+  "flash_limit_hypothesis": "0x0803B800 NOT HARDWARE VALIDATED",
+  "note": "Static checks and ISA emulation cannot establish heap ownership or real MCU safety."
+}
