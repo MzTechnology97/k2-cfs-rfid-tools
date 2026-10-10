@@ -21,7 +21,10 @@ Target: `cfs0_050_G32`, application `cfs0_000_153`.
 - ARM simulation: 28 default GET, all 21 SET/GET/RESET, 42 out-of-range rejects, invalid memory fallback, busy-state rejection, plus exact execution of the two new patched `BL` callsites at both original defaults and overridden values. Non-output registers and APSR verified; BL necessarily updates LR, while the original stock callers save their return address.
 - Physical MCU **PASS**: API `0xB7`, all 28 default GET values, Klipper ready/CFS IDLE/no errors after first boot.
 - Physical MCU **PASS**: ID 7 3200→3220→3200, ID 8 700→720→700, with all 28 values restored and no motor movements.
-- **NOT TESTED:** physical filament load/unload to demonstrate timing-hook execution under real workload, repeated rail power cycles with v3.20, any other advanced motion hooks, long-duration printing or alternative CFS hardware revisions.
+- **Physical load/unload tests (2026-10-10):** three real PLA slot-1 load/unload cycles completed with heaters off. Stock: load 11.531 s, unload 14.781 s; ID7 increased 3200→6400 ms: phase `feeding_to_printhead` shifted **+3.262 s** (4.420→7.682 s) while total load remained 11.531 s and head-sensor-on shifted +0.249 s; ID8 increased 700→1400 ms: no meaningful delay during successful load. **This demonstrates a real phase-timing effect for ID7, NOT a change in feed motor speed.**
+- **RELEASE BLOCKER:** after any completed physical load/unload, `CONFIG_V2_SET` and `CONFIG_V2_RESET` may be rejected as `stock CFS task is busy` **despite** Kalico reporting CFS `IDLE` with path clear. Both ID7 and ID8 remained overridden until true MCU rail power-cycle cleared volatile state. Firmware-side busy guard needs investigation/fix before releasing general runtime tuning. **Do not bypass the busy guard**. No modified values remain on test printer.
+- Encoder snapshot position did not change during polling, so direct encoder-onset→head-sensor latency is unavailable; observed `feeding_to_printhead` phase is a proxy, not an encoder timestamp. Only one run per configuration; repeated timing trials remain necessary.
+- **NOT YET VALIDATED:** robust repeated runs after guard fix, high-resolution encoder-to-head timing, motor speed hooks, alternate CFS models, long-run stability. Full sanitized [motion timing evidence](hardware-motion-timing-2026-10-10.json).
 
 ## Rebuild and check
 
