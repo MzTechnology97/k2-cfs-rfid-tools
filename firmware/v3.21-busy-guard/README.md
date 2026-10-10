@@ -1,6 +1,6 @@
 # CFS v3.21 — busy-guard forensic findings and safe design
 
-**Status: investigation and tests only. No v3.21 firmware BIN is built, flashed, or approved for release.** The printer stays on the proven-to-boot experimental v3.20 image (API2, `0xB7`), with all runtime values restored to stock after prior experiments. The v3.13 image remains the rollback.
+**Status: experimental v3.21 BIN built and fully emulated, staged locally on CM5, but NOT flashed or approved for release.** The printer stays on the proven-to-boot experimental v3.20 image (API2, `0xB7`), with all runtime values restored to stock after prior experiments. The v3.13 image remains the rollback.
 
 ## Confirmed physical reproduction, 2026-10-10
 
@@ -51,7 +51,7 @@ The included `tests/test_host_idle_predicate.py` is a **pure model** of these co
 
 ### Mandatory independent MCU check
 
-Before any v3.21 firmware SET/RESET implementation can be flashed, identify the **actual** physical CFS task/motor activity flag or stock routine in the `cfs0_000_153` application. The wire `CMD_BOX_STATE=0x0A` reports useful information, but a reliable internal MCU flag/source and any races must first be confirmed. A correct firmware guard rejects writes during active load, unload, RFID work, a hardware fault, an unknown state, and controller transition. It must permit writes only after a fully completed idle transition without disturbing existing RFID data.
+The original Creality `CMD_BOX_STATE=0x0A` response routine at `0x0801BD26` obtains its state from the structure at `0x200037D0`: instruction `0x0801BD7A` loads byte `[r5,#2]` and `0x0801BD7C` stores it in response payload byte 3. The **CFS operation state is therefore `0x200037D2`**, independently of RFID `STOCK_STATE` at `0x200001F2`. Stock enum: `0=IDLE`, `1=PRELOAD`, `2=PRINT`, `3=RELOAD`, `4=ERROR`, `5=TEST`. Unknown states fail closed. The new v3.21 SET/RESET guard reads this actual source and requires exactly `0`. The host adds a fail-closed empty-CFS, clear-sensor, standby and RFID-lock preflight. This is a candidate, not yet real-hardware verified; races and internal RFID background activity still require careful observation. A correct firmware guard rejects writes during active load, unload, RFID work, a hardware fault, an unknown state, and controller transition. It must permit writes only after a fully completed idle transition without disturbing existing RFID data.
 
 If an authoritative MCU-side flag cannot be identified, keep SET/RESET fail-closed. Do **not** ship a 'fix' based only on a host-provided idle bit or on an unverified RAM address.
 
@@ -66,3 +66,20 @@ If an authoritative MCU-side flag cannot be identified, keep SET/RESET fail-clos
 ## Current blocking issue
 
 [Issue #7: confirmed RFID active-slot / motor-busy conflation](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/7). The v3.20 firmware and installer PRs remain experimental and **must not be merged as production-safe** on the basis of GET/SET/RAM tests alone.
+
+## Local v3.21 candidate built and checked — 2026-10-10
+
+The draft branch contains `handler-v3_21.S`, `build-v3_21.py`, `bench_preflight_v3_21.py`, `emulate_v3_21.py`, and reproducible static and ARM evidence. The BIN is **not published** until its physical CFS safety tests pass.
+
+- Target: `cfs0_050_G32 / cfs0_000_153`; v2 catalogue=28, experimental feature marker `0x97`.
+- SHA-256 of built BIN: `4a918febbee1e411ae736acb7fd79eb718e3401a641ee947008bbecf1e6c0b19`; 178100 bytes; container CRC16 `0xC0DE`? **Use the authoritative static validation JSON and Creality validator**, not this illustrative CRC text.
+- Actual CRC-16 from the verified container: decimal `49374` (`0xC0DE`).
+- ROM end `0x0803B7B4`, 76 bytes before the **inferred, unproven** `0x0803B800` footprint boundary.
+- ARM emulation PASS: all 28 GET, 21 advanced individual SET/GET/RESET, 42 rejected out-of-range writes, stock ID protection, immutable GET, retained RFID slot `1` with CFS `IDLE=0` accepts SET/RESET; states `1..6` and `0xFF` reject both SET and RESET with no sidecar writes; unchanged execution of both timing hook callsites.
+- Kalico host-safety mock PASS: write lock, standby/idle/empty box, head sensor clear, active RFID/read rejection and unknown-state fail-closed.
+- The CM5 installer manifest includes this exact SHA, with v3.20 and v3.13 available as rollbacks. The running printer **remains v3.20 (feature `0xB7`)**; the v3.21 host extra was loaded by restarting Klipper and v3.20 operation remained ready.
+- **Flash blocker:** `sudo -n true` on CM5 hangs even when called non-interactively; flashing through the guarded installer cannot be completed safely. No privilege escalation or bypass was attempted.
+
+Rebuild using the exact already patched v3.13 BIN in the sibling `../v3.19-volatile-ram/` folder, then `python3 bench_preflight_v3_21.py` and `python3 build-v3_21.py --base ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin --out /tmp/v321-rebuilt.bin`. Run `python3 emulate_v3_21.py` with optional Unicorn installed, after placing the rebuilt firmware under the emulator's expected output filename.
+
+**Release gate remains closed:** must validate on real hardware that SET is rejected during load/unload and succeeds immediately after unloading, without power cycling; observe automatic RFID activity and repeat motion/timing tests.
