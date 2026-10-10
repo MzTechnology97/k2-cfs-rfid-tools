@@ -24,12 +24,18 @@ The firmware reserves `0x20006EE8..0x20006F27` (64 bytes) at the former heap bou
 ## Hardware evidence (2026-10-10)
 
 - **PASS:** real CFS reports API v2, 28 parameters, fingerprint `0xF7`, all 28 default GET values match the expected host catalogue.
-- **PASS:** a controlled manual SET of ID 18 `rfid_neighbor_detect_delay_ms` to `401` returned success, and the subsequent RESET restored `400` in the Klipper log and host status.
-- **PASS:** three further read-only complete-catalogue rounds returned 28 values without errors and confirmed ID 18 was `400`.
+- **PASS on real CFS hardware:** **21/21** individual advanced ID 7–27 SET → GET → RESET tests, each restoring the stock value. Crosschecks after IDs 13, 20 and 27 confirmed all advanced defaults remained intact.
+- **PASS on real CFS hardware:** four simultaneous advanced overrides were correctly isolated; `RESET ALL` restored all **28/28** baseline values.
+- **PASS host protection tests:** attempts to write IDs 0 and 6, two out-of-range values and bulk APPLY were rejected, with all 28 device values unchanged. These are **Kalico host-side** guards, not a direct hardware bypass test of MCU bounds enforcement.
+- **PASS read stability:** 60 full-catalogue scans, **1,680 actual GET requests**, with zero errors or data changes; mean scan response approximately 0.065 s.
+- **PASS host reconnect:** restarting **Klipper only** preserved a temporary ID18 RAM override (400 → 402), and a subsequent RESET returned it to 400 with all 28 baseline values intact. This does **not** validate power cycling the CFS MCU.
 - **PASS in ARM emulation only:** 21 single-ID SET/GET/RESET cycles; 42 out-of-range values rejected; stock IDs 0–6 reject writes; corrupted RAM candidate ignored; busy-state SET rejected; boot-wrapper init contract verified.
-- **NOT TESTED on hardware:** every other advanced ID's SET/RESET, simultaneous overrides, RESET ALL, actual post-reboot RAM clearing, load/unload motion, third-party RFID movement, stress/long print, and alternative CFS firmware generations.
+- **NOT YET TESTED:** power cycling/resetting the actual CFS MCU (volatile RAM boot-clear), long-running real filament load/unload and RFID spool movement, motor safety under physical load, firmware bounds rejection bypassing Kalico's host checks, and alternative CFS hardware/firmware generations.
 
 The `HOST_EXPECTED` label in `BOX_CFS_CONFIG_DIAG` is intentional: default/min/max/type come from Kalico, while GET values come from the CFS. The former v3.15/v3.17 `0xFFFF` incident may involve read access to data beyond the validated firmware footprint; **a specific Creality flash-writer size limit is NOT proven**. The current 178068-byte image has a code end at `0x0803B794` and lies below the hypothesized `0x0803B800` boundary, which is likewise not a verified hardware flash-region limit.
+
+
+The hardware test details are summarized in [`hardware-validation-2026-10-10.json`](hardware-validation-2026-10-10.json). A non-fatal RS-485 discovery timeout was observed once during post-restart motor startup; motor initialization completed on the first attempt, the CFS returned to IDLE and follow-up communication was successful.
 
 ## Source files and deterministic build
 
