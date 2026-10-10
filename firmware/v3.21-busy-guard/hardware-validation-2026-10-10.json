@@ -1,0 +1,121 @@
+{
+  "test_date": "2026-10-10",
+  "firmware": "CFS v3.21",
+  "firmware_feature_signature": "0x97",
+  "api_version": 2,
+  "parameter_count": 28,
+  "hardware": "Creality K2 Pro CFS cfs0_050_G32 / cfs0_000_153",
+  "environment": "K2-OpenHost external CM5 and T113",
+  "temperature_control": "nozzle/bed targets 0 C; no heating requested",
+  "first_boot": {
+    "passed": true,
+    "api_v2": true,
+    "feature_0x97": true,
+    "all_28_defaults": true,
+    "printer_ready": true,
+    "cfs_idle": true,
+    "error": null
+  },
+  "idle_writes_before_motion": {
+    "passed": true,
+    "id7_set_get_reset": [
+      3200,
+      3220,
+      3200
+    ],
+    "id8_set_get_reset": [
+      700,
+      720,
+      700
+    ],
+    "reject_stock_parameter": true,
+    "reject_out_of_bounds": true,
+    "reject_bulk_apply": true,
+    "all_28_restored": true
+  },
+  "after_physical_load_unload": {
+    "passed": true,
+    "slot": 1,
+    "filament": "PLA",
+    "load_duration_seconds": 11.529,
+    "load_printhead_sensor_on_seconds": 10.938,
+    "unload_duration_seconds": 14.536,
+    "printhead_sensor_cleared": true,
+    "loaded_slot_after_unload": -1,
+    "box_state_after_unload": "IDLE",
+    "no_mcu_reboot": true,
+    "id7_set_get_reset_after_unload": [
+      3200,
+      3220,
+      3200
+    ],
+    "id8_set_get_reset_after_unload": [
+      700,
+      720,
+      700
+    ],
+    "all_28_unchanged": true,
+    "rfid_state_after_unload": {
+      "active_slot_raw": 1,
+      "raw": "40000100",
+      "note": "Retained RFID slot 1 no longer blocks writes even though RFID diagnostic's legacy 'busy' shorthand is true."
+    }
+  },
+  "moving_protection": {
+    "load": {
+      "request_dispatched_during": "feeding_to_buffer",
+      "active_operation": true,
+      "host_box_state_at_dispatch": "IDLE",
+      "rejected": true,
+      "rejection_before_physical_load_finished": true,
+      "rejected_by": "Kalico v3.21 host preflight"
+    },
+    "unload": {
+      "request_dispatched_during": "retracting_to_cfs",
+      "active_operation": true,
+      "host_box_state_at_dispatch": "PRINT",
+      "rejected": false,
+      "request_completed_after_physical_unload_finished": true,
+      "interpretation": "Moonraker request queued/delayed; it executed only once box returned to IDLE, so it does not demonstrate a moving-time acceptance or rejection. Harmless ID18 value was restored."
+    },
+    "safety_caveat": "During early physical feeding, box.state/state_code can still be IDLE/0 while box.operation.active=true. The stock CFS BOX_STATE byte alone is not proven sufficient as an independent MCU-side movement guard. Host guard rejected the active-load request. Direct MCU protocol bypass was intentionally not tested.",
+    "independent_mcu_guard_validated_during_actual_movement": false
+  },
+  "after_two_physical_cycles_advanced_ram_test": {
+    "passed": true,
+    "advanced_ids_tested": "7..27",
+    "set_get_reset_passed": 21,
+    "total": 21,
+    "each_parameter_restored_to_default": true,
+    "no_mcu_reboot": true,
+    "all_28_defaults": true
+  },
+  "final": {
+    "printer": "ready",
+    "print_stats": "standby",
+    "box": "IDLE",
+    "loaded_slot": -1,
+    "printhead_sensor": false,
+    "cfs_last_error": null,
+    "firmware_feature": "0x97",
+    "id7": 3200,
+    "id8": 700,
+    "id18": 400,
+    "param_count": 28,
+    "nozzle_target": 0,
+    "bed_target": 0
+  },
+  "remaining_release_gate": [
+    "Verify/strengthen independent MCU physical movement predicate beyond BOX_STATE=IDLE because live feeding can be underway while BOX_STATE remains IDLE.",
+    "Test MCU-side rejection under active load/unload without circumventing Kalico host interlocks or introducing unsafe writes.",
+    "Repeat cycles under more varied conditions and verify RFID background work and unexpected/unknown states.",
+    "Do not merge the experimental firmware or host PR as production ready until safety gate is satisfied."
+  ],
+  "evidence_saved_on_device": [
+    "V321_FIRST_BOOT_READBACK.json",
+    "V321_IDLE_WRITE_GUARD_HARDWARE.json",
+    "V321_POST_UNLOAD_TIMING_BASELINE.json",
+    "V321_ACTIVE_GUARD_HARDWARE.json",
+    "V321_POST_MOVEMENT_ALL_ADVANCED_21.json"
+  ]
+}
