@@ -34,6 +34,9 @@ jobs:
       - name: Verify motor trampoline ABI against stock Thumb instructions
         working-directory: firmware/v3.23-ram-event-trace/abi
         run: sh ./run_abi_offline.sh
+      - name: Test real C RAM ring connected to synthetic motor hook
+        working-directory: firmware/v3.23-ram-event-trace/abi/integrated
+        run: sh ./run_integrated_offline.sh
       - name: Confirm no flashable CFS image was created
         run: |
           test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
