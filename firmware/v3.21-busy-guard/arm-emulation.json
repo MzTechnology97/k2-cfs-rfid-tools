@@ -1,0 +1,37 @@
+{
+  "info": {
+    "status": 0,
+    "payload": "021c0197"
+  },
+  "default_get_count": 28,
+  "set_get_reset_individual_count": 21,
+  "stock_parameter_writes_rejected": 7,
+  "invalid_bounds_rejected": 42,
+  "corrupt_runtime_value_guarded": true,
+  "get_does_not_modify_storage": true,
+  "retained_rfid_slot_still_allows_idle_set_reset": true,
+  "busy_state_rejects_set": true,
+  "busy_state_rejects_reset": true,
+  "moving_and_unknown_states_rejected": 7,
+  "no_live_hardware_operations": true,
+  "physical_movw_hooks_emulated": [
+    {
+      "id": 7,
+      "callsite": "0x8011116",
+      "stock_equals_hook_default": true,
+      "stock_value": 3200,
+      "patched_value": 3200,
+      "wrapper_instruction_count": 29,
+      "valid_override_applied_without_register_or_APSR_change": true
+    },
+    {
+      "id": 8,
+      "callsite": "0x80112ca",
+      "stock_equals_hook_default": true,
+      "stock_value": 700,
+      "patched_value": 700,
+      "wrapper_instruction_count": 30,
+      "valid_override_applied_without_register_or_APSR_change": true
+    }
+  ]
+}
