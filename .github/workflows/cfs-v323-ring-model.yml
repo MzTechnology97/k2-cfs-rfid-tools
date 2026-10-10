@@ -1,0 +1,32 @@
+name: CFS v3.23 RAM ring model (offline only)
+on:
+  push:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  pull_request:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ring-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM offline compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc gcc-arm-none-eabi
+      - name: Sanitize and cross-compile RAM ring model
+        working-directory: firmware/v3.23-ram-event-trace
+        run: ./run_offline.sh
+      - name: Confirm no flashable CFS image was created
+        run: |
+          test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
+          echo 'No firmware patching or flashing was performed.'
