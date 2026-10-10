@@ -20,7 +20,7 @@ A 512-byte candidate RAM reservation from **0x20006F28 to 0x20007127** would req
 
 ## Run model tests
 
-Run ./run_offline.sh from this directory. Optionally provide the exact tested v3.22 firmware binary as its first argument for a Capstone static callsite/ROM/RAM audit. Requires native GCC and arm-none-eabi-gcc; the optional audit additionally requires Capstone for Python.
+Run `sh ./run_offline.sh` from this directory. Optionally provide the exact tested v3.22 firmware binary as its first argument for a Capstone static callsite/ROM/RAM audit. Requires native GCC and arm-none-eabi-gcc; the optional audit additionally requires Capstone for Python.
 
 Test coverage: deterministic ring wrap, chronological readback, freeze, size assertions, memory guard canaries, generation reset, host ASan/UBSan and Cortex-M3 cross compilation. It produces **no flashable binary**.
 
@@ -34,3 +34,6 @@ Test coverage: deterministic ring wrap, chronological readback, freeze, size ass
 6. Run complete ARM differential emulation and rollback checks; only then consider controlled hardware tests.
 
 The independent MCU safety issue remains open: https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9
+## Follow-up forensics (2026-10-11)
+
+See [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) for the archived on-device comparison: oversized v3.15/v3.16 firmware returned 65535 for advanced parameters, whereas compact v3.18 and the currently running v3.22 read correctly. This supports a conservative effective address ceiling of `0x0803B800` but does not prove the bootloader's partition map. See [TRAMPOLINE_ABI_STATIC_REVIEW.md](TRAMPOLINE_ABI_STATIC_REVIEW.md) for the proposed motor-entry hook's limited *static* calling-convention analysis; no differential ARM emulator or real firmware hook was validated. The v3.22 linked ELF already omits disabled advanced motor hook wrappers, so removing those wrappers offers no additional image space.
