@@ -1,0 +1,46 @@
+name: CFS v3.23 RAM ring model (offline only)
+on:
+  push:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  pull_request:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ring-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM offline compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc gcc-arm-none-eabi
+      - name: Sanitize and cross-compile RAM ring model
+        working-directory: firmware/v3.23-ram-event-trace
+        run: sh ./run_offline.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offline ARM emulator
+        run: python3 -m pip install unicorn==2.1.3
+      - name: Verify motor trampoline ABI against stock Thumb instructions
+        working-directory: firmware/v3.23-ram-event-trace/abi
+        run: sh ./run_abi_offline.sh
+      - name: Test real C RAM ring connected to synthetic motor hook
+        working-directory: firmware/v3.23-ram-event-trace/abi/integrated
+        run: sh ./run_integrated_offline.sh
+      - name: Audit empirical CFS image size and read-only dump parser
+        working-directory: firmware/v3.23-ram-event-trace
+        run: python3 test_memory_gate.py
+      - name: Confirm no flashable CFS image was created
+        run: |
+          test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
+          echo 'No firmware patching or flashing was performed.'
