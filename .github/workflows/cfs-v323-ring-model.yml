@@ -37,6 +37,9 @@ jobs:
       - name: Test real C RAM ring connected to synthetic motor hook
         working-directory: firmware/v3.23-ram-event-trace/abi/integrated
         run: sh ./run_integrated_offline.sh
+      - name: Audit empirical CFS image size and read-only dump parser
+        working-directory: firmware/v3.23-ram-event-trace
+        run: python3 test_memory_gate.py
       - name: Confirm no flashable CFS image was created
         run: |
           test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
