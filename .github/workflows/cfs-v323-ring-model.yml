@@ -26,6 +26,14 @@ jobs:
       - name: Sanitize and cross-compile RAM ring model
         working-directory: firmware/v3.23-ram-event-trace
         run: sh ./run_offline.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offline ARM emulator
+        run: python3 -m pip install unicorn==2.1.3
+      - name: Verify motor trampoline ABI against stock Thumb instructions
+        working-directory: firmware/v3.23-ram-event-trace/abi
+        run: sh ./run_abi_offline.sh
       - name: Confirm no flashable CFS image was created
         run: |
           test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
