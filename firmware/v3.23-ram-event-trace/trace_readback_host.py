@@ -49,7 +49,10 @@ def decode_header(payload: bytes) -> TraceHeader:
             or header.head >= CAPACITY or header.count > CAPACITY
             or (header.count < CAPACITY
                 and (header.head != header.count
-                     or header.overwritten != 0))):
+                     or header.overwritten != 0))
+            or (header.count == CAPACITY
+                and header.overwritten != 0xFFFF
+                and header.head != header.overwritten % CAPACITY)):
         raise TraceDecodeError("Invalid/unfinished trace header")
     return header
 
