@@ -51,6 +51,9 @@ jobs:
           gcc -std=c11 -O2 -Wall -Wextra -Werror trace_ring.c trace_readback.c \
             test_trace_wire_fixture.c -o build/test_trace_wire_fixture
           python3 test_trace_wire_interop.py build/test_trace_wire_fixture
+      - name: Rebuild size-optimized CFS v3.22 in temporary directory and diff against baseline
+        working-directory: firmware/v3.23-ram-event-trace/sizeopt
+        run: python3 offline_rebuild.py
       - name: Confirm no flashable CFS image was created
         run: |
           test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
