@@ -94,12 +94,21 @@ In particular:
 - No use of the unverified Flash area beyond the conservative
   `0x0803B800` limit is permitted.
 
-The **next substantive step** is tracing stores to the pointer
-at `0x20004A14` and constructing an execution-safe dataflow
-proof to/from the array initialized at `0x2000075C`.
-In parallel, follow peripheral/ISR readers to identify genuine
-feedback signals, without using the software-only
-`0x2000499C` status byte as a motor-idle interlock.
+**Follow-up, 2026-10-11:** The writer of `0x20004A14` has
+now been identified. At `0x0801E086`, original startup ROM
+stores the result of a **type-9 registry lookup by the name
+`pwm1`**; it previously clears that field at `0x0801DFEE`.
+See [CFS_PWM1_NAMED_DEVICE_LOOKUP_20261011.md](CFS_PWM1_NAMED_DEVICE_LOOKUP_20261011.md).
+Three differential ARM cases show that the store accepts a
+pointer into the five-object array, an unrelated pointer,
+or NULL — so the concrete registered object identity still
+**cannot be inferred** from the common callback offset.
+
+The next substantive step is identifying which actual RTOS
+object registers the name `pwm1` with device type 9,
+then following that callback to independent peripheral
+or motor-feedback evidence. The RAM byte `0x2000499C`
+remains software-derived and is not an idle interlock.
 
 The working MCU v3.22 is not modified. Firmware v3.23 release,
 live MCU probe/firmware update and the independent motor-active
