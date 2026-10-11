@@ -66,6 +66,41 @@ the nonzero path on entry to the external finalizer
 `0x08013CD6` or `0x0802F190` behaved identically to mocks
 on the real board. The external functions are hardware-dependent.
 
+## Additional original software-status helper at `0x0801E1AA`
+
+The original ROM has **three direct Thumb BL callers** of this
+function, at `0x080108AE`, `0x08010932` and
+`0x08010C8A`. The code loads a static pointer to
+`0x20004960`, reads a single **software RAM byte**
+`[0x20004960 + 0x3C] = [0x2000499C]`, then returns `1`
+for a zero byte and `0` for any nonzero byte. It performs
+**no direct peripheral, encoder, current-sense or motor-driver
+register read** in that function.
+
+Four isolated executions using actual original machine code
+and the v3.22 code matched exactly:
+
+| Forced software RAM byte | Returned status |
+| ---: | ---: |
+| `0x00` | `1` |
+| `0x01` | `0` |
+| `0x14` | `0` |
+| `0xFF` | `0` |
+
+The emulator read hook observed **only**
+`0x0801E244` (pointer literal) and `0x2000499C`
+(single RAM byte). No mocked hardware routine is required for
+this status-helper test. The original common duty setter contains
+a separate **statically verified** instruction writing the
+literal `0x14` to this same RAM byte on its zero-command path;
+that write is past the duty-path emulator's deliberate stop point.
+
+**Safety conclusion:** this function exposes a **software-derived
+condition**, not independent physical `motor_idle` evidence.
+Treat its value as an opaque stock state. It MUST NOT be used
+alone as an MCU motor-active interlock to permit runtime
+parameter SET/RESET. A real feedback correlation would require
+separately controlled instrumentation.
 ## Safety implications
 
 The zero-command path is now distinguishable from the nonzero
@@ -104,5 +139,11 @@ CI runs the same **five constrained cases** on SHA-pinned rebuilt
 v3.22, without distributing any vendor firmware. It also verifies the
 21 exact original instructions that delimit these paths and denies
 any release or physical-idle claim.
+
+The offline self-test also corrupts **nine** Thumb instruction bytes
+in-memory, each with a correctly recalculated firmware CRC. All
+mutants are rejected by the disassembly guards; these include
+branch logic, a zero-path SRAM state store, two RAM-status helper
+instructions and a direct helper caller.
 
 **All results are offline-only. No change to the running Creality CFS.**
