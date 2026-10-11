@@ -48,6 +48,9 @@ jobs:
             test_trace_readback.c -o build/test_trace_readback
           ./build/test_trace_readback
           python3 test_trace_readback_host.py
+          gcc -std=c11 -O2 -Wall -Wextra -Werror trace_ring.c trace_readback.c \
+            test_trace_wire_fixture.c -o build/test_trace_wire_fixture
+          python3 test_trace_wire_interop.py build/test_trace_wire_fixture
       - name: Confirm no flashable CFS image was created
         run: |
           test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
