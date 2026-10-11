@@ -610,6 +610,24 @@ jobs:
           print("PASS: original older CFS PWM ROM-name xref scan against independently decoded SRAM, never confuse with v3.22")
           PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
+      - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_scatter_v313_v322_source_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-v313-v322-scatter-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-v313-v322-scatter-provenance.json") as f: d=json.load(f)
+          assert d["same_original_first_scatter_descriptor"]
+          assert d["input_length"] == 716
+          assert d["searched_relative_offset_range"] == [-128,128]
+          assert not d["no_assumed_runtime_name_mapping"] is False
+          assert not d["safe_to_write_while_motor_active"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: source provenance and bounded alignment hypotheses, no operational implications")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
