@@ -372,6 +372,43 @@ jobs:
           assert not d["firmware_release_authorized"]
           print("PASS: 9 mock cases, 23 original instructions, 11 CRC-valid rejects; runtime pwm1 link NOT proven")
           PY
+      - name: Trace original RT-Thread PWM1 typed registry linked-list lookup (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python pwm1_rt_registry_walk_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-pwm1-registry.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm1-registry.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["pinned_registry_thumb_instructions"]) == 24
+          assert v["static"]["original_name"] == "pwm1"
+          assert v["static"]["original_lookup_type"] == 9
+          cases = v["named_registry_walk_cases"]
+          assert [x["scenario"] for x in cases] == [
+              "first_name_match", "second_name_match",
+              "third_name_match", "no_match", "empty_registry",
+              "name_prefix_not_match", "case_sensitive"
+          ]
+          assert [x["original_device_pointer_stored"] for x in cases] == [
+              "0x20002000", "0x20002100", "0x20002200",
+              "0x0", "0x0", "0x20002100", "0x20002100"
+          ]
+          assert [len(x["synthetic_list_comparisons"]) for x in cases] == [
+              1, 2, 3, 2, 0, 2, 2
+          ]
+          assert all(x["original_name_type"] == 9 for x in cases)
+          assert all(not x["real_runtime_object_identity_proven"] for x in cases)
+          assert d["tamper_tests"]["count"] == 9
+          assert d["real_device_registry_contents_not_observed"]
+          assert not d["runtime_motor_object_identity_proven"]
+          assert not d["independent_motor_stop_feedback_proven"]
+          assert not d["firmware_release_authorized"]
+          assert not d["physical_CFS_or_serial_accessed"]
+          print("PASS: original pwm1 registry list walker, 7 synthetic scenarios, 9 CRC-valid mutations")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
