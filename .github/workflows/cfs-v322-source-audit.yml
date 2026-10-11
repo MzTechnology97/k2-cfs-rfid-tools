@@ -73,6 +73,26 @@ jobs:
               "pre_256k_end_0x0803b800_to_0x0803ffff"]["count"] == 0
           print("PASS: v3.13/v3.22 offline CPU vectors + CRC + memory map")
           PY
+      - name: Verify loader-page map from original-layout constants (NO MCU IO)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python bootloader_static_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-bootloader-static.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-bootloader-static.json") as f:
+              result = json.load(f)
+          assert result["four_mutations_rejected"] == 4
+          assert result["physical_flash"]["app_last_image_page"] == 118
+          assert result["physical_flash"]["historical_build_boundary_first_excluded_page"] == 119
+          assert result["physical_flash"]["undocumented_2k_pages_between_policy_and_fast_fetch_end"] == 9
+          assert result["physical_flash"]["stock_application_last_flash_page_pointer"] == "0x807f800"
+          assert result["loader"]["bootloader_raw_dump_available"] is False
+          assert result["conclusions"]["authorises_flash"] is False
+          assert result["conclusions"]["safe_to_expand_CFS_binary"] is False
+          print("PASS: offline bootloader evidence, no update-authorisation")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
