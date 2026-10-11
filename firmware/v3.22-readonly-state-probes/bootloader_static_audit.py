@@ -93,7 +93,7 @@ def analyze_updater(path: Path | None) -> dict:
     # at offset +36; these are host-side facts ONLY, not loader constraints.
     seek = HOST_SEEK_END_OPCODE_AT - HOST_ELF_CODE_TO_FILE_OFFSET
     stored = HOST_STORED_SIZE_OPCODE_AT - HOST_ELF_CODE_TO_FILE_OFFSET
-    if data[seek:seek + 4] != bytes.fromhex("0200a0e3"):
+    if data[seek:seek + 4] != bytes.fromhex("0220a0e3"):
         raise ValueError("host SEEK_END fingerprint not present")
     if data[stored:stored + 4] != bytes.fromhex("240084e5"):
         raise ValueError("host size-store fingerprint not present")
