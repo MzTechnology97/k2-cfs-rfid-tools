@@ -21,6 +21,7 @@ import struct
 from pathlib import Path
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_LITTLE_ENDIAN, CS_MODE_THUMB
+from capstone.arm import ARM_OP_IMM
 from flash_ram_phase2_audit import (
     APP_BASE, CRC_OFF, META_END, crc16_bypass, pinned, report_image,
 )
@@ -180,6 +181,41 @@ def emulate(image: bytes, code: int, installed: bool, fake_return: int):
     }
 
 
+def original_static_reference_inventory(image: bytes) -> dict:
+    # Exhaustively check halfword-aligned direct BL targets, plus any
+    # unaligned literal address words. This is NOT a full recursive
+    # control-flow proof: indirect BLX, synthesized addresses, bootloader
+    # and firmware loader registrations are outside this analysis.
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN)
+    decoder.detail = True
+    calls = []
+    for offset in range(0, len(image) - 4, 2):
+        ins = next(decoder.disasm(image[offset:offset + 4],
+                                  APP_BASE + offset, count=1), None)
+        if ins is not None and ins.mnemonic == "bl" and len(ins.operands) == 1:
+            op = ins.operands[0]
+            if op.type == ARM_OP_IMM and op.imm == ENTRY:
+                calls.append(hex(APP_BASE + offset))
+    words = {}
+    for t in (ENTRY, ENTRY | 1):
+        encoded = struct.pack("<I", t)
+        positions = []
+        start = 0
+        while True:
+            idx = image.find(encoded, start)
+            if idx == -1:
+                break
+            positions.append(hex(APP_BASE + idx))
+            start = idx + 1
+        words[hex(t)] = positions
+    return {
+        "direct_Thumb_BL_sites_in_saved_APP": calls,
+        "raw_address_word_sites_in_saved_APP": words,
+        "function_runtime_unreachable_proven": False,
+        "actual_pwm1_device_callback_binding_proven": False,
+    }
+
+
 def tamper(image: bytes):
     locations = {
         "extended_request_decode": 0x080263A0,
@@ -225,6 +261,7 @@ def main():
         return {
             "static": verify_static(image, kind),
             "cases": [emulate(image, *item) for item in CASE_IDS],
+            "static_reference_inventory": original_static_reference_inventory(image),
             "runtime_pwm1_uses_this_callback": False,
             "safe_to_install_MCU_trampoline": False,
         }
@@ -235,6 +272,8 @@ def main():
             raise ValueError("stock/v3.22 Thumb bytes not identical")
         if cur["cases"] != original["cases"]:
             raise ValueError("stock/v3.22 original extended PWM semantics differ")
+        if cur["static_reference_inventory"] != original["static_reference_inventory"]:
+            raise ValueError("stock/v3.22 extended PWM static reference differs")
     outcome = {
         "scope": "strictly offline, exact Thumb synthetic callback tests",
         "stock_compared": stock is not None,
