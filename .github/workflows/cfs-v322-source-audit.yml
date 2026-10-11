@@ -112,6 +112,28 @@ jobs:
           assert result["no_device_open_or_serial_commands"]
           print("PASS: exact original FMC erase/program paths, no new Flash release")
           PY
+      - name: Verify original database callgraph and safe handler alias size audit
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python database_path_and_sizeopt_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld \
+            --self-test >/tmp/cfs-database-sizeopt-audit.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-database-sizeopt-audit.json") as f:
+              d = json.load(f)
+          assert len(d["current"]["matched_direct_calls"]) == 11
+          assert len(d["current"]["matched_database_and_RFID_strings"]) == 4
+          assert d["sizeopt_alias_and_table"]["source_alias_config_ptr"] == "0x803af72"
+          assert d["sizeopt_alias_and_table"]["alias_referenced_by_BL_config_ptr"]
+          assert not d["sizeopt_alias_and_table"]["config_v2_ensure_can_be_deleted_safely"]
+          assert d["sizeopt_alias_and_table"]["saved_handler_bytes_IN_OFFLINE_EXPERIMENT"] == 4
+          assert d["fail_closed_tests"]["count"] == 5
+          assert not d["safe_to_flash_larger_app"]
+          assert not d["runtime_use_of_last_flash_page_proven"]
+          print("PASS: 11 Creality database/FMC callsites, alias safety, 4B offline estimate")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
