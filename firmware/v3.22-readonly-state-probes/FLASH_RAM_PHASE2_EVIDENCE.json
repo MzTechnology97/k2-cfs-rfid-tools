@@ -1,0 +1,323 @@
+{
+  "scope": "offline static evidence; not dynamic MCU measurements",
+  "soc": {
+    "part": "GD32F303VET6 (CFS G32 hypothesis; re-confirm actual silicon)",
+    "core": "Cortex-M4 (older test assembly targets M3 ISA subset)",
+    "total_flash_bytes": 524288,
+    "fast_instruction_fetch_flash_bytes": 262144,
+    "slower_instruction_fetch_flash_bytes": 262144,
+    "slower_flash_instruction_fetch_possible": true,
+    "sram_bytes": 65536,
+    "reference": "https://www.gigadevice.com.cn/product/mcu/mcus-product-selector/gd32f303vet6"
+  },
+  "images": {
+    "creality_stock_153": {
+      "sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+      "bytes": 175672,
+      "linked_base": "0x8010000",
+      "linked_end_exclusive": "0x803ae38",
+      "header_crc_valid": true,
+      "header_size_matches": true,
+      "initial_stack_pointer": "0x20006ee8",
+      "reset_vector_thumb": "0x801a969",
+      "sram_end": "0x20010000",
+      "heap_start_literal": "0x20006ee8",
+      "heap_end_literal": "0x20010000",
+      "nominal_heap_window_bytes": 37144,
+      "bytes_to_unverified_0x0803b800": 2504,
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 20936,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 283080
+    },
+    "intermediate_v313": {
+      "sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
+      "bytes": 177700,
+      "linked_base": "0x8010000",
+      "linked_end_exclusive": "0x803b624",
+      "header_crc_valid": true,
+      "header_size_matches": true,
+      "initial_stack_pointer": "0x20006ee8",
+      "reset_vector_thumb": "0x801a969",
+      "sram_end": "0x20010000",
+      "heap_start_literal": "0x20006ee8",
+      "heap_end_literal": "0x20010000",
+      "nominal_heap_window_bytes": 37144,
+      "bytes_to_unverified_0x0803b800": 476,
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18908,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 281052
+    },
+    "running_v322": {
+      "sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+      "bytes": 178140,
+      "linked_base": "0x8010000",
+      "linked_end_exclusive": "0x803b7dc",
+      "header_crc_valid": true,
+      "header_size_matches": true,
+      "initial_stack_pointer": "0x20006ee8",
+      "reset_vector_thumb": "0x801a969",
+      "sram_end": "0x20010000",
+      "heap_start_literal": "0x20006f28",
+      "heap_end_literal": "0x20010000",
+      "nominal_heap_window_bytes": 37080,
+      "bytes_to_unverified_0x0803b800": 36,
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18468,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 280612
+    },
+    "experimental_sizeopt_unflashed": {
+      "sha256": "06f36ef5c088ee2bb3497c89e30695ab1a3ca3b786b563b6f3d2c368ccf28d19",
+      "bytes": 178120,
+      "linked_base": "0x8010000",
+      "linked_end_exclusive": "0x803b7c8",
+      "header_crc_valid": true,
+      "header_size_matches": true,
+      "initial_stack_pointer": "0x20006ee8",
+      "reset_vector_thumb": "0x801a969",
+      "sram_end": "0x20010000",
+      "heap_start_literal": "0x20006f28",
+      "heap_end_literal": "0x20010000",
+      "nominal_heap_window_bytes": 37080,
+      "bytes_to_unverified_0x0803b800": 56,
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18488,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 280632
+    }
+  },
+  "flash": {
+    "total_main_flash_half_open": [
+      "0x8000000",
+      "0x8080000"
+    ],
+    "fast_fetch_flash_half_open": [
+      "0x8000000",
+      "0x8040000"
+    ],
+    "instruction_fetch_after_256k_has_higher_latency": true,
+    "application_base": "0x8010000",
+    "lower_64k_separate_area_content_UNDUMPED": true,
+    "prior_conservative_application_boundary_UNVERIFIED": "0x803b800",
+    "physical_flash_and_256k_latency_split_ARE_NOT_loader_app_limits": true,
+    "original_v322_spot_crc_and_vectors_match": true,
+    "possible_last_reserved_flash_pages_unknown": true,
+    "candidate_20B_smaller_image_unflashed": true,
+    "max_proven_additional_code_bytes": 0
+  },
+  "sram": {
+    "initial_sp": "0x20006ee8",
+    "sidecar_half_open": [
+      "0x20006ee8",
+      "0x20006f28"
+    ],
+    "sidecar_bytes": 64,
+    "current_heap_half_open": [
+      "0x20006f28",
+      "0x20010000"
+    ],
+    "current_nominal_heap_bytes": 37080,
+    "UNCOMMITTED_ring_half_open": [
+      "0x20006f28",
+      "0x20007128"
+    ],
+    "UNCOMMITTED_new_heap_start": "0x20007128",
+    "UNCOMMITTED_new_nominal_heap_bytes": 36568,
+    "heap_window_reduction_bytes": 512,
+    "heap_window_reduction_percent": 1.381,
+    "heap_peak_fragmentation_verified": false,
+    "task_stack_highwater_verified": false,
+    "dma_buffers_and_irq_writers_verified": false
+  },
+  "aligned_word_heuristics": {
+    "pre_256k_end_0x0803b800_to_0x0803ffff": {
+      "count": 0,
+      "examples": [],
+      "literal_and_instruction_bytes_NOT_disambiguated": true
+    },
+    "slower_flash_0x08040000_to_0x0807ffff": {
+      "count": 6,
+      "examples": [
+        {
+          "rom": "0x8014e08",
+          "unclassified_value": "0x804f10d"
+        },
+        {
+          "rom": "0x801b22c",
+          "unclassified_value": "0x806ea4f"
+        },
+        {
+          "rom": "0x8020604",
+          "unclassified_value": "0x804f04f"
+        },
+        {
+          "rom": "0x8031a6c",
+          "unclassified_value": "0x807ffff"
+        },
+        {
+          "rom": "0x803690c",
+          "unclassified_value": "0x807f00c"
+        },
+        {
+          "rom": "0x8036d2c",
+          "unclassified_value": "0x807f800"
+        }
+      ],
+      "literal_and_instruction_bytes_NOT_disambiguated": true
+    },
+    "within_64k_sram": {
+      "count": 645,
+      "examples": [
+        {
+          "rom": "0x8010000",
+          "unclassified_value": "0x20006ee8"
+        },
+        {
+          "rom": "0x80102a4",
+          "unclassified_value": "0x20006584"
+        },
+        {
+          "rom": "0x80102dc",
+          "unclassified_value": "0x2000fecb"
+        },
+        {
+          "rom": "0x801032c",
+          "unclassified_value": "0x20004621"
+        },
+        {
+          "rom": "0x8010454",
+          "unclassified_value": "0x20000000"
+        },
+        {
+          "rom": "0x80104bc",
+          "unclassified_value": "0x2000390d"
+        },
+        {
+          "rom": "0x80104cc",
+          "unclassified_value": "0x200038f0"
+        },
+        {
+          "rom": "0x80104e4",
+          "unclassified_value": "0x20000bc4"
+        },
+        {
+          "rom": "0x80104f8",
+          "unclassified_value": "0x20003568"
+        },
+        {
+          "rom": "0x80104fc",
+          "unclassified_value": "0x20000dc4"
+        },
+        {
+          "rom": "0x801050c",
+          "unclassified_value": "0x20001dc4"
+        },
+        {
+          "rom": "0x801051c",
+          "unclassified_value": "0x20003450"
+        }
+      ],
+      "literal_and_instruction_bytes_NOT_disambiguated": true
+    },
+    "above_64k_sram_lookalikes": {
+      "count": 57,
+      "examples": [
+        {
+          "rom": "0x8010300",
+          "unclassified_value": "0x2001496e"
+        },
+        {
+          "rom": "0x8010638",
+          "unclassified_value": "0x20013f18"
+        },
+        {
+          "rom": "0x8010c78",
+          "unclassified_value": "0x20014682"
+        },
+        {
+          "rom": "0x801113c",
+          "unclassified_value": "0x200149f0"
+        },
+        {
+          "rom": "0x80114e4",
+          "unclassified_value": "0x20014e06"
+        },
+        {
+          "rom": "0x8012360",
+          "unclassified_value": "0x200149f1"
+        },
+        {
+          "rom": "0x8012394",
+          "unclassified_value": "0x200149e4"
+        },
+        {
+          "rom": "0x80123c0",
+          "unclassified_value": "0x20014770"
+        },
+        {
+          "rom": "0x80126a8",
+          "unclassified_value": "0x20014920"
+        },
+        {
+          "rom": "0x8013658",
+          "unclassified_value": "0x200154a0"
+        },
+        {
+          "rom": "0x8013eb0",
+          "unclassified_value": "0x20016842"
+        },
+        {
+          "rom": "0x8013f28",
+          "unclassified_value": "0x20016842"
+        }
+      ],
+      "literal_and_instruction_bytes_NOT_disambiguated": true
+    },
+    "candidate_ring_span_0x20006f28_to_0x20007127": {
+      "count": 5,
+      "examples": [
+        {
+          "rom": "0x8011628",
+          "unclassified_value": "0x200070a0"
+        },
+        {
+          "rom": "0x8017a54",
+          "unclassified_value": "0x200070a0"
+        },
+        {
+          "rom": "0x8018138",
+          "unclassified_value": "0x20007005"
+        },
+        {
+          "rom": "0x8019ef8",
+          "unclassified_value": "0x20007008"
+        },
+        {
+          "rom": "0x8027960",
+          "unclassified_value": "0x20006f28"
+        }
+      ],
+      "literal_and_instruction_bytes_NOT_disambiguated": true
+    }
+  },
+  "source_unused_SYMBOL_CANDIDATES": {
+    "config_v2_ensure": {
+      "source_occurrences": 1,
+      "candidate_only_no_relocation_removal_authorised": true
+    },
+    "config_defaults": {
+      "source_occurrences": 1,
+      "candidate_only_no_relocation_removal_authorised": true
+    },
+    "SIDECAR_SIZE": {
+      "source_occurrences": 1,
+      "candidate_only_no_relocation_removal_authorised": true
+    }
+  },
+  "release_gates": {
+    "bootloader_full_dump_or_authenticated_layout_verified": false,
+    "application_update_max_length_verified": false,
+    "last_page_reservations_verified": false,
+    "heap_and_stack_dynamic_safety_verified": false,
+    "v323_event_ring_flash_ramsafe": false,
+    "approve_flash": false,
+    "approve_motion_writes": false
+  },
+  "read_only": true,
+  "new_bin_or_elf_created": false,
+  "tamper_cases_rejected": 4
+}

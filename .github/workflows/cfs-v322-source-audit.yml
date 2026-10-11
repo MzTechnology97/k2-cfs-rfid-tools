@@ -48,6 +48,31 @@ jobs:
         run: python emulate_v3_22.py
       - name: Validate opt-in original-to-v3.22 auditor syntax
         run: python -m py_compile firmware/v3.22-readonly-state-probes/audit_stock_vs_v322.py
+      - name: Verify MCU phase-2 memory bounds against SHA-pinned offline build
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python - <<'PY'
+          import importlib.util
+          import hashlib
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location("cfs_memory", "flash_ram_phase2_audit.py")
+          module = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(module)
+          base = Path("../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin").read_bytes()
+          curr = Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin").read_bytes()
+          assert hashlib.sha256(curr).hexdigest() == module.PINS["running_v322"][1]
+          assert hashlib.sha256(base).hexdigest() == module.PINS["intermediate_v313"][1]
+          b = module.report_image(base, "intermediate_v313")
+          c = module.report_image(curr, "running_v322")
+          assert b["header_crc_valid"] and c["header_crc_valid"]
+          assert c["nominal_heap_window_bytes"] == 37080
+          assert c["bytes_to_unverified_0x0803b800"] == 36
+          assert c["bytes_to_fast_fetch_end_NOT_AUTHORISED"] == 18468
+          assert c["bytes_to_total_flash_end_NOT_AUTHORISED"] == 280612
+          assert module.literal_observations(curr)[
+              "pre_256k_end_0x0803b800_to_0x0803ffff"]["count"] == 0
+          print("PASS: v3.13/v3.22 offline CPU vectors + CRC + memory map")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
