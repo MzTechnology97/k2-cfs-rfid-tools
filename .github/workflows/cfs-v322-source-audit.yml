@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install isolated emulator
-        run: python -m pip install "unicorn>=2.0,<3.0"
+        run: python -m pip install "unicorn>=2.0,<3.0" "capstone>=5,<6"
       - name: Verify 28 RFID/remaining ARM routine bodies
         run: python firmware/v3.22-readonly-state-probes/verify_rfid_regression.py
       - name: Static builder preflight + SHA-pinned offline build
@@ -92,6 +92,25 @@ jobs:
           assert result["conclusions"]["authorises_flash"] is False
           assert result["conclusions"]["safe_to_expand_CFS_binary"] is False
           print("PASS: offline bootloader evidence, no update-authorisation")
+          PY
+      - name: Verify stock CFS FMC driver and page-erase/program callers (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python stock_fmc_driver_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-v322-fmc-audit.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-v322-fmc-audit.json") as f:
+              result = json.load(f)
+          assert result["v322"]["flash_driver"]["critical_instruction_count"] == 23
+          assert result["fail_closed_mutation_tests"]["total"] == 5
+          assert result["v322"]["flash_driver"]["page_erase_target"] == "0x803175a"
+          assert result["v322"]["flash_driver"]["word_program_target"] == "0x80318be"
+          assert result["flash_access_findings"]["last_page_address_explicit_in_stock_ROM"]
+          assert not result["flash_access_findings"]["safe_to_flash_a_larger_app"]
+          assert result["no_device_open_or_serial_commands"]
+          print("PASS: exact original FMC erase/program paths, no new Flash release")
           PY
       - name: Remove disposable compiled image
         if: always()
