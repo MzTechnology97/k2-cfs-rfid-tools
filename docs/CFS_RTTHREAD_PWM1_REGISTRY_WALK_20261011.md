@@ -41,6 +41,25 @@ offset, hardware timer channel, or guessed function pointer.
 It does **not** establish the actual contents of that list
 on the real device.
 
+## Additional finding: five original constructed objects register as type 9
+
+Original code at `0x080283BE` constructs five objects and calls
+`0x0802644A` at `0x08028408`. Its tail at `0x08026484`
+branches to the RT-Thread registration helper `0x0802377A`.
+That helper executes **`movs r1,#9`** at `0x0802379A`
+immediately before calling the RT-Thread registration function
+`0x0802DFD6` at `0x0802379E`.
+
+These newly pinned manufacturer Thumb instructions establish
+that **the five objects are submitted for registration as
+class/type 9 devices**, the same class used in the `pwm1`
+name lookup. This is more than matching object and string counts.
+
+The five objects' actual **names are not yet established**:
+the constructor reads each name through `[object+0x54]`,
+whose real initialized RAM contents are not recovered.
+Neither the callback identity nor whether `pwm1` belongs to
+this five-object group is independently established.
 ## Differential emulation cases
 
 The reproducible script
@@ -87,9 +106,9 @@ which callback is installed in that instance?**
 
 ## Failure isolation and compliance
 
-The script also pins **24 original Thumb instruction
+The script also pins **29 original Thumb instruction
 encodings**, verifies the fixed `pwm1` ROM string,
-and rejects **nine checksum-corrected in-memory
+and rejects **eleven checksum-corrected in-memory
 mutations** of the name lookup, linked-list traversal
 and device pointer store. GitHub CI runs the checks
 against a fresh rebuild of the exact validated v3.22
