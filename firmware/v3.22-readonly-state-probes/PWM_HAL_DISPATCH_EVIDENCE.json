@@ -1,0 +1,116 @@
+{
+  "date": "2026-10-11",
+  "scope": "SHA-pinned original CFS 1.5.3 and validated v3.22; original ARM Thumb emulated with hardware destinations intercepted",
+  "sources": {
+    "original_creality_153_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+    "validated_v322_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7"
+  },
+  "original_v322_exact_behavior_match": true,
+  "generic_pwm_dispatcher_entry": "0x08028394",
+  "timer_selector_entry": "0x08028128",
+  "pinned_thumb_instruction_count": 31,
+  "timer_selector_cases": [
+    {
+      "index": 0,
+      "hardware_timer_base": "0x40012c00"
+    },
+    {
+      "index": 1,
+      "hardware_timer_base": "0x40000000"
+    },
+    {
+      "index": 2,
+      "hardware_timer_base": "0x40000400"
+    },
+    {
+      "index": 3,
+      "hardware_timer_base": "0x40000800"
+    },
+    {
+      "index": 4,
+      "hardware_timer_base": "0x40000c00"
+    },
+    {
+      "index": 5,
+      "hardware_timer_base": "0x40001000"
+    },
+    {
+      "index": 6,
+      "hardware_timer_base": "0x40001400"
+    },
+    {
+      "index": 7,
+      "hardware_timer_base": "0x40013400"
+    },
+    {
+      "index": 8,
+      "hardware_timer_base": "0x40014c00"
+    },
+    {
+      "index": 9,
+      "hardware_timer_base": "0x40015000"
+    },
+    {
+      "index": 10,
+      "hardware_timer_base": "0x40015400"
+    },
+    {
+      "index": 11,
+      "hardware_timer_base": "0x40001800"
+    },
+    {
+      "index": 12,
+      "hardware_timer_base": "0x40001c00"
+    },
+    {
+      "index": 13,
+      "hardware_timer_base": "0x40002000"
+    }
+  ],
+  "generic_pwm_cases": [
+    {
+      "command": "0x1E00",
+      "dispatch_target": "0x0802820C",
+      "forwarded_flag": 1
+    },
+    {
+      "command": "0x1E01",
+      "dispatch_target": "0x0802820C",
+      "forwarded_flag": 0
+    },
+    {
+      "command": "0x1E02",
+      "dispatch_target": "0x0802828E"
+    },
+    {
+      "command": "0x1E03",
+      "dispatch_target": "0x080285E0"
+    },
+    {
+      "command": "0x1E04",
+      "return_code": 5,
+      "dispatch_target": null
+    },
+    {
+      "command": "0x1E05",
+      "return_code": 5,
+      "dispatch_target": null
+    }
+  ],
+  "high_level_original_CFS_request_ids": [
+    "0x1E02",
+    "0x1E04",
+    "0x1E05",
+    "0x1E00"
+  ],
+  "crc_corrected_in_memory_mutations_rejected": 10,
+  "five_device_ctor_and_five_PWM_name_counts_does_not_prove_runtime_identity": true,
+  "original_runtime_pwm1_registry_object_identified": false,
+  "generic_pwm_dispatcher_proven_as_actual_pwm1_driver": false,
+  "real_hardware_peripherals_executed": false,
+  "encoder_or_hardware_motor_idle_feedback_observed": false,
+  "safe_to_patch_motor_activity_guard": false,
+  "safe_to_flash_extended_firmware": false,
+  "device_or_serial_operations": false,
+  "proprietary_original_firmware_committed": false
+}
