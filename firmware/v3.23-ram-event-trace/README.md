@@ -237,3 +237,21 @@ nor 692-byte synthetic image is flashable on the CFS; both are linked at a
 All tests remain offline; no MCU flash, motor task modification or power
 cycling was performed. The real-time and independent motor-active safety
 questions remain open.
+
+## 2026-10-11 source-level space recovery: 20 bytes, hardware unchanged
+
+A [new disposable offline rebuild test](sizeopt/README.md) now reproduces
+the byte-exact v3.22 binary, modifies **only temporary copies** of the
+existing handler to share SET/GET response serialization and let the
+assembler shorten eligible Thumb branches, then reruns the full v3.22 ARM
+behavioral regression. It saves **20 bytes** (178140 → 178120) with the
+same 28 parameters, 21 advanced SET/GET/RESET operations, 42 bounds tests,
+two original timing callsites and all BUSY guards in simulation. GitHub
+Actions includes this test and destroys its temporary binaries.
+
+The candidate still has **no safe-to-flash approval**. Conservative
+flash headroom increases only from 36 to **56 bytes**; the smallest
+previous synthetic C ring+hook requires 380 bytes, leaving at least
+**324 bytes** still missing before a real GET-only drain, task timing
+or stack-safety mechanisms. A larger application partition has *not*
+been established. The installed v3.22 remains untouched.
