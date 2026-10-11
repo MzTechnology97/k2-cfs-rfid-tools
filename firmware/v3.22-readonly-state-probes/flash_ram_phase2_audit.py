@@ -144,13 +144,32 @@ def unused_source_candidates(source: str) -> dict:
     # a computed address, vector, register-indirect or script reference
     # can reach otherwise unreferenced ARM labels.
     symbols = ("config_v2_ensure", "config_defaults", "SIDECAR_SIZE")
-    return {
+    result = {
         name: {
             "source_occurrences": len(re.findall(r"\b" + re.escape(name) + r"\b", source)),
             "candidate_only_no_relocation_removal_authorised": True,
         }
         for name in symbols
     }
+    # 2026-10-11 correction: two assembler labels share the *same* address.
+    # config_ptr is called by GET; its config_v2_ensure alias is NOT dead.
+    # Merely counting the spelling "config_v2_ensure" was misleading.
+    aliases_identical = "config_v2_ensure:\nconfig_ptr:\n" in source
+    real_alias_caller = len(re.findall(r"\bbl\s+config_ptr\b", source))
+    result["config_v2_ensure"].update({
+        "same_entrypoint_as_called_config_ptr": aliases_identical,
+        "bl_config_ptr_source_calls": real_alias_caller,
+        "confirmed_live_via_alias": aliases_identical and real_alias_caller > 0,
+        "safe_to_remove": False,
+    })
+    result["config_defaults"].update({
+        "direct_symbol_references_excluding_label": max(
+            0, len(re.findall(r"\bconfig_defaults\b", source)) - 1),
+        "independent_offline_build_test_only_saved_bytes": 4,
+        "safe_to_remove_in_installed_firmware": False,
+    })
+    result["SIDECAR_SIZE"]["source_constant_only_binary_bytes"] = 0
+    return result
 
 
 def collect(stock: bytes, old: bytes, current: bytes,
