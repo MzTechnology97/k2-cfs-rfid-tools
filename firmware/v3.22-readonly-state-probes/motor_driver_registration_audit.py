@@ -48,7 +48,7 @@ VFUNCTION_WORDS = {
 }
 ORIGINAL_LITERAL = {0x08028510: OBJECT_BASE}
 FIXED_INS = {
-    0x080283F0: ("mov.w", "r4, #0"),
+    0x080283F0: ("movs.w", "r4, #0"),
     0x080283F4: ("add.w", "r0, r4, r4, lsl #1"),
     0x080283F8: ("add.w", "r0, r5, r0, lsl #5"),
     0x080283FC: ("ldr", "r2, [pc, #0x110]"),
