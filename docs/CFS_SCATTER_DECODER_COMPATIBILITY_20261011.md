@@ -120,6 +120,31 @@ source pointer, changed compression data, build
 packaging, or another unverified assumption; the evidence
 does not authorize choosing one explanation yet.
 
+### Historical five PWM names now linked to initialized SRAM
+
+`cfs_historical_pwm_name_xrefs.py` cross-references the historical
+2,844-byte decompressed initialized RAM to the **actual old ROM
+strings** and confirms all five pointers again in the independent,
+already-running historical CFS RAM snapshot:
+
+| Old CFS PWM name | Old ROM string | Name pointer field in historical RAM | Historical object base if +0x54 |
+| --- | --- | --- | --- |
+| `pwm1` | `0x08026730` | `0x20000710` | `0x200006BC` |
+| `pwm3` | `0x08026738` | `0x20000770` | `0x2000071C` |
+| `pwm4` | `0x08026740` | `0x200007D0` | `0x2000077C` |
+| `pwm5` | `0x08026748` | `0x20000830` | `0x200007DC` |
+| `pwm8` | `0x08026750` | `0x20000890` | `0x2000083C` |
+
+There are **five unique names, five initialized RAM pointer
+references, and five matching fields in the old live snapshot**.
+All fields are separated by 96 bytes, as in the five v3.22
+constructor objects. Importantly, the table is **old firmware
+memory evidence only**. The v3.22 objects sit elsewhere
+(`0x2000075C`, `0x200007BC`, `0x2000081C`,
+`0x2000087C`, `0x200008DC`), and their actual names
+remain UNPROVEN until valid v3.22 initialization data or a
+safe authenticated live snapshot is available.
+
 **Critical limitations:** The installed unit's loader
 bytes have not been read, and the old reconstructed RAM
 does **not** prove the object layout or callback addresses
