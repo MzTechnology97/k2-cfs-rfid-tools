@@ -72,6 +72,13 @@ int main(void) {
     assert(memcmp(&saved,&data.ring,sizeof(saved))==0);
     for (unsigned i=0;i<16;i++)
         assert(data.before[i]==0xB7 && data.after[i]==0xB7);
+    /* Full-ring head must match overwrite modulo capacity until saturation. */
+    data.ring.header.overwritten=0;
+    assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
+    data.ring.header.overwritten=2;
+    assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
+    data.ring.header.overwritten=13;
+    assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==20);
     data.ring.header.head=30;
     assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
     data.ring.header.count=2;
