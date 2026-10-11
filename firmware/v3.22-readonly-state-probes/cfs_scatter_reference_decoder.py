@@ -134,7 +134,27 @@ def main():
     args=ap.parse_args()
     image=pinned(args.v322,"running_v322")
     original=verify_image(image)
-    decoded=candidate_decode(image)
+    # This is an explicit *rejection experiment*. Do NOT silently
+    # "fix up" invalid candidate backreferences or manufacture names.
+    try:
+        decoded=candidate_decode(image)
+    except ValueError as exc:
+        prefix="invalid scatter history distance: "
+        if not str(exc).startswith(prefix):
+            raise
+        details=json.loads(str(exc)[len(prefix):])
+        if not (details["token"] == 2 and details["offset"] == 160
+                and details["decoded_len"] == 10 and details["src_bytes"] == 14):
+            raise ValueError("unexpected candidate decoder mismatch") from exc
+        decoded={
+            "candidate_algorithm_matches_source":False,
+            "rejection_reason":"invalid backwards reference to uninitialized output",
+            "deterministic_failure":details,
+            "five_candidate_objects":[],
+            "no_real_device_name_recovered":True,
+            "counterfactual_decompression_succeeded":False,
+            "real_bootloader_decompressor_executed":False,
+        }
     evidence={
       "source":original,
       "counterfactual_reference_decoder":decoded,
