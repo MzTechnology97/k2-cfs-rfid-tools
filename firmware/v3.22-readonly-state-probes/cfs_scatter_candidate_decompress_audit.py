@@ -33,7 +33,7 @@ from unicorn import (
 )
 from unicorn.arm_const import (
     UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1,
-    UC_ARM_REG_R2, UC_ARM_REG_SP,
+    UC_ARM_REG_R2, UC_ARM_REG_SP, UC_ARM_REG_CPSR,
 )
 
 ROM_BASE = 0x08000000
@@ -138,13 +138,27 @@ def emulate_candidate(image: bytes):
     u.reg_write(UC_ARM_REG_R2,n)
     u.reg_write(UC_ARM_REG_LR,SENTINEL|1)
     trace={"returned":False,"steps":0,"read_min":None,"read_max":None,
-           "write_min":None,"write_max":None,"written_count":0}
+           "write_min":None,"write_max":None,"written_count":0,
+           "emulated_condition_branches":0}
     written=set()
     def code(uc,pc,size,_):
         trace["steps"]+=1
         if pc==SENTINEL:
             trace["returned"]=True
             uc.emu_stop()
+        elif pc in (0x080101B0, 0x080101BE):
+            # Some versions of Unicorn reject original 16-bit BPL
+            # inside this compressed scatter loop. Model ONLY the
+            # original BPL APSR.N decision at this exact pinned ROM PC;
+            # all data operations remain native original ARM Thumb.
+            cpsr=uc.reg_read(UC_ARM_REG_CPSR)
+            n=bool(cpsr & 0x80000000)
+            if pc==0x080101B0:
+                next_pc=(0x080101A8 if not n else 0x080101B4)
+            else:
+                next_pc=(0x080101B4 if not n else 0x080101C0)
+            trace["emulated_condition_branches"]+=1
+            uc.reg_write(UC_ARM_REG_PC,next_pc|1)
     def mmio_read(uc,access,address,size,value,_):
         if dest <= address and address + size <= dest + n:
             # The original decompressor uses overlapping LZ-style
@@ -176,6 +190,7 @@ def emulate_candidate(image: bytes):
             "source_reads":(trace["read_min"],trace["read_max"]),
             "dst_writes":(trace["write_min"],trace["write_max"]),
             "instruction_count":trace["steps"],
+            "cpsr":hex(u.reg_read(UC_ARM_REG_CPSR)),
         }
         raise ValueError(
             "isolated decompressor hit unsupported control flow: "
