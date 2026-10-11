@@ -65,6 +65,8 @@ def test_bad_header_fails():
                  HEADER.pack(MAGIC, 1, 0, 31, 0, 1, 0),
                  HEADER.pack(MAGIC, 1, 0, 30, 0, 0, 0),
                  HEADER.pack(MAGIC, 1, 30, 30, 0, 1, 0),
+                 HEADER.pack(MAGIC, 1, 13, 30, 0, 1, 0),
+                 HEADER.pack(MAGIC, 1, 13, 30, 2, 1, 0),
                  HEADER.pack(MAGIC, 1, 4, 2, 0, 1, 0),
                  HEADER.pack(MAGIC, 1, 2, 2, 1, 1, 0)):
         fail(lambda b=blob: read_frozen_snapshot(lambda _: b))
