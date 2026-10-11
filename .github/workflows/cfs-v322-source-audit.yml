@@ -232,6 +232,39 @@ jobs:
           assert not d["hardware_or_serial_interface_opened"]
           print("PASS: 2 indirect callchains, arbitrary callback return, 9 CRC-valid mutations")
           PY
+      - name: Verify five original CFS callback device objects in isolated ROM emulator
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_driver_registration_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-driver-register.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-driver-register.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["matched_Thumb_instructions"]) == 28
+          assert v["static"]["object_count_static"] == 5
+          assert v["static"]["object_stride_bytes"] == 96
+          assert d["mutations"]["total"] == 8
+          objects = v["objects"]
+          assert [x["object_address"] for x in objects] == [
+              "0x2000075c", "0x200007bc", "0x2000081c",
+              "0x2000087c", "0x200008dc"
+          ]
+          for x in objects:
+              ptr = x["pointer_fields"]
+              assert ptr["0x30"] == "0x80193c5"
+              assert ptr["0x34"] == "0x8019401"
+              assert ptr["0x38"] == "0x801939d"
+              assert x["field_0x14"] == "0x1d"
+              assert x["object_registered_with_mock_OS"]
+              assert not x["native_callback_bodies_executed"]
+              assert not x["real_motor_hardware_owner_proven"]
+          assert not d["real_CFS_motor_instance_identity_proven"]
+          assert not d["firmware_release_allowed"]
+          print("PASS: 5 original object constructors, 3 callback pointers each, 8 CRC-valid corruptions")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
