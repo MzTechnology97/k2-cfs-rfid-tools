@@ -7,9 +7,11 @@
   "v322_descriptor_sha256": "f76a5776dfef2396ef90c16d5e5edc2abd03053afd9d5d7e6bd216ac39187248",
   "exact_matched_thumb_instructions": 23,
   "flash_driver_calls": {
-    "higher_level_page_erase": "0x801eaec",
-    "target": "0x80318be",
-    "higher_level_word_program": "0x801ea86"
+    "page_erase_callsite": "0x801eaec",
+    "page_erase_target": "0x803175a",
+    "word_program_callsite": "0x801ea86",
+    "word_program_target": "0x80318be",
+    "page_stride_bytes": 2048
   },
   "literal_refs": [
     {
