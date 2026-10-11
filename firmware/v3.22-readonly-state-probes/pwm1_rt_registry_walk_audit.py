@@ -82,6 +82,14 @@ PINS = {
     0x0802E214: ("bne", "#0x802e200"),
     0x0802E220: ("mov", "r0, r7"),
     0x0802E222: ("b", "#0x802dfa0"),
+    # Separate genuine application registration chain: FIVE objects
+    # go through a type-9 RT-Thread registration helper, but their
+    # actual runtime names and match to "pwm1" are still unobserved.
+    0x08028408: ("bl", "#0x802644a"),
+    0x08028428: ("cmp", "r4, #5"),
+    0x08026484: ("b.w", "#0x802377a"),
+    0x0802379A: ("movs", "r1, #9"),
+    0x0802379E: ("bl", "#0x802dfd6"),
 }
 LITERAL_ROM_PW1 = b"pwm1\x00"
 EXPECTED_UPPER_BOUND = 300
@@ -120,6 +128,9 @@ def static_pins(image: bytes, kind: str) -> dict:
         "original_name": "pwm1",
         "original_lookup_type": 9,
         "synthetic_registry_not_real_devices": True,
+        "separate_five_object_constructor_registers_type9": True,
+        "five_original_device_names_resolved": False,
+        "concrete_pwm1_object_is_one_of_five_proven": False,
     })
     return report
 
@@ -251,6 +262,8 @@ def mutate_and_reject(image: bytes):
         "registry_strncmp_call": 0x0802E20A,
         "link_next_pointer": 0x0802E210,
         "motor_pointer_store": APP_STORE,
+        "five_object_constructor": 0x08028408,
+        "five_object_type9_registration": 0x0802379A,
     }
     rejected = []
     for label, at in addresses.items():
