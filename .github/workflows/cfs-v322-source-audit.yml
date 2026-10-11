@@ -412,6 +412,11 @@ jobs:
           assert not d["physical_CFS_or_serial_accessed"]
           print("PASS: original pwm1 registry list walker, 7 synthetic scenarios, 9 CRC-valid mutations")
           PY
+      - name: Inspect original PWM name initializer and device field provenance (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python pwm1_name_init_static_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
