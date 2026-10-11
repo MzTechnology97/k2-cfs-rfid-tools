@@ -76,6 +76,31 @@ def printable_name(raw: bytes, ptr:int):
     return None
 
 
+def find_historical_scatter_descriptors(flash:bytes):
+    # Search aligned 16-byte records for exactly the archived loader
+    # function-pointer words. All candidate fields must describe plausible
+    # CFS APP-to-SRAM regions; no live memory is touched.
+    result=[]
+    for i in range(12,len(flash)-3,4):
+        handler=struct.unpack_from("<I",flash,i)[0]
+        if handler not in (OLD_LOADER_D,OLD_LOADER_Z,OLD_LOADER_D|1,OLD_LOADER_Z|1):
+            continue
+        src,dst,size=struct.unpack_from("<III",flash,i-12)
+        if not (FLASH_BASE <= src < FLASH_BASE+FLASH_N
+                and RAM_BASE <= dst < RAM_BASE+RAM_N
+                and 0 < size <= RAM_N and dst-RAM_BASE+size<=RAM_N+1):
+            continue
+        result.append({
+          "descriptor_at":hex(FLASH_BASE+i-12),
+          "source":hex(src),
+          "destination":hex(dst),
+          "output_bytes":size,
+          "handler":hex(handler),
+          "handler_role":"compressed" if (handler&~1)==OLD_LOADER_D else "zero",
+        })
+    return result
+
+
 def analyze(old_flash:bytes, old_ram:bytes, current:bytes):
     old_start=OLD_LOADER_D-FLASH_BASE
     app_start=CURRENT_APP_D-APP_BASE
@@ -104,6 +129,8 @@ def analyze(old_flash:bytes, old_ram:bytes, current:bytes):
         })
     vtable=struct.unpack_from("<II",old_flash,0)
     return {
+        "historical_scatter_descriptor_candidates":
+            find_historical_scatter_descriptors(old_flash),
         "public_historical_Flash":{
             "vector_initial_SP":hex(vtable[0]),
             "vector_reset_PC":hex(vtable[1]),
