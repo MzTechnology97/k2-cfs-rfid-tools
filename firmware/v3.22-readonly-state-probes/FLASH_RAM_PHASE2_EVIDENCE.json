@@ -4,8 +4,9 @@
     "part": "GD32F303VET6 (CFS G32 hypothesis; re-confirm actual silicon)",
     "core": "Cortex-M4 (older test assembly targets M3 ISA subset)",
     "total_flash_bytes": 524288,
-    "CODE_flash_bytes": 262144,
-    "DATA_flash_bytes_not_available_as_simple_code_space": 262144,
+    "fast_instruction_fetch_flash_bytes": 262144,
+    "slower_instruction_fetch_flash_bytes": 262144,
+    "slower_flash_instruction_fetch_possible": true,
     "sram_bytes": 65536,
     "reference": "https://www.gigadevice.com.cn/product/mcu/mcus-product-selector/gd32f303vet6"
   },
@@ -24,7 +25,8 @@
       "heap_end_literal": "0x20010000",
       "nominal_heap_window_bytes": 37144,
       "bytes_to_unverified_0x0803b800": 2504,
-      "bytes_to_silicon_code_area_end_NOT_ALLOCATABLE": 20936
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 20936,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 283080
     },
     "intermediate_v313": {
       "sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
@@ -40,7 +42,8 @@
       "heap_end_literal": "0x20010000",
       "nominal_heap_window_bytes": 37144,
       "bytes_to_unverified_0x0803b800": 476,
-      "bytes_to_silicon_code_area_end_NOT_ALLOCATABLE": 18908
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18908,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 281052
     },
     "running_v322": {
       "sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
@@ -56,7 +59,8 @@
       "heap_end_literal": "0x20010000",
       "nominal_heap_window_bytes": 37080,
       "bytes_to_unverified_0x0803b800": 36,
-      "bytes_to_silicon_code_area_end_NOT_ALLOCATABLE": 18468
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18468,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 280612
     },
     "experimental_sizeopt_unflashed": {
       "sha256": "06f36ef5c088ee2bb3497c89e30695ab1a3ca3b786b563b6f3d2c368ccf28d19",
@@ -72,18 +76,24 @@
       "heap_end_literal": "0x20010000",
       "nominal_heap_window_bytes": 37080,
       "bytes_to_unverified_0x0803b800": 56,
-      "bytes_to_silicon_code_area_end_NOT_ALLOCATABLE": 18488
+      "bytes_to_fast_fetch_end_NOT_AUTHORISED": 18488,
+      "bytes_to_total_flash_end_NOT_AUTHORISED": 280632
     }
   },
   "flash": {
-    "code_area_half_open": [
+    "total_main_flash_half_open": [
+      "0x8000000",
+      "0x8080000"
+    ],
+    "fast_fetch_flash_half_open": [
       "0x8000000",
       "0x8040000"
     ],
+    "instruction_fetch_after_256k_has_higher_latency": true,
     "application_base": "0x8010000",
     "lower_64k_separate_area_content_UNDUMPED": true,
     "prior_conservative_application_boundary_UNVERIFIED": "0x803b800",
-    "silicon_code_area_end_IS_NOT_loader_approved_app_end": true,
+    "physical_flash_and_256k_latency_split_ARE_NOT_loader_app_limits": true,
     "original_v322_spot_crc_and_vectors_match": true,
     "possible_last_reserved_flash_pages_unknown": true,
     "candidate_20B_smaller_image_unflashed": true,
@@ -114,12 +124,12 @@
     "dma_buffers_and_irq_writers_verified": false
   },
   "aligned_word_heuristics": {
-    "code_flash_0x0803b800_to_0x0803ffff": {
+    "pre_256k_end_0x0803b800_to_0x0803ffff": {
       "count": 0,
       "examples": [],
       "literal_and_instruction_bytes_NOT_disambiguated": true
     },
-    "data_looking_0x08040000_to_0x0807ffff": {
+    "slower_flash_0x08040000_to_0x0807ffff": {
       "count": 6,
       "examples": [
         {
