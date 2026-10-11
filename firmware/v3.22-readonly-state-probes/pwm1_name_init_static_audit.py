@@ -18,6 +18,7 @@ REGIONS = (
     ("name_preinitializer", 0x08028530, 0x08028578),
     ("five_pwm_object_init", 0x080283BE, 0x08028430),
     ("device_reg_tail", 0x0802644A, 0x08026488),
+    ("pre_device_name_writers", 0x08027F40, 0x08028054),
     ("aux_metadata_init", 0x08028054, 0x080280C0),
 )
 TARGET_RAM_FIELDS = {0x48, 0x4C, 0x50, 0x54}
