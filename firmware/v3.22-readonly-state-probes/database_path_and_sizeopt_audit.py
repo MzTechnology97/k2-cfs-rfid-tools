@@ -140,7 +140,7 @@ def inspect_handler_optimisation(source_path: Path, linker_path: Path) -> dict:
             raise ValueError("missing/duplicated critical handler alias or legacy data")
     # A line-by-line audit, with both symbol names accounted for. It is unsafe
     # to conclude config_v2_ensure is dead simply from its literal name count.
-    assert src.count("config_v2_ensure") == 1
+    assert len(re.findall(r"\bconfig_v2_ensure\b", src)) == 1
     assert src.count("config_ptr") >= 2
     assert src.count("config_expected_ptr") >= 2
     assert src.count("config_defaults") >= 1
