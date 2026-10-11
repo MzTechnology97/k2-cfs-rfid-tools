@@ -1,0 +1,146 @@
+{
+  "scope": "offline byte-pinned static ROM evidence only",
+  "source_images": {
+    "previous_v313": {
+      "sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
+      "size_bytes": 177700,
+      "heap_init_load_r1_at": "0x80278f2",
+      "heap_init_load_r0_at": "0x80278f4",
+      "heap_init_call_at": "0x80278f6",
+      "allocator_entry": "0x802d5e0",
+      "upper_literal": "0x20010000",
+      "lower_literal": "0x20006ee8",
+      "nominal_allocator_window_bytes": 37144,
+      "address_looking_aligned_words": [
+        {
+          "rom": "0x8011628",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8017a54",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8018138",
+          "value": "0x20007005",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8019ef8",
+          "value": "0x20007008",
+          "classification": "instruction_encoding_false_positive"
+        }
+      ],
+      "thumb_instruction_false_positives": 4,
+      "unexplained_aligned_immediate_words_in_ring_span": 0,
+      "static_literal_screen_passed_NOT_A_RUNTIME_PROOF": true
+    },
+    "working_v322": {
+      "sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+      "size_bytes": 178140,
+      "heap_init_load_r1_at": "0x80278f2",
+      "heap_init_load_r0_at": "0x80278f4",
+      "heap_init_call_at": "0x80278f6",
+      "allocator_entry": "0x802d5e0",
+      "upper_literal": "0x20010000",
+      "lower_literal": "0x20006f28",
+      "nominal_allocator_window_bytes": 37080,
+      "address_looking_aligned_words": [
+        {
+          "rom": "0x8011628",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8017a54",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8018138",
+          "value": "0x20007005",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8019ef8",
+          "value": "0x20007008",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8027960",
+          "value": "0x20006f28",
+          "classification": "known_heap_base_literal"
+        }
+      ],
+      "thumb_instruction_false_positives": 4,
+      "unexplained_aligned_immediate_words_in_ring_span": 0,
+      "static_literal_screen_passed_NOT_A_RUNTIME_PROOF": true
+    },
+    "unflashed_sizeopt": {
+      "sha256": "06f36ef5c088ee2bb3497c89e30695ab1a3ca3b786b563b6f3d2c368ccf28d19",
+      "size_bytes": 178120,
+      "heap_init_load_r1_at": "0x80278f2",
+      "heap_init_load_r0_at": "0x80278f4",
+      "heap_init_call_at": "0x80278f6",
+      "allocator_entry": "0x802d5e0",
+      "upper_literal": "0x20010000",
+      "lower_literal": "0x20006f28",
+      "nominal_allocator_window_bytes": 37080,
+      "address_looking_aligned_words": [
+        {
+          "rom": "0x8011628",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8017a54",
+          "value": "0x200070a0",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8018138",
+          "value": "0x20007005",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8019ef8",
+          "value": "0x20007008",
+          "classification": "instruction_encoding_false_positive"
+        },
+        {
+          "rom": "0x8027960",
+          "value": "0x20006f28",
+          "classification": "known_heap_base_literal"
+        }
+      ],
+      "thumb_instruction_false_positives": 4,
+      "unexplained_aligned_immediate_words_in_ring_span": 0,
+      "static_literal_screen_passed_NOT_A_RUNTIME_PROOF": true
+    }
+  },
+  "heap_top": "0x20010000",
+  "v322_alloc_start": "0x20006f28",
+  "proposed_ring_half_open_range": [
+    "0x20006f28",
+    "0x20007128"
+  ],
+  "proposed_new_allocator_start_NOT_PATCHED": "0x20007128",
+  "current_nominal_heap_span_bytes": 37080,
+  "proposed_nominal_heap_span_bytes": 36568,
+  "nominal_heap_reduction_bytes": 512,
+  "nominal_heap_reduction_percent": 1.381,
+  "heap_alignment_8_ok": true,
+  "conservative_unverified_app_end": "0x803b800",
+  "headroom_v322_bytes": 36,
+  "headroom_sizeopt_bytes": 56,
+  "direct_literal_scan_is_runtime_nonoverlap_proof": false,
+  "rtos_heap_peak_and_fragmentation_verified": false,
+  "task_stack_highwater_verified": false,
+  "dma_and_isr_ownership_verified": false,
+  "bootloader_app_partition_verified": false,
+  "no_patch_no_flash_no_device_io": true,
+  "safe_to_flash": false,
+  "fail_closed_cases_passed": 6
+}
