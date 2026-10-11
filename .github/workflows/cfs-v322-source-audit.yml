@@ -609,6 +609,24 @@ jobs:
           assert not d["motor_stop_feedback_proven"]
           print("PASS: original older CFS PWM ROM-name xref scan against independently decoded SRAM, never confuse with v3.22")
           PY
+          python cfs_pwm_callback_crossgen_static_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-callback-2025-v322.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-callback-2025-v322.json") as f:
+              d=json.load(f)
+          assert d["historical_authenticated_runtime_pointer"] == "0x8014555"
+          assert d["v322_original_constructor_callback_pointer"] == "0x801939d"
+          assert d["historical"]["instruction_count"] >= 12
+          assert d["v322"]["instruction_count"] >= 12
+          assert not d["callback_equivalence_proven"]
+          assert not d["actual_v322_pwm1_name_association_proven"]
+          assert not d["physical_motor_stop_proven"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: historical vs current PWM callback Thumb disassembly for review only")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
