@@ -3,7 +3,8 @@ import argparse, hashlib, pathlib, struct, subprocess, tempfile, json
 
 APP_BASE=0x08010000
 # Conservative build-policy bound, NOT a bootloader-certified application end.
-# GD32F303VE has 256 KiB code Flash (plus separate 256 KiB data Flash).
+# First 256 KiB of 512 KiB main Flash have fast instruction fetch. The rest
+# can also be fetched as code at higher latency; loader's app bound is unknown.
 UNVERIFIED_BUILD_LIMIT=0x0803B800
 HANDLER_ADDR=0x0803AE38
 CRC_OFF=0x20C
@@ -221,8 +222,10 @@ def main():
       'v319_heap_start': '0x20006F28',
       'v322_flash_end_limit': '0x0803B800',
       'v322_flash_end_limit_bootloader_verified': False,
-      'physical_code_flash_end': '0x08040000 (physical, NOT loader-authorised)',
-      'physical_data_flash_code_allocation_allowed': False,
+      'fast_fetch_flash_end': '0x08040000 (performance boundary, NOT app limit)',
+      'total_main_flash_end': '0x08080000 (silicon capacity, NOT loader-authorised)',
+      'beyond_first_256k_code_fetch_slower': True,
+      'flash_above_unverified_policy_approved_for_use': False,
       'v322_diag': '21 advanced RAM overrides, two stock timing callsites hooked (IDs 7/8), remaining 19 advanced settings not applied, no RFID motor hooks',
       'active_advanced_motion_hooks': [7,8],
       'never_flash_automatically':True,
