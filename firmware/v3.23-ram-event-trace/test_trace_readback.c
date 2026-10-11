@@ -74,7 +74,13 @@ int main(void) {
         assert(data.before[i]==0xB7 && data.after[i]==0xB7);
     data.ring.header.head=30;
     assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
-    data.ring.header.head=0;
+    data.ring.header.count=2;
+    data.ring.header.head=3;
+    data.ring.header.overwritten=0;
+    assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
+    data.ring.header.head=2;
+    data.ring.header.overwritten=1;
+    assert(cfs_trace_export_readonly(&data.ring,0xFF,dest,sizeof(dest))==0);
     data.ring.header.frozen=0;
     assert(cfs_trace_export_readonly(&data.ring,0,dest,sizeof(dest))==0);
     puts("PASS: read-only 20-byte header and 30 chronological 16-byte events; no source mutations/OOB");
