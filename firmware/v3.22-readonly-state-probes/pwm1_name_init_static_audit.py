@@ -18,7 +18,6 @@ REGIONS = (
     ("name_preinitializer", 0x08028530, 0x08028578),
     ("five_pwm_object_init", 0x080283BE, 0x08028430),
     ("device_reg_tail", 0x0802644A, 0x08026488),
-    ("pwm_name_table_near", 0x080284F8, 0x08028530),
     ("aux_metadata_init", 0x08028054, 0x080280C0),
 )
 TARGET_RAM_FIELDS = {0x48, 0x4C, 0x50, 0x54}
@@ -96,6 +95,7 @@ def main():
         {"at":hex(a),"op":m+" "+op} for a,m,op in hits]
     report["halfword_decode_can_contain_data_false_positives"] = True
     print("NAMES", json.dumps(report["candidate_name_strings"]))
+    print("NOTE: 0x080284F8..0x08028530 is treated as DATA, not executable Thumb; earlier STR +0x54 there were false disassembly hits")
     if options.json_out:
         options.json_out.write_text(json.dumps(report, indent=2)+"\n")
 
