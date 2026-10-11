@@ -459,6 +459,19 @@ jobs:
           assert d["static_ROM_does_not_prove_initialized_RAM_content"]
           print("PASS: exact reset scatter descriptors, 5 PWM name fields")
           PY
+      - name: Inspect full manufacturer Thumb scatter opcode stream (diagnostic only)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from capstone import Cs,CS_ARCH_ARM,CS_MODE_THUMB,CS_MODE_LITTLE_ENDIAN
+          from flash_ram_phase2_audit import pinned,APP_BASE
+          b=pinned(Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin"),"running_v322")
+          lo,hi=0x0801016c,0x080101c6
+          c=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_LITTLE_ENDIAN)
+          for i in c.disasm(b[lo-APP_BASE:hi-APP_BASE],lo):
+              print(f"CFS_SCATTER_ARM {i.address:#010x} {i.bytes.hex()} {i.mnemonic} {i.op_str}")
+          PY
       - name: Validate bounded APP scatter reference decoder against SHA-pinned v3.22
         working-directory: firmware/v3.22-readonly-state-probes
         run: |
