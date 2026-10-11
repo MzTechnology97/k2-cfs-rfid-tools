@@ -134,7 +134,10 @@ def emulate(image: bytes, code: int, installed: bool, fake_return: int):
             uc.emu_stop()
 
     def on_write(uc, access, address, size, value, _):
-        writes.append((address, size, value))
+        # Ignore AAPCS stack saves/pops. Track persistent request/device
+        # data writes only; stack is mapped at 0x2000E000.
+        if address < 0x2000C000:
+            writes.append((address, size, value))
 
     u.hook_add(UC_HOOK_CODE, on_code)
     u.hook_add(UC_HOOK_MEM_WRITE, on_write)
