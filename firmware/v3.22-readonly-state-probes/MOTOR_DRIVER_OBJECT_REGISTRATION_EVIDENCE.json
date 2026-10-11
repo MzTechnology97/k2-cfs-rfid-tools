@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-11",
+  "scope": "isolated original Thumb constructor execution with mocked RTOS + memset, no hardware",
+  "original_153_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "v322_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "original_equals_v322": true,
+  "loop": "0x080283F0",
+  "constructor": "0x0802644A",
+  "loop_caller": "0x08028408",
+  "object_stride_bytes": 96,
+  "object_count": 5,
+  "object_RAM_addresses": [
+    "0x2000075C",
+    "0x200007BC",
+    "0x2000081C",
+    "0x2000087C",
+    "0x200008DC"
+  ],
+  "callbacks_stored_by_each_constructor": {
+    "offset_0x30": "0x080193C5",
+    "offset_0x34": "0x08019401",
+    "offset_0x38": "0x0801939D"
+  },
+  "field_0x14": "0x1D",
+  "device_callback_dispatcher": "0x08023A92",
+  "motor_controller_device_pointer_RAM": "0x20004A14",
+  "motor_controller_device_instance_matches_one_of_these_five": false,
+  "motor_instance_match_not_established": true,
+  "original_Thumb_instructions_pinned": 28,
+  "crc_valid_mutations_rejected": 8,
+  "real_registered_callback_execution": false,
+  "real_OS_registration": false,
+  "hardware_motor_or_encoder_feedback_proven": false,
+  "firmware_or_device_IO": false,
+  "safe_to_flash": false
+}
