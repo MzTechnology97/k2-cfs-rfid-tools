@@ -14,7 +14,8 @@ import struct
 from pathlib import Path
 
 from flash_ram_phase2_audit import (
-    APP_BASE, CONSERVATIVE_APP_END, PINS, report_image, pinned
+    APP_BASE, CONSERVATIVE_APP_END, CRC_OFF, META_END,
+    crc16_bypass, report_image, pinned
 )
 
 FLASH_START = 0x08000000
@@ -195,6 +196,11 @@ def self_test(v322: bytes, stock: bytes | None) -> int:
     for site in (FLASH_ADDR_WORD_AT, PAGE_SIZE_WORD_AT, RAM_ADDR_WORD_AT):
         wrong = bytearray(v322)
         wrong[site - APP_BASE] ^= 1
+        # Recompute a VALID firmware CRC: this must test the semantic ROM
+        # table check, not get rejected merely by report_image's CRC gate.
+        crc_input = bytearray(wrong)
+        crc_input[CRC_OFF:META_END] = b"\\x00" * (META_END - CRC_OFF)
+        struct.pack_into("<H", wrong, CRC_OFF, crc16_bypass(crc_input))
         try:
             analyze_application(bytes(wrong), "running_v322")
         except ValueError:
