@@ -533,6 +533,42 @@ jobs:
           assert not d["expanded_v323_firmware_safe_to_flash"]
           print("PASS: reject incompatible APP decoder / 7 CRC-valid mutants, no fabricated names")
           PY
+      - name: Compare archived original CFS GD32 bootloader and RAM forensic snapshot (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          set -eu
+          # Public read-only 2025 data, from independent earlier CFS firmware.
+          curl -fsSL --retry 3 --max-time 45 \
+            -o /tmp/cfs-2025-original-flash.bin \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/main/reversing/live_dumps/0x0800_0000.bin
+          curl -fsSL --retry 3 --max-time 30 \
+            -o /tmp/cfs-2025-original-ram.bin \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/main/reversing/live_dumps/0x2000_0000_trunc.bin
+          python cfs_historical_bootloader_compare.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-public-bootloader-v322-compare.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-public-bootloader-v322-compare.json") as f:
+              d=json.load(f)
+          assert d["public_flash_integrity"]["git_blob_sha1"] == \
+              "44e2d48a144356c1ae2b3fe0b4e23175c050e28e"
+          assert d["public_RAM_integrity"]["git_blob_sha1"] == \
+              "80e1103c16dd5e17ddf5c84af6e976ad14bd0d38"
+          a=d["analysis"]
+          assert a["decompressor_total_bytes_compared"] == 92
+          assert a["zeroinit_total_bytes_compared"] == 32
+          assert len(a["historical_dump_five_fields_at_v322_offsets_UNVERIFIED"]) == 5
+          assert not a["deployed_CFS_bootloader_identity_verified"]
+          assert not a["actual_pwm1_runtime_callback_proven"]
+          assert not a["independent_motor_feedback_proven"]
+          assert not a["firmware_flash_safe"]
+          assert not d["any_firmware_flashing"]
+          print("PASS: historical CFS G32 bootloader diff and private name-field bounds checked; hardware remains unchanged")
+          PY
+          rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
