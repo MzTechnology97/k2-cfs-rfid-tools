@@ -17,6 +17,9 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from heap_static_crosscheck import build_report as audit_heap, self_test as test_heap_gate
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parents[2]
@@ -150,6 +153,16 @@ def main():
         assert APP_BASE + len(new) <= EMPIRICAL_LIMIT
         after = emulate(optimized, new)
         fields_checked = equivalent_functionality(before, after)
+        # Byte-pinned, source-only memory gate; images remain disposable.
+        v313 = (root / "original" / "firmware" /
+                "v3.19-volatile-ram" / BASE_NAME).read_bytes()
+        heap_evidence = audit_heap(v313, old, new)
+        assert heap_evidence["safe_to_flash"] is False
+        for item in heap_evidence["source_images"].values():
+            assert item["unexplained_aligned_immediate_words_in_ring_span"] == 0
+            assert item["thumb_instruction_false_positives"] == 4
+        heap_fail_closed = test_heap_gate(v313, old, new)
+        assert heap_fail_closed == 6
         # The temporary scratch directory and experimental BINs are removed
         # on exit; this script cannot install any firmware.
         result = {
@@ -161,6 +174,10 @@ def main():
             "remaining_bytes_to_empirical_limit": EMPIRICAL_LIMIT - APP_BASE - len(new),
             "wide_branch_qualifiers_relaxed": num_relaxed,
             "behavioral_comparison_fields_checked": fields_checked,
+            "heap_static_crosscheck_images": 3,
+            "heap_static_false_positive_thumb_words_each": 4,
+            "heap_static_mutation_fail_closed_tests": heap_fail_closed,
+            "heap_static_check_is_runtime_proof": False,
             "same_28_get_values_and_21_set_reset": True,
             "physical_motor_hooks_added": False,
             "hardware_or_installer_touched": False,
