@@ -66,6 +66,8 @@ def main():
       "v313":examine(old_app,APP_BASE),
       "v322":examine(cur_app,APP_BASE),
       "historical_raw_flash":examine(historical,FLASH_BASE),
+      "historical_app_at_0x08010000":examine(
+          historical[APP_BASE-FLASH_BASE:],APP_BASE),
       "exact_early_application_vector_pair_same_v313_v322":
          old_app[:8]==cur_app[:8],
       "early_application_entry_256B_identical_v313_v322":
@@ -74,6 +76,8 @@ def main():
          cur_app[(struct.unpack_from("<I",cur_app,4)[0]&~1)-APP_BASE:
                  (struct.unpack_from("<I",cur_app,4)[0]&~1)-APP_BASE+ROOT_ENTRY_WINDOW],
       "data_scatter_table_proves_executed_startup_path":False,
+      "current_APP_entry_has_normal_reset_handler_prologue_VERIFIED":False,
+      "current_APP_source_is_known_to_execute_scatter_descriptors":False,
       "actual_CFS_reset_observed":False,
       "release_approved":False,
     }
