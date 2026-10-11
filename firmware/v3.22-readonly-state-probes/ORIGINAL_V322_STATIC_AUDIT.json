@@ -1,0 +1,188 @@
+{
+  "stock": {
+    "sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+    "size_bytes": 175672
+  },
+  "v313": {
+    "sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
+    "size_bytes": 177700
+  },
+  "v322": {
+    "sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+    "size_bytes": 178140
+  },
+  "stock_to_v322": {
+    "different_bytes_within_original_length": 63,
+    "new_suffix_bytes": 2468,
+    "diff_clusters_in_original_length": [
+      {
+        "rom_start": "0x801020c",
+        "rom_end_exclusive": "0x8010210"
+      },
+      {
+        "rom_start": "0x8011116",
+        "rom_end_exclusive": "0x801111a"
+      },
+      {
+        "rom_start": "0x80112ca",
+        "rom_end_exclusive": "0x80112ce"
+      },
+      {
+        "rom_start": "0x8012ddc",
+        "rom_end_exclusive": "0x8012de0"
+      },
+      {
+        "rom_start": "0x8012e62",
+        "rom_end_exclusive": "0x8012e66"
+      },
+      {
+        "rom_start": "0x8013380",
+        "rom_end_exclusive": "0x8013384"
+      },
+      {
+        "rom_start": "0x8013394",
+        "rom_end_exclusive": "0x8013398"
+      },
+      {
+        "rom_start": "0x801a4cc",
+        "rom_end_exclusive": "0x801a4d0"
+      },
+      {
+        "rom_start": "0x801a52c",
+        "rom_end_exclusive": "0x801a530"
+      },
+      {
+        "rom_start": "0x801a590",
+        "rom_end_exclusive": "0x801a594"
+      },
+      {
+        "rom_start": "0x801bf9e",
+        "rom_end_exclusive": "0x801bfa2"
+      },
+      {
+        "rom_start": "0x801c3a0",
+        "rom_end_exclusive": "0x801c3a4"
+      },
+      {
+        "rom_start": "0x80225d0",
+        "rom_end_exclusive": "0x80225d4"
+      },
+      {
+        "rom_start": "0x8022604",
+        "rom_end_exclusive": "0x8022608"
+      },
+      {
+        "rom_start": "0x8022638",
+        "rom_end_exclusive": "0x802263c"
+      },
+      {
+        "rom_start": "0x8027960",
+        "rom_end_exclusive": "0x8027962"
+      },
+      {
+        "rom_start": "0x802a5f2",
+        "rom_end_exclusive": "0x802a5f6"
+      }
+    ]
+  },
+  "v313_to_v322": {
+    "different_bytes_within_base_length": 1956,
+    "appended_bytes": 440,
+    "clusters": [
+      {
+        "rom_start": "0x801020c",
+        "rom_end_exclusive": "0x8010210"
+      },
+      {
+        "rom_start": "0x8011116",
+        "rom_end_exclusive": "0x801111a"
+      },
+      {
+        "rom_start": "0x80112ca",
+        "rom_end_exclusive": "0x80112ce"
+      },
+      {
+        "rom_start": "0x8012dde",
+        "rom_end_exclusive": "0x8012de0"
+      },
+      {
+        "rom_start": "0x8012e64",
+        "rom_end_exclusive": "0x8012e66"
+      },
+      {
+        "rom_start": "0x8013382",
+        "rom_end_exclusive": "0x8013384"
+      },
+      {
+        "rom_start": "0x8013396",
+        "rom_end_exclusive": "0x8013398"
+      },
+      {
+        "rom_start": "0x801a4ce",
+        "rom_end_exclusive": "0x801a4cf"
+      },
+      {
+        "rom_start": "0x801a52c",
+        "rom_end_exclusive": "0x801a530"
+      },
+      {
+        "rom_start": "0x801a590",
+        "rom_end_exclusive": "0x801a594"
+      },
+      {
+        "rom_start": "0x801bfa0",
+        "rom_end_exclusive": "0x801bfa2"
+      },
+      {
+        "rom_start": "0x80225d0",
+        "rom_end_exclusive": "0x80225d4"
+      },
+      {
+        "rom_start": "0x8022604",
+        "rom_end_exclusive": "0x8022608"
+      },
+      {
+        "rom_start": "0x8022638",
+        "rom_end_exclusive": "0x802263c"
+      },
+      {
+        "rom_start": "0x8027960",
+        "rom_end_exclusive": "0x8027962"
+      },
+      {
+        "rom_start": "0x802a5f2",
+        "rom_end_exclusive": "0x802a5f6"
+      },
+      {
+        "rom_start": "0x803ae3c",
+        "rom_end_exclusive": "0x803b624"
+      }
+    ],
+    "expected_patched_original_callsites": [
+      "legacy_read0_wrapper",
+      "legacy_read1_wrapper",
+      "legacy_read2_wrapper",
+      "alt_read_wrapper",
+      "alt_read_wrapper",
+      "alt_read_wrapper",
+      "uid_compare_wrapper",
+      "msg_validate_wrapper",
+      "remaining_gate_wrapper",
+      "remaining_init_wrapper",
+      "remaining_valid_wrapper",
+      "cfg7_r0_wrapper",
+      "cfg8_r1_wrapper",
+      "heap_init_sidecar_wrapper"
+    ],
+    "unexplained_changes_before_handler": 0
+  },
+  "explicit_nonclaims": {
+    "safe_to_flash_new_image": false,
+    "independent_mcu_motor_busy_guard_verified": false,
+    "heap_stack_dma_runtime_proven": false,
+    "bootloader_flash_partition_proven": false,
+    "all_28_parameters_affect_physical_behavior": false,
+    "rfid_secure_backend_capture_hardware_validated": false
+  },
+  "offline_read_only": true
+}

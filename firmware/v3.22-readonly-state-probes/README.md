@@ -56,3 +56,58 @@ After the operator flashed v3.22, initial Klipper startup displayed `NO_RESPONSE
 - Firmware still has the original v3.21 `BOX_STATE`-based write guard, which was already shown to be insufficient alone during early `feeding_to_buffer`. Keep Kalico's motion/write interlock enabled, auto-apply off, and issue #9 open until an independently timestamped MCU-side activity flag is validated.
 
 Evidence is stored locally on the CM5 as `~/cfs-rfid-v322-readonly-probe-lab/V322_IDLE_BASELINE_HARDWARE.json` and `V322_PHYSICAL_SNAPSHOT_20261010.json`. These device snapshots were not published in full. An event-driven read-only MCU/serial trace is needed to observe candidate bytes *during* movement; another G-code-queued request will not provide valid in-motion data.
+
+## Independent 2026-10-11 stock-to-v3.22 audit (offline only)
+
+The exact unmodified Creality G32/application-153 BIN was recovered locally and
+SHA256-pinned to `5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea`
+(175,672 bytes). It is **not distributed or committed** in this repository.
+The audited v3.22 image remains byte-identical to the physical-test build:
+SHA256 `40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`
+(178,140 bytes).
+
+- Against the stock original: **63 bytes** changed in the common original image,
+  and **2,468 bytes** were appended. Changes comprise firmware header metadata,
+  handler dispatch, RFID/remaining hooks, timing hooks and volatile-sidecar init.
+  This is not a claim that the appended code is production-safe.
+- Against the SHA-pinned v3.13 intermediary: **1,956 common bytes** differ and
+  **440 bytes** were appended. No byte differences *before the appended handler*
+  fall outside the manifest's known callsites, container CRC and heap literal.
+- The assembly retains all principal v3.12 API7 RFID capture, guarded
+  redundant-retry acceptance and stock-geometry remaining routine bodies;
+  the only 2 operative advanced motion hooks are IDs **7/8**.
+- IDs **9–27** accept bounded `SET/GET/RESET` in the MCU but **do not
+  influence original motor, delay, RFID or protection callsites**. Treat these
+  as no-op RAM bench values. The paired Kalico audit branch now fails closed
+  before sending manual SETs to them; legacy stock speed IDs 0–6 remain read-only.
+- `0x14 CONFIG_V2_DESCRIBE` and API1 `0x0D–0x0F` are not dispatched.
+  Some historical comments/documentation incorrectly described them as present.
+  Comments in the assembly are corrected; **executable bytes are unchanged**.
+- The six-byte historical `config_defaults` table and the unused
+  `config_v2_ensure` code path have no verified live callers. Do not remove
+  them in an unvalidated release: doing so shifts executable handler placement
+  near the unverified application flash boundary.
+- CFS third-party remaining uses a fixed **330,000 mm nominal type-4 odometer**
+  and the original stock geometry-derived initial percentage. This was
+  intentionally inferred from a Creality RFID `len=0330` hardware record.
+  It is a *reference*, not the true spool length for every material. Kalico
+  can separately track actual third-party lengths from the tag/profile/material
+  estimates. Do not alter this stock-style behavior without hardware tests.
+- `BOX_STATE==IDLE` remains a **non-atomic, insufficient MCU write guard**.
+  The four v3.22 diagnostic reads are not proven activity flags. Auto-apply and
+  unattended runtime writes remain prohibited. v3.23 512-byte event-ring work
+  remains *offline only*, with SRAM/bootloader safety gates unresolved.
+
+Reproduce the comparison with the unmodified 175672-byte vendor image kept
+outside this public repository:
+
+```sh
+python3 firmware/v3.22-readonly-state-probes/audit_stock_vs_v322.py \
+  --stock /private/path/to/unmodified-v153.bin \
+  --base firmware/v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+  --modified /private/path/to/CFS-v3_22.bin
+```
+
+The checker pins each image's size/hash and rejects unexplained changes
+outside its declared code sites. It neither creates a firmware image nor
+communicates with a CFS. This audit does **not** approve v3.22 for production.

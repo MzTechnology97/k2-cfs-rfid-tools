@@ -1,0 +1,54 @@
+name: CFS v3.22 source and RFID audit (offline)
+
+on:
+  pull_request:
+    paths:
+      - "firmware/v3.12-remaining/**"
+      - "firmware/v3.19-volatile-ram/**"
+      - "firmware/v3.22-readonly-state-probes/**"
+      - ".github/workflows/cfs-v322-source-audit.yml"
+  workflow_dispatch:
+
+jobs:
+  source-integrity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM Thumb toolchain
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gcc-arm-none-eabi binutils-arm-none-eabi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install isolated emulator
+        run: python -m pip install "unicorn>=2.0,<3.0"
+      - name: Verify 28 RFID/remaining ARM routine bodies
+        run: python firmware/v3.22-readonly-state-probes/verify_rfid_regression.py
+      - name: Static builder preflight + SHA-pinned offline build
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          set -eu
+          python bench_preflight_v3_22.py >/tmp/cfs-v322-preflight.json
+          python build-v3_22.py \
+            --base ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --out CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin >/tmp/cfs-v322-build.json
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          image=Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin").read_bytes()
+          assert len(image) == 178140
+          assert hashlib.sha256(image).hexdigest() == (
+              "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7")
+          print("PASS: exact original unmodified v3.22 image")
+          PY
+      - name: Verify Cortex-M3 callsite and host protocol emulation
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: python emulate_v3_22.py
+      - name: Validate opt-in original-to-v3.22 auditor syntax
+        run: python -m py_compile firmware/v3.22-readonly-state-probes/audit_stock_vs_v322.py
+      - name: Remove disposable compiled image
+        if: always()
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: rm -f CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin

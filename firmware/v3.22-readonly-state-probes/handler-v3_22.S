@@ -10,8 +10,6 @@
 .equ STOCK_REMAIN_INIT,   0x0801AA14
 .equ STOCK_REMAIN_VALID,  0x0801245C
 .equ STOCK_REMAIN_GATE,   0x080102E2
-.equ STOCK_HUB_FORWARD,   0x0801E164
-.equ STOCK_DELAY_MS,      0x0802EE28
 .equ REMAIN_SET,          0x080123E4
 .equ REMAIN_RUNTIME,      0x20004590
 .equ STOCK_51,           0x0801C704
@@ -41,14 +39,13 @@
 @ 7 ARM_KEYS3: reader,slot,key0[6],key1[6],key2[6]
 @ 8 CLEAR_KEYS: reader,slot
 @ 9 RUNTIME_INFO: hw_flag, legacy_block0, legacy_block1, legacy_block2
-@ 0x0D CONFIG_INFO: version,count,current[6]
-@ 0x0E CONFIG_SET: id,value (volatile RAM only; idle only)
-@ 0x0F CONFIG_RESET: legacy v1 id or 0xFF (six speed parameters)
+@ The historical v3.13 API1 opcodes 0x0D..0x0F are NOT dispatched here.
+@ Stock speed IDs 0..5 are READ-ONLY in this API2 experiment.
 @ 0x10 CONFIG_V2_INFO: version,count,catalog_revision,features
 @ 0x11 CONFIG_V2_GET: id -> id,value16
 @ 0x12 CONFIG_V2_SET: id,value16 -> id,value16 (idle only)
 @ 0x13 CONFIG_V2_RESET: id or 0xFF (idle only)
-@ 0x14 CONFIG_V2_DESCRIBE: id -> type,flags,default,min,max
+@ CONFIG_V2_DESCRIBE 0x14 is documented but NOT implemented here.
 @
 @ No RFID operation is started from opcode 0x57. The six patched stock read
 @ callsites remain inside Creality's original RFID worker/task:
@@ -223,15 +220,17 @@ op_runtime:
     b       send
 
 @ Runtime CFS configuration.
-@ v1 (0x0D..0x0F) is retained for backward compatibility.
-@ v3.17 diagnostic: original stock motion-table pointer never replaced.
-@ No experimental heap, sidecar, or advanced motor hooks are activated.
-@ Advanced options remain read-only stock defaults until storage is proven.
+@ Legacy API1 commands are NOT routed by this handler.
+@ Stock motor-table pointer is untouched; speed IDs 0..6 are read-only.
+@ 64 bytes of sidecar SRAM store advanced overrides for bench tests.
+@ Only IDs 7/8 are wired to execution; IDs 9..27 are NO-OP tuning.
+@ Host must protect motion/write independently of BOX_STATE=IDLE.
 .equ CONFIG_V2_COUNT,       28
 
-@ v3.20 TIMING HOOK BENCH: IDs 7..27 only, with bounded volatile storage.
-@ There are NO stock motor/read callsite hooks for these new parameters.
-@ IDs 0..6 remain read-only in API v2 during this controlled bench stage.
+@ 21 advanced IDs 7..27 store bounded volatile values for bench tests.
+@ ONLY IDs 7/8 have effective stock timing callsite hooks.
+@ All other advanced IDs are STORED-ONLY, not effective motor controls.
+@ IDs 0..6 remain READ-ONLY on v3.19-v3.22 API2.
 @ 64 bytes at former heap start are isolated by moving heap literal +64.
 @ Magic+bitmask are cleared at RTOS heap init; volatile across resets.
 config_v2_ensure:
@@ -313,7 +312,7 @@ op_config_v2_info:
     ldrb    r0, [r4, #1]
     cmp     r0, #4
     bne.w   status_bad
-    @ Prototype read-only: INFO has no allocation or global-pointer writes.
+    @ INFO is GET-only: no heap allocation or global-pointer writes.
     movs    r0, #2
     strb    r0, [sp, #0]
     movs    r0, #CONFIG_V2_COUNT
@@ -366,7 +365,9 @@ v322_get_result:
     b       send
 
 op_config_v2_set:
-    @ Bench SET only 7..27: never alters the stock motor table.
+    @ Bench SET stores IDs 7..27; only ID7/8 can affect behavior.
+    @ WARNING: stock BOX_STATE=IDLE is NOT proven to exclude early feeding.
+    @ Auto-apply and raw writes without a host motion mutex are unsafe.
     ldrb    r0, [r4, #1]
     cmp     r0, #7
     bne.w   status_bad
@@ -465,7 +466,9 @@ reset_done:
     movs    r3, #0
     b       send
 
-@ Read-only compact ROM values for runtime IDs 7..27.
+@ Nominal ROM catalogue values for IDs 7..27. Values of 9..27
+@ are not all independently verified against original stock callsites.
+@ They are experimental STORAGE-ONLY descriptors, not tuning knobs.
 .balign 2
 compact_defaults_u16:
     .hword 3200  @ ID 7
@@ -1351,6 +1354,8 @@ sidecar_address_ptr:   .word SIDECAR_BASE
 sidecar_magic_word:    .word SIDECAR_MAGIC
 config_expected_ptr:   .word 0x200037E2
 config_offsets:        .byte 1, 2, 3, 5, 6, 7
+@ The six-speed defaults below are currently UNREFERENCED by this handler.
+@ Retain for exact v3.22 binary layout until all relocation safety is proven.
 config_defaults:       .byte 255, 100, 200, 155, 255, 80
 .balign 4
 @ API7: bit3=three-key override, bit5=state, bit6=stock capture, bit7=internal.
