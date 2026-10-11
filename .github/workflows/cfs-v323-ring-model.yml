@@ -1,0 +1,60 @@
+name: CFS v3.23 RAM ring model (offline only)
+on:
+  push:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  pull_request:
+    paths:
+      - "firmware/v3.23-ram-event-trace/**"
+      - ".github/workflows/cfs-v323-ring-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ring-model:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM offline compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gcc gcc-arm-none-eabi
+      - name: Sanitize and cross-compile RAM ring model
+        working-directory: firmware/v3.23-ram-event-trace
+        run: sh ./run_offline.sh
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install offline ARM emulator
+        run: python3 -m pip install unicorn==2.1.3
+      - name: Verify motor trampoline ABI against stock Thumb instructions
+        working-directory: firmware/v3.23-ram-event-trace/abi
+        run: sh ./run_abi_offline.sh
+      - name: Test real C RAM ring connected to synthetic motor hook
+        working-directory: firmware/v3.23-ram-event-trace/abi/integrated
+        run: sh ./run_integrated_offline.sh
+      - name: Audit empirical CFS image size and read-only dump parser
+        working-directory: firmware/v3.23-ram-event-trace
+        run: python3 test_memory_gate.py
+      - name: Validate C read-only trace serialization and Python decoder
+        working-directory: firmware/v3.23-ram-event-trace
+        run: |
+          gcc -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=address,undefined \
+            -fno-omit-frame-pointer trace_ring.c trace_readback.c \
+            test_trace_readback.c -o build/test_trace_readback
+          ./build/test_trace_readback
+          python3 test_trace_readback_host.py
+          gcc -std=c11 -O2 -Wall -Wextra -Werror trace_ring.c trace_readback.c \
+            test_trace_wire_fixture.c -o build/test_trace_wire_fixture
+          python3 test_trace_wire_interop.py build/test_trace_wire_fixture
+      - name: Rebuild size-optimized CFS v3.22 in temporary directory and diff against baseline
+        working-directory: firmware/v3.23-ram-event-trace/sizeopt
+        run: python3 offline_rebuild.py
+      - name: Confirm no flashable CFS image was created
+        run: |
+          test ! -e firmware/v3.23-ram-event-trace/CFS-v3_23.bin
+          echo 'No firmware patching or flashing was performed.'
