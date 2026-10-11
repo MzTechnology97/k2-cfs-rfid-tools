@@ -19,7 +19,10 @@ int cfs_trace_export_readonly(const cfs_trace_ring_t *ring,
         ring->header.magic!=CFS_TRACE_MAGIC ||
         ring->header.frozen!=1 ||
         ring->header.head>=CFS_TRACE_CAPACITY ||
-        ring->header.count>CFS_TRACE_CAPACITY)
+        ring->header.count>CFS_TRACE_CAPACITY ||
+        (ring->header.count<CFS_TRACE_CAPACITY &&
+          (ring->header.head!=ring->header.count ||
+           ring->header.overwritten!=0)))
         return 0;
 
     if (selector==CFS_TRACE_SELECTOR_HEADER) {
