@@ -15,7 +15,9 @@ import struct
 from pathlib import Path
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_LITTLE_ENDIAN
-from flash_ram_phase2_audit import pinned, report_image, APP_BASE
+from flash_ram_phase2_audit import (
+    APP_BASE, CRC_OFF, META_END, crc16_bypass, pinned, report_image,
+)
 
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
 from unicorn.arm_const import (
@@ -219,11 +221,42 @@ def audit(image, kind):
     }
 
 
+def fail_closed_tests(image):
+    # In-memory byte flips and re-signed firmware checksum must be rejected
+    # by the motor flow instructions, independent of the CRC. No file writes.
+    sites = {
+        "nonzero_only_branch": 0x0801E0F4,
+        "zero_versus_nonzero_branch": 0x0801E128,
+        "nonzero_state_clear": 0x0801E10A,
+        "zero_path_followup": 0x0801E13E,
+        "zero_path_status_store": 0x0801E14C,
+        "zero_path_fpu_store": 0x0801E154,
+    }
+    rejected = []
+    for name, addr in sites.items():
+        mutated = bytearray(image)
+        mutated[addr - APP_BASE] ^= 1
+        unsigned = bytearray(mutated)
+        unsigned[CRC_OFF:META_END] = bytes(META_END - CRC_OFF)
+        struct.pack_into("<H", mutated, CRC_OFF, crc16_bypass(unsigned))
+        verified_header = report_image(bytes(mutated), "running_v322")
+        if not verified_header["header_crc_valid"]:
+            raise AssertionError("mutated image CRC must be valid: " + name)
+        try:
+            verify_instructions(bytes(mutated))
+        except ValueError:
+            rejected.append(name)
+        else:
+            raise AssertionError("unsafe changed duty branch accepted: " + name)
+    return {"crc_corrected_Thumb_changes_rejected": rejected, "count": len(rejected)}
+
+
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--v322", required=True, type=Path)
     cli.add_argument("--stock", type=Path)
     cli.add_argument("--json-out", type=Path)
+    cli.add_argument("--self-test", action="store_true")
     x = cli.parse_args()
     current = audit(pinned(x.v322, "running_v322"), "running_v322")
     stock = audit(pinned(x.stock, "creality_stock_153"),
@@ -242,6 +275,9 @@ def main():
         "motor_idle_proven": False,
         "flash_release_authorized": False,
     }
+    if x.self_test:
+        report["fail_closed_mutations"] = fail_closed_tests(
+            pinned(x.v322, "running_v322"))
     text = json.dumps(report, indent=2) + "\n"
     if x.json_out:
         x.json_out.write_text(text)
