@@ -31,6 +31,13 @@ at `0x0801E28C`. The following debug messages mention
 they are diagnostic context, not proof of the chip model
 or motor electrical interface.
 
+A separate occurrence of `pwm1` exists in the original
+ROM at `0x080399E4` within a grouping of RT-Thread diagnostic
+device names including `pwm3`, `pwm4`, `pwm5` and
+`pwm8`. The group is useful contextual evidence of multiple
+PWM-named devices, but is **not** a registry object, a vtable
+or proof that a specific motor uses any of those channels.
+
 This corrects an uncertainty in
 [CFS_DEVICE_OBJECT_REGISTRATION_20261011.md](CFS_DEVICE_OBJECT_REGISTRATION_20261011.md):
 the root's +0xB4 pointer is populated by a **named `pwm1`,
