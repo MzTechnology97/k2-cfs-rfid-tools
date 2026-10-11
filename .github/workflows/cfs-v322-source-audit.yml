@@ -134,6 +134,32 @@ jobs:
           assert not d["runtime_use_of_last_flash_page_proven"]
           print("PASS: 11 Creality database/FMC callsites, alias safety, 4B offline estimate")
           PY
+      - name: Validate original Creality CFS motor command routes (offline)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_command_callgraph_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --scan-all --self-test >/tmp/cfs-motor-command-callgraph.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-command-callgraph.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert v["callsite_total"] == 102
+          assert v["forward_wrapper_static_BL"] == 33
+          assert v["reverse_wrapper_static_BL"] == 17
+          assert v["zero_command_wrapper_static_BL"] == 50
+          assert v["direct_duty_setter_static_BL"] == 2
+          assert v["full_scan_completed"]
+          assert len(v["wrapper_tails"]) == 3
+          assert d["fail_closed"]["count"] == 9
+          assert v["callsite_inventory_sha256"] == "d66b17e67f80af1a8e9eb89ac435fadb4250a8c5c441a5580468e94b45617081"
+          assert not v["zero_duty_command_proves_motor_idle"]
+          assert not v["all_physical_motor_start_stop_events_proven"]
+          assert not v["safe_to_install_trace_hook"]
+          assert not v["safe_to_flash_expanded_app"]
+          print("PASS: 102 original ROM command calls, 50 zero-duty sites, 9 CRC-valid rejects")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
