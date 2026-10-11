@@ -148,7 +148,7 @@ def main():
       "new_scatter_output_bytes":amount,
       "same_bytes_at_historical_bootloader_vs_APP_candidate":(
           flash[0x316c:0x31c8] ==
-          current[0x1016c-APP_BASE:0x101c8-APP_BASE]),
+          current[0x0801016c-APP_BASE:0x080101c8-APP_BASE]),
       "actual_deployed_bootloader_verified":False,
       "physical_CFS_access":False,
       "motor_safety_release_authorized":False,
