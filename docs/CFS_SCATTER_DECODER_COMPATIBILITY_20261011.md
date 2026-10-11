@@ -145,6 +145,30 @@ memory evidence only**. The v3.22 objects sit elsewhere
 remain UNPROVEN until valid v3.22 initialization data or a
 safe authenticated live snapshot is available.
 
+### Historical RT-Thread callback installed after initialization
+
+The historical independently acquired running SRAM snapshot now
+provides a strong corroboration of *when* the five PWM device callbacks
+are installed. For each of the five named historical 96-byte-stride
+objects, the decompressed initial image contains **zero** at offsets
+`+0x30`, `+0x34` and `+0x38`. The independently captured later
+RAM snapshot differs at these offsets, consistent with initialization
+by RT-Thread/board-specific device registration.
+
+Importantly, all five historical `[object+0x38]` callback pointers
+converge to the **same historical Flash Thumb function**
+`0x08014555` in the later RAM snapshot. That value falls inside
+the archived original Flash image.
+
+Our separate v3.22 manufacturer constructor sets its five
+`[object+0x38]` pointers to **`0x0801939D`**. This is
+a useful **functional comparison candidate**, not an
+equivalence proof. The historical `0x08014555` is from
+older original code, and `0x0801939D` is from the
+v3.22 branch. Neither address alone proves motor
+running/idle feedback, driver hardware ownership,
+or which specific real v3.22 name maps to which object.
+
 **Critical limitations:** The installed unit's loader
 bytes have not been read, and the old reconstructed RAM
 does **not** prove the object layout or callback addresses
