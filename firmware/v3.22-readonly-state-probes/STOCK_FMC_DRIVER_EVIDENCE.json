@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-11",
+  "method": "saved SHA-pinned Creality 1.5.3/v3.22 original ROM; offline Thumb-2 static audit",
+  "original_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "v322_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "original_descriptor_sha256": "f76a5776dfef2396ef90c16d5e5edc2abd03053afd9d5d7e6bd216ac39187248",
+  "v322_descriptor_sha256": "f76a5776dfef2396ef90c16d5e5edc2abd03053afd9d5d7e6bd216ac39187248",
+  "exact_matched_thumb_instructions": 23,
+  "flash_driver_calls": {
+    "higher_level_page_erase": "0x801eaec",
+    "target": "0x80318be",
+    "higher_level_word_program": "0x801ea86"
+  },
+  "literal_refs": [
+    {
+      "ldr_at": "0x803175e",
+      "rom_word_at": "0x8031a64",
+      "validated_value": "0x1ffff7e0"
+    },
+    {
+      "ldr_at": "0x8031760",
+      "rom_word_at": "0x8031a58",
+      "validated_value": "0x40022000"
+    },
+    {
+      "ldr_at": "0x803176c",
+      "rom_word_at": "0x8031a6c",
+      "validated_value": "0x807ffff"
+    },
+    {
+      "ldr_at": "0x80319fc",
+      "rom_word_at": "0x8031a58",
+      "validated_value": "0x40022000"
+    },
+    {
+      "ldr_at": "0x8031a04",
+      "rom_word_at": "0x8031a5c",
+      "validated_value": "0x45670123"
+    },
+    {
+      "ldr_at": "0x8031a08",
+      "rom_word_at": "0x8031a60",
+      "validated_value": "0xcdef89ab"
+    }
+  ],
+  "original_last_page_pointer_occurrences": [
+    "0x8036d2c"
+  ],
+  "fail_closed_mutation_tests": {
+    "crc_valid_mutations_rejected": [
+      "last_page_pointer",
+      "last_page_size",
+      "erase_per_bit",
+      "word_program_call",
+      "fmc_unlock_key"
+    ],
+    "total": 5
+  },
+  "findings": {
+    "FMC_BASE": "0x40022000",
+    "unlock_key_order": [
+      "0x45670123",
+      "0xcdef89ab"
+    ],
+    "GD32_FMC_CTL0_PER_bit": 2,
+    "GD32_FMC_CTL0_START_bit": 64,
+    "GD32_FMC_CTL0_PG_bit": 1,
+    "flash_erase_page_size_bytes": 2048,
+    "flash_erase_page_number_last": 255,
+    "stock_app_mcu_FLASH_driver_present": true,
+    "stock_direct_callers_to_driver_present": true,
+    "last_page_address_explicit_in_stock_ROM": true,
+    "connection_of_last_page_descriptor_to_driver_RUNTIME_UNPROVEN": true,
+    "actual_app_update_bootloader_max_bytes": null,
+    "Flash_above_0x0803B800_free_for_new_code": false,
+    "source_bootloader_code_was_dumped": false,
+    "safe_to_flash_a_larger_app": false,
+    "safe_to_write_flash_runtime": false
+  },
+  "proven_runtime_use_of_last_page": false,
+  "safe_to_flash": false,
+  "original_firmware_bytes_published": false
+}
