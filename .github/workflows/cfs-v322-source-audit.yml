@@ -472,6 +472,30 @@ jobs:
           for i in c.disasm(b[lo-APP_BASE:hi-APP_BASE],lo):
               print(f"CFS_SCATTER_ARM {i.address:#010x} {i.bytes.hex()} {i.mnemonic} {i.op_str}")
           PY
+      - name: Verify full APP Thumb decoder control flow and synthetic contract (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_scatter_decoder_contract.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-scatter-contract.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-scatter-contract.json") as f:
+              d=json.load(f)
+          assert d["manufacturer_Thumb"]["full_instruction_count"] == 32
+          assert d["manufacturer_Thumb"]["all_IT_and_branch_instructions_verified"]
+          tests=d["controlled_synthetic_codec_tests"]
+          assert tests["synthetic_tests_total"] == 9
+          assert len(tests["valid"]) == 7
+          assert len(tests["invalid_rejected"]) == 2
+          assert d["actual_saved_stream"]["candidate_decode_rejected"]
+          assert d["actual_saved_stream"]["backref_offset"] == 160
+          assert not d["actual_vendor_bootloader_0x0800316C_authenticated"]
+          assert not d["CFS_PWM_names_recovered"]
+          assert not d["independent_motor_idle_proven"]
+          assert not d["firmware_release_allowed"]
+          print("PASS: all APP Thumb IT/branch instructions and 9 synthetic codec fixtures, real CFS stream rejected")
+          PY
       - name: Validate bounded APP scatter reference decoder against SHA-pinned v3.22
         working-directory: firmware/v3.22-readonly-state-probes
         run: |
