@@ -46,7 +46,10 @@ def decode_header(payload: bytes) -> TraceHeader:
         raise TraceDecodeError("Trace header must be exactly 20 bytes")
     header = TraceHeader(*HEADER.unpack(payload))
     if (header.magic != MAGIC or header.frozen != 1
-            or header.head >= CAPACITY or header.count > CAPACITY):
+            or header.head >= CAPACITY or header.count > CAPACITY
+            or (header.count < CAPACITY
+                and (header.head != header.count
+                     or header.overwritten != 0))):
         raise TraceDecodeError("Invalid/unfinished trace header")
     return header
 
