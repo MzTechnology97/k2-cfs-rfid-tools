@@ -459,32 +459,35 @@ jobs:
           assert d["static_ROM_does_not_prove_initialized_RAM_content"]
           print("PASS: exact reset scatter descriptors, 5 PWM name fields")
           PY
-      - name: Execute APP scatter decompressor candidate with bounded synthetic SRAM (OFFLINE)
+      - name: Validate bounded APP scatter reference decoder against SHA-pinned v3.22
         working-directory: firmware/v3.22-readonly-state-probes
         run: |
-          python cfs_scatter_candidate_decompress_audit.py \
+          python cfs_scatter_reference_decoder.py \
             --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
-            --self-test --json-out /tmp/cfs-scatter-candidate.json
+            --json-out /tmp/cfs-scatter-candidate.json
           python - <<'PY'
           import json
+          from pathlib import Path
+          from flash_ram_phase2_audit import pinned
+          from cfs_scatter_candidate_decompress_audit import mutation_checks
           with open("/tmp/cfs-scatter-candidate.json") as f:
               d = json.load(f)
-          assert d["tamper"]["count"] == 7
-          original = d["original_ROM"]
+          image = pinned(Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin"),"running_v322")
+          assert mutation_checks(image)["count"] == 7
+          original = d["source"]
           assert original["undumped_actual_handler"] == "0x800316c"
           assert original["candidate_ROM_routine"] == "0x801016c"
           assert original["candidate_minus_handler"] == "0xd000"
-          info = d["counterfactual_decompression"]
-          assert info["emulator"]["returned"]
-          assert info["emulator"]["written_count"] == 3012
-          assert len(info["candidate_5_objects"]) == 5
-          assert not info["real_CFS_RAM_recovered"]
-          assert not info["actual_bootloader_handler_executed"]
-          assert not d["actual_loader_behavior_proven"]
-          assert not d["actual_pwm1_registry_object_proven"]
-          assert not d["motor_stop_feedback_proven"]
-          assert not d["safe_to_flash_extended_v323"]
-          print("PASS: original APP scatter candidate, output 3012 B, actual loader identity unproven")
+          info = d["counterfactual_reference_decoder"]
+          assert info["output_bytes"] == 3012
+          assert 0 < info["source_bytes_consumed"] <= 716
+          assert len(info["five_candidate_objects"]) == 5
+          assert not info["real_bootloader_decompressor_executed"]
+          assert not d["physical_CFS_accessed"]
+          assert not d["actual_runtime_pwm1_name_pointer_proven"]
+          assert not d["independent_motor_stop_proven"]
+          assert not d["expanded_v323_firmware_safe_to_flash"]
+          print("PASS: 3012 B candidate output, 5 name fields, 7 checksum-valid corruption rejections")
           PY
       - name: Remove disposable compiled image
         if: always()
