@@ -22,6 +22,30 @@ This establishes that newer K2RL hooks did not create the mismatch. It does
 reset sequence. The original reset-vector branch sequence needs separate
 verification before calling the supposed data corruption a runtime defect.
 
+## Reset-vector interpretation is another unresolved prerequisite
+
+The exact first two words of both v3.13 and v3.22 saved APP images
+contain `MSP=0x20006EE8` and a Thumb reset-looking pointer
+**`0x0801A969`**. Disassembly at the pointed address
+`0x0801A968` starts with `add.w r0,r5,r5,lsl #3`,
+uses existing working registers / VFP state, and later executes
+`pop {r4,r5,r6,pc}`. This does **not** resemble a normal
+standalone Cortex-M Reset_Handler called with only defined SP/PC
+registers. Contrast the real original older CFS full-Flash bootloader
+reset at `0x080005B9`, which disables interrupts, loads SP and
+branches through a stored pointer.
+
+This observation **does not prove** the v3.22 application is
+unbootable or that its header is corrupt. It means we have **not**
+established how the deployed unit enters the code and whether its
+APP scatter-loader at `0x08010130` is even reached. The failing
+historically unchanged compressed stream may be a vestigial region,
+a separately interpreted format or an output of another linker
+stage. Those are hypotheses, not findings.
+
+Do **not** infer MCU inactivity, ROM safety, or incorrect
+live RAM contents from the APP header until its actual boot chain
+has been authenticated.
 ## Historical old GD32 bootloader evidence
 
 An independently published original CFS dump has a decompression routine
