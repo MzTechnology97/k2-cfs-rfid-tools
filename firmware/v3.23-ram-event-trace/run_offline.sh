@@ -25,5 +25,6 @@ gcc -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-fr
 arm-none-eabi-gcc -std=c11 -O2 -Wall -Wextra -Werror -mcpu=cortex-m3 -mthumb -ffreestanding -nostdlib -c trace_readback.c -o build/trace_readback-arm-O2.o
 arm-none-eabi-gcc -std=c11 -Os -Wall -Wextra -Werror -mcpu=cortex-m3 -mthumb -ffreestanding -nostdlib -c trace_readback.c -o build/trace_readback-arm-Os.o
 arm-none-eabi-size build/trace_readback-arm-O2.o build/trace_readback-arm-Os.o
+python3 test_trace_readback_host.py
 echo "NO firmware BIN generated or installed."
 if [ "$#" -eq 1 ]; then python3 preflight_v323.py --firmware "$1"; fi
