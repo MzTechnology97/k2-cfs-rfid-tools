@@ -22,5 +22,6 @@ arm-none-eabi-objcopy -O binary build/motor_hook_redirect.elf \
   build/motor_hook_redirect.bin
 arm-none-eabi-size build/motor_hook_ring_bench.elf
 python3 emulate_ring_hook.py
+python3 emulate_ring_stress.py
 python3 emulate_ring_wrap.py
 echo "ONLY isolated emulator binaries, NO flashable CFS firmware image."
