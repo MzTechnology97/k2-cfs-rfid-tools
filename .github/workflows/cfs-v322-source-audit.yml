@@ -646,6 +646,26 @@ jobs:
           assert not d["safe_to_flash_v323"]
           print("PASS: source provenance and bounded alignment hypotheses, no operational implications")
           PY
+      - name: Verify manufacturer callback entry provenance v3.13 vs v3.22 (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_callback_entry_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-callback-entry.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-callback-entry.json") as f: d=json.load(f)
+          assert d["original_callback_pointer_unchanged"]
+          assert d["version_313"]["callback_pointer_literal"] == "0x801939d"
+          assert d["version_322"]["callback_pointer_literal"] == "0x801939d"
+          assert not d["valid_independent_callback_entry_behavior_PROVEN"]
+          assert not d["historical_callback_equivalence_PROVEN"]
+          assert not d["actual_motor_stop_feedback_proven"]
+          assert not d["safe_to_flash_v323"]
+          assert not d["live_hardware_touched"]
+          print("PASS: callback code entry provenance, no production assumptions")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
