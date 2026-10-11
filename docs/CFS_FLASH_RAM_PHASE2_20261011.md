@@ -106,29 +106,47 @@ are known **false positive 32-bit little-endian word scans**. The fifth
 ring-range word is the known current heap pointer. See existing v3.23
 `heap_static_crosscheck.py`; neither test detects indirect RAM pointers.
 
-## Candidate code reduction (UNVALIDATED)
+## Correction to the earlier dead-code hypothesis (2026-10-11)
 
-The assembly source contains one textual occurrence each of:
+**Do not delete `config_v2_ensure`: it is live via a symbol alias.**
+The assembly defines:
 
-- `config_v2_ensure`: assembler label at `0x0803AF72`; body through
-  `0x0803AF85` (~20 bytes) with no obvious direct named caller;
-- `config_defaults`: six-byte historical speed table at
-  `0x0803B792`, with no obvious named direct consumer;
-- `SIDECAR_SIZE`: unused assembler constant with **zero binary footprint**.
+```asm
+config_v2_ensure:
+config_ptr:
+    ldr r0, config_root_ptr
+    ...
+```
 
-The `config_v2_ensure` block references separate constant words
-(`config_root_ptr`, `config_expected_ptr`) that may also become
-candidates only after a complete relocation/callgraph audit.
-**One textual mention is not proof of dead machine code.** Computed
-branches, function pointers and cross-boundary hooks are possible.
+The label `config_ptr` points to the same address `0x0803AF72`.
+Elsewhere `config_v2_get_value` includes `bl config_ptr`. A text-only
+grep for the name `config_v2_ensure` had wrongly suggested no calls.
+The ~20B routine and both `config_root_ptr` / `config_expected_ptr`
+MUST be preserved. The earlier statement about their potential removal
+is hereby withdrawn.
 
-The pre-existing 178,120-byte sizeopt experiment is 20 bytes shorter
-than the working 178,140-byte image. It also changes several Thumb branch
-encodings and SET response serialization; it has *not* demonstrated full
-physical equivalence. Its size reduction must not be added to the estimated
-unused-source sizes as if the edits were independent. No space recovery is
-approved or deployed by this PR; the conservative, *hardware-proven*
-reclaimable budget remains **zero**.
+The historical six-byte speed table `config_defaults` is a different
+case: it has no direct named reference in the assembler. In a **private,
+isolated, never-flashed test**, deleting only this table and rebuilding
+the complete v3.22 application reduced the image from **178,140** to
+**178,136 bytes**. The real saving was **4 bytes**, not 6, because of
+ARM alignment. Isolated full-image Unicorn tests of 28 GET values,
+21 advanced SET/GET/RESET paths, busy state rejection and the two
+effective timing hooks passed. The independently tested candidate has
+SHA256 `a743f747a11528a1cc4f3b6d31296560946723db7ac9eb5769974a421ad3c1d0`
+and has **NOT been flashed or released**.
+
+This small optimization is not a credible way to accommodate the
+proposed ~320B event logger plus trampoline and transport. The
+pre-existing separate 178,120-byte sizeopt experiment also modifies
+branch widths and response serialization; its savings must not be
+combined with these four bytes. Neither candidate is approved for
+the operational CFS. The hardware-proven reclaimable budget remains
+**zero bytes**.
+
+See `docs/CFS_DATABASE_XREF_AND_SIZEOPT_20261011.md` and
+`firmware/v3.22-readonly-state-probes/database_path_and_sizeopt_audit.py`.
+The original firmware is still byte-identical and untouched.
 
 ## Repeatable test procedure
 
