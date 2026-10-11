@@ -641,6 +641,19 @@ jobs:
           assert d["same_original_first_scatter_descriptor"]
           assert d["input_length"] == 716
           assert d["searched_relative_offset_range"] == [-2048,2048]
+          assert d["input_changed_byte_count"] == 0
+          assert d["v313_input_SHA256"] == d["v322_input_SHA256"] == (
+              "6c798b603b4139169f60d03cc7d1be58444f6514d2a7f077230ebd5269e27a66"
+          )
+          assert not d["candidate_full_decodes"]
+          for version in ("v313","v322"):
+              check=d[version+"_candidate_decode"]
+              assert not check["valid"]
+              assert check["reason"] == "uninitialized_backreference"
+              assert (check["state"]["tokens"],check["state"]["source_consumed"],
+                      check["state"]["output_written"],check["state"]["distance"]) == (
+                  2,14,10,160
+              )
           assert not d["no_assumed_runtime_name_mapping"] is False
           assert not d["safe_to_write_while_motor_active"]
           assert not d["safe_to_flash_v323"]
@@ -657,6 +670,7 @@ jobs:
           import json
           with open("/tmp/cfs-pwm-callback-entry.json") as f: d=json.load(f)
           assert d["original_callback_pointer_unchanged"]
+          assert d["near_callback_code_window_bytes_unchanged"]
           assert d["version_313"]["callback_pointer_literal"] == "0x801939d"
           assert d["version_322"]["callback_pointer_literal"] == "0x801939d"
           assert not d["valid_independent_callback_entry_behavior_PROVEN"]
