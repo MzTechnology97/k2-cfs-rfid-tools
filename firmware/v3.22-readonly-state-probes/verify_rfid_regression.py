@@ -45,7 +45,7 @@ MARKERS = ("K2O2", "K2N2", "K2C3", "K2D3", "K2RL")
 
 
 def sections(source):
-    matches = list(re.finditer(r"^([A-Za-z_.$][\\w.$]*):[^\\n]*\\n", source, re.M))
+    matches = list(re.finditer(r"^([A-Za-z_.$][\w.$]*):[^\n]*\n", source, re.M))
     result = {}
     for i, item in enumerate(matches):
         end = matches[i + 1].start() if i + 1 < len(matches) else len(source)
@@ -71,7 +71,7 @@ def check(v312, v322):
             raise ValueError("missing required API7 scratch/latch marker " + marker)
     if "config_v2_get_value" not in new or "cfg7_r0_wrapper" not in new:
         raise ValueError("expected v3.22 advanced bench and timing markers missing")
-    if len(re.findall(r"^\\s*bl\\s+config_v2_get_value\\b", v322, re.M)) != 3:
+    if len(re.findall(r"^\s*bl\s+config_v2_get_value\b", v322, re.M)) != 3:
         # one normal GET + two stock timing wrappers
         raise ValueError("unexpected runtime hook graph; inspect new caller(s)")
     return {
