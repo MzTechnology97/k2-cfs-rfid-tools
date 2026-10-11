@@ -165,7 +165,21 @@ def emulate_candidate(image: bytes):
     u.hook_add(UC_HOOK_CODE,code)
     u.hook_add(UC_HOOK_MEM_READ,mmio_read)
     u.hook_add(UC_HOOK_MEM_WRITE,ram_write)
-    u.emu_start(APP_DECOMPRESS_CANDIDATE|1,0,count=400000)
+    try:
+        u.emu_start(APP_DECOMPRESS_CANDIDATE|1,0,count=400000)
+    except Exception as exc:
+        pc=u.reg_read(UC_ARM_REG_PC)
+        state={
+            "pc":hex(pc),"r0":hex(u.reg_read(UC_ARM_REG_R0)),
+            "r1":hex(u.reg_read(UC_ARM_REG_R1)),
+            "r2":hex(u.reg_read(UC_ARM_REG_R2)),
+            "source_reads":(trace["read_min"],trace["read_max"]),
+            "dst_writes":(trace["write_min"],trace["write_max"]),
+            "instruction_count":trace["steps"],
+        }
+        raise ValueError(
+            "isolated decompressor hit unsupported control flow: "
+            + json.dumps(state) + " error=" + str(exc)) from exc
     if not trace["returned"]:
         raise ValueError("candidate decompressor failed to return")
     final_source=u.reg_read(UC_ARM_REG_R0)
