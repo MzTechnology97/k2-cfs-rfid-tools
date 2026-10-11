@@ -71,5 +71,18 @@
   "real_encoder_or_motor_stop_signal_identified": false,
   "safe_to_install_v323_or_motor_guard": false,
   "CFS_serial_or_hardware_touched": false,
-  "proprietary_binary_committed": false
+  "proprietary_binary_committed": false,
+  "disproved_nearby_writer": {
+    "original_ROM_instruction": "0x08027FA0",
+    "ROM_root_literal_at": "0x08028030",
+    "ROM_root_literal_value": "0x200006E8",
+    "offset_subtracted_before_store": 16,
+    "store_field_offset": 84,
+    "actual_store_target": "0x2000072C",
+    "matches_any_of_five_PWM_name_fields": false
+  },
+  "disproved_false_code_at_0x08028044": {
+    "instruction_appears_inside_ROM_DATA_after_original_return_at_0x08028004": true,
+    "hardware_store_proven": false
+  }
 }
