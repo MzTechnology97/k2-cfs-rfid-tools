@@ -1,0 +1,126 @@
+{
+  "date": "2026-10-11",
+  "scope": "READ ONLY, offline saved-image and disposable handler objects",
+  "stock_SHA256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "v322_SHA256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "stock_original_calls_verified_against_v322": true,
+  "callgraph": [
+    {
+      "caller": "0x80102ee",
+      "target": "0x801eeba"
+    },
+    {
+      "caller": "0x801eebe",
+      "target": "0x801ed40"
+    },
+    {
+      "caller": "0x801ed50",
+      "target": "0x801ec72"
+    },
+    {
+      "caller": "0x801c69c",
+      "target": "0x801ed82"
+    },
+    {
+      "caller": "0x801c6d2",
+      "target": "0x801edb4"
+    },
+    {
+      "caller": "0x8017066",
+      "target": "0x801edb4"
+    },
+    {
+      "caller": "0x801eefa",
+      "target": "0x801edb4"
+    },
+    {
+      "caller": "0x801ea86",
+      "target": "0x80318be"
+    },
+    {
+      "caller": "0x801eaec",
+      "target": "0x803175a"
+    },
+    {
+      "caller": "0x801ebb6",
+      "target": "0x801ea78"
+    },
+    {
+      "caller": "0x801ebcc",
+      "target": "0x801ea78"
+    }
+  ],
+  "original_database_RFID_strings": [
+    {
+      "rom_address": "0x8036cb6",
+      "literal": "rfid_mgr_fila_save"
+    },
+    {
+      "rom_address": "0x8036cc9",
+      "literal": "rfid_mgr_fila_task"
+    },
+    {
+      "rom_address": "0x8036d7c",
+      "literal": "database_get_value"
+    },
+    {
+      "rom_address": "0x8036d8f",
+      "literal": "database_set_value"
+    }
+  ],
+  "original_ROM_pointer_words": [
+    {
+      "rom_address": "0x8036d2c",
+      "word": "0x807f800"
+    },
+    {
+      "rom_address": "0x8036d38",
+      "word": "0x800"
+    },
+    {
+      "rom_address": "0x8036d3c",
+      "word": "0x20004a20"
+    },
+    {
+      "rom_address": "0x801ec48",
+      "word": "0x20004a20"
+    },
+    {
+      "rom_address": "0x801ec44",
+      "word": "0x8029d2c"
+    }
+  ],
+  "live_config_alias_confirmed": {
+    "source_alias_config_v2_ensure": "0x803af72",
+    "source_alias_config_ptr": "0x803af72",
+    "alias_referenced_by_BL_config_ptr": true,
+    "config_v2_ensure_can_be_deleted_safely": false,
+    "config_root_ptr_can_be_deleted_safely": false,
+    "config_expected_ptr_can_be_deleted_safely": false,
+    "legacy_speed_defaults_table_direct_symbol_references": 0,
+    "working_handler_bytes": 2468,
+    "unflashed_trimmed_HANDLER_bytes": 2464,
+    "saved_handler_bytes_IN_OFFLINE_EXPERIMENT": 4,
+    "estimated_full_app_bytes_experiment_only": 178136,
+    "all_original_28_RFID_routines_same_bytes_after_trimming_PROVEN": false,
+    "real_MCU_write_or_emulation_run_by_this_tool": false,
+    "tmp_handler_fragments_auto_removed": true,
+    "production_optimisation_authorised": false
+  },
+  "fail_closed_mutations": {
+    "mutations_rejected_with_valid_CRC": [
+      "database_startup_BL",
+      "database_write_BL",
+      "flash_word_program_BL",
+      "last_flash_page_descriptor",
+      "database_get_value_name"
+    ],
+    "count": 5
+  },
+  "sizeopt_candidate_full_image_SHA256": "a743f747a11528a1cc4f3b6d31296560946723db7ac9eb5769974a421ad3c1d0",
+  "sizeopt_full_image_emulator_passed_offline": true,
+  "original_proprietary_bins_committed": false,
+  "verified_last_page_runtime_write": false,
+  "bootloader_app_limit_proven": false,
+  "production_flash_allowed": false
+}
