@@ -166,6 +166,7 @@ def verify(image: bytes, kind: str, all_sites_scan: bool = False) -> dict:
         # static direct-call counts to runtime motor coverage claims.
         discovered = {target: [] for target in CALLS}
         cs = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN)
+        cs.detail = True
         for offset in range(0, len(image) - 4, 2):
             address = APP_BASE + offset
             i = next(cs.disasm(image[offset:offset + 4],
