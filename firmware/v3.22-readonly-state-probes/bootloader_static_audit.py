@@ -199,7 +199,7 @@ def self_test(v322: bytes, stock: bytes | None) -> int:
         # Recompute a VALID firmware CRC: this must test the semantic ROM
         # table check, not get rejected merely by report_image's CRC gate.
         crc_input = bytearray(wrong)
-        crc_input[CRC_OFF:META_END] = b"\\x00" * (META_END - CRC_OFF)
+        crc_input[CRC_OFF:META_END] = bytes(META_END - CRC_OFF)
         struct.pack_into("<H", wrong, CRC_OFF, crc16_bypass(crc_input))
         try:
             analyze_application(bytes(wrong), "running_v322")
