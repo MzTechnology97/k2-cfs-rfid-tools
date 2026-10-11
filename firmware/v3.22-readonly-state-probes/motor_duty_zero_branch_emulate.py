@@ -19,7 +19,10 @@ from flash_ram_phase2_audit import (
     APP_BASE, CRC_OFF, META_END, crc16_bypass, pinned, report_image,
 )
 
-from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE, UC_HOOK_MEM_WRITE
+from unicorn import (
+    Uc, UC_ARCH_ARM, UC_MODE_THUMB,
+    UC_HOOK_CODE, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE,
+)
 from unicorn.arm_const import (
     UC_ARM_REG_CPSR, UC_ARM_REG_LR, UC_ARM_REG_PC,
     UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3,
@@ -27,6 +30,10 @@ from unicorn.arm_const import (
 )
 
 DUTY_ENTRY = 0x0801E0CC
+RAM_STATUS_READER_ENTRY = 0x0801E1AA
+RAM_STATUS_READER_BL_CALLERS = (
+    0x080108AE, 0x08010932, 0x08010C8A,
+)
 MOTOR_ROOT = 0x20004960
 MOTOR_STATE = MOTOR_ROOT + 0xB4
 HOST_CACHE = 0x20003778
@@ -72,6 +79,18 @@ PINNED_INS = {
     0x0801E154: ("vstr", "s0, [r5, #0x20]"),
     0x0801E158: ("vstr", "s0, [r5, #0x24]"),
     0x0801E15C: ("strb.w", "r6, [r5, #0x28]"),
+    # The "status" helper is an inversion of a software RAM byte, not
+    # independent encoder, current or motor-enable feedback.
+    0x0801E1AA: ("ldr", "r0, [pc, #0x98]"),
+    0x0801E1AC: ("ldrb.w", "r0, [r0, #0x3c]"),
+    0x0801E1B0: ("cbz", "r0, #0x801e1b6"),
+    0x0801E1B2: ("movs", "r0, #0"),
+    0x0801E1B4: ("bx", "lr"),
+    0x0801E1B6: ("movs", "r0, #1"),
+    0x0801E1B8: ("bx", "lr"),
+    0x080108AE: ("bl", "#0x801e1aa"),
+    0x08010932: ("bl", "#0x801e1aa"),
+    0x08010C8A: ("bl", "#0x801e1aa"),
 }
 # The default nonzero/zero route model stops BEFORE low-level branches or
 # VFP initialization. It does not execute the entire motor function.
@@ -203,14 +222,72 @@ def run_case(image, value):
     }
 
 
+def run_software_status_case(image, raw_status_byte):
+    # This is the ORIGINAL stock helper; unlike the motor duty test it
+    # contains no mocked external functions. It reads a local RAM byte,
+    # inverts its nonzero condition, and returns 0 or 1.
+    machine = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
+    machine.mem_map(FLASH_BEGIN, FLASH_MAP_BYTES)
+    machine.mem_map(RAM_BEGIN, RAM_MAP_BYTES)
+    machine.mem_write(APP_BASE, image)
+    machine.mem_write(MOTOR_ROOT, bytes([0xA5]) * 0x150)
+    machine.mem_write(MOTOR_ROOT + 0x3C, bytes([raw_status_byte]))
+    exit_sentinel = 0x08010100
+    machine.reg_write(UC_ARM_REG_SP, 0x2000E000)
+    machine.reg_write(UC_ARM_REG_LR, exit_sentinel | 1)
+    machine.reg_write(UC_ARM_REG_PC, RAM_STATUS_READER_ENTRY | 1)
+    stops, memory_reads = [], []
+    def _code(uc, pc, size, _):
+        if pc == exit_sentinel:
+            stops.append(pc)
+            uc.emu_stop()
+    def _mem_read(uc, access, address, size, value, _):
+        memory_reads.append((address, size))
+    machine.hook_add(UC_HOOK_CODE, _code)
+    machine.hook_add(UC_HOOK_MEM_READ, _mem_read)
+    machine.emu_start(RAM_STATUS_READER_ENTRY | 1, 0, count=40)
+    if stops != [exit_sentinel]:
+        raise ValueError("original RAM-status helper did not return")
+    want_reads = [
+        (0x0801E244, 4),  # Literal with original RAM pointer
+        (MOTOR_ROOT + 0x3C, 1),
+    ]
+    if memory_reads != want_reads:
+        raise ValueError("status helper unexpectedly used non-RAM sensors")
+    result = machine.reg_read(UC_ARM_REG_R0)
+    if result != (1 if raw_status_byte == 0 else 0):
+        raise ValueError("RAM byte software status inversion changed")
+    return {
+        "software_status_byte": raw_status_byte,
+        "helper_result": result,
+        "literal_RAM_pointer": hex(MOTOR_ROOT),
+        "only_data_reads": [
+            {"address": hex(a), "size": size} for a, size in memory_reads
+        ],
+        "independent_motor_feedback_observed": False,
+    }
+
+
 def audit(image, kind):
     header = report_image(image, kind)
     pin = verify_instructions(image)
     cases = [run_case(image, value) for value in SPEED_CASES]
+    software_status = [
+        run_software_status_case(image, value) for value in (0, 1, 20, 255)
+    ]
+    if struct.unpack("<I", _read(image, 0x0801E244, 4))[0] != MOTOR_ROOT:
+        raise ValueError("original software status pointer changed")
     return {
         "input": header,
         "pinned_thumb_instructions": pin,
         "simulation_cases": cases,
+        "software_RAM_status_helper": {
+            "helper_entry": hex(RAM_STATUS_READER_ENTRY),
+            "direct_callers": [hex(x) for x in RAM_STATUS_READER_BL_CALLERS],
+            "inverted_RAM_byte_emulations": software_status,
+            "no_independent_motor_sensor": True,
+            "not_suitable_as_standalone_motor_active_guard": True,
+        },
         "safety": {
             "all_external_hardware_functions_stubbed": True,
             "controller_emulation_stops_before_VFP_and_external_finalizers": True,
@@ -231,6 +308,9 @@ def fail_closed_tests(image):
         "zero_path_followup": 0x0801E13E,
         "zero_path_status_store": 0x0801E14C,
         "zero_path_fpu_store": 0x0801E154,
+        "software_RAM_status_load": 0x0801E1AC,
+        "software_RAM_status_branch": 0x0801E1B0,
+        "software_RAM_status_callsite": 0x080108AE,
     }
     rejected = []
     for name, addr in sites.items():
@@ -266,6 +346,8 @@ def main():
             raise ValueError("stock original MCU branch differs from v3.22")
         if stock["simulation_cases"] != current["simulation_cases"]:
             raise ValueError("stock original / v3.22 case-by-case execution differs")
+        if stock["software_RAM_status_helper"] != current["software_RAM_status_helper"]:
+            raise ValueError("stock original / v3.22 software status helper differs")
     report = {
         "scope": "offline Thumb constrained differential, not real movement",
         "stock_compared": stock is not None,
