@@ -63,7 +63,8 @@ def main():
     p.add_argument("--v322", required=True, type=Path)
     p.add_argument("--json-out", type=Path)
     options = p.parse_args()
-    report = scan(pinned(options.v322, "running_v322"))
+    b = pinned(options.v322, "running_v322")
+    report = scan(b)
     for g in report["regions"]:
         print("REGION", g["region"])
         for line in g["instructions"]:
