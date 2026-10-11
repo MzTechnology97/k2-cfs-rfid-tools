@@ -15,10 +15,12 @@ import struct
 from pathlib import Path
 
 APP_BASE = 0x08010000
-CODE_FLASH_START = 0x08000000
-# GD32F303VE: 256 KiB CODE + 256 KiB DATA FLASH, total 512 KiB.
-# The data area is NOT extra space that is automatically usable as code.
-CODE_FLASH_END = 0x08040000
+FLASH_START = 0x08000000
+# GD32F303VE: first 256KiB has fast instruction fetch; remaining 256KiB
+# is still readable / potentially executable with higher fetch latency.
+# Neither boundary is the Creality application's certified allocation limit.
+FAST_FETCH_END = 0x08040000
+MAIN_FLASH_END = 0x08080000
 SRAM_START = 0x20000000
 SRAM_END = 0x20010000
 CONSERVATIVE_APP_END = 0x0803B800  # UNVERIFIED hypothetical loader limit
@@ -91,8 +93,8 @@ def report_image(data: bytes, variant: str) -> dict:
     if sp != INITIAL_HEAP_START:
         raise ValueError(variant + ": initial MSP changed unexpectedly")
     end = APP_BASE + len(data)
-    if end > CODE_FLASH_END:
-        raise ValueError(variant + ": image exceeds documented code-flash area")
+    if end > MAIN_FLASH_END:
+        raise ValueError(variant + ": image exceeds reported physical main Flash capacity")
     return {
         "sha256": hashlib.sha256(data).hexdigest(),
         "bytes": len(data),
@@ -107,7 +109,8 @@ def report_image(data: bytes, variant: str) -> dict:
         "heap_end_literal": hex(heap_top),
         "nominal_heap_window_bytes": heap_top - heap_start,
         "bytes_to_unverified_0x0803b800": CONSERVATIVE_APP_END - end,
-        "bytes_to_silicon_code_area_end_NOT_ALLOCATABLE": CODE_FLASH_END - end,
+        "bytes_to_fast_fetch_end_NOT_AUTHORISED": FAST_FETCH_END - end,
+        "bytes_to_total_flash_end_NOT_AUTHORISED": MAIN_FLASH_END - end,
     }
 
 
@@ -115,8 +118,8 @@ def literal_observations(data: bytes) -> dict:
     # Scan 4-byte-aligned words only; instructions may look like addresses.
     # Count observations but NEVER interpret them as verified live pointers.
     classes = {
-        "code_flash_0x0803b800_to_0x0803ffff": (0x0803B800, CODE_FLASH_END),
-        "data_looking_0x08040000_to_0x0807ffff": (0x08040000, 0x08080000),
+        "pre_256k_end_0x0803b800_to_0x0803ffff": (0x0803B800, FAST_FETCH_END),
+        "slower_flash_0x08040000_to_0x0807ffff": (FAST_FETCH_END, MAIN_FLASH_END),
         "within_64k_sram": (SRAM_START, SRAM_END),
         "above_64k_sram_lookalikes": (SRAM_END, SRAM_END + 0x8000),
         "candidate_ring_span_0x20006f28_to_0x20007127": (
@@ -171,18 +174,21 @@ def collect(stock: bytes, old: bytes, current: bytes,
             "part": "GD32F303VET6 (CFS G32 hypothesis; re-confirm actual silicon)",
             "core": "Cortex-M4 (older test assembly targets M3 ISA subset)",
             "total_flash_bytes": 512 * 1024,
-            "CODE_flash_bytes": 256 * 1024,
-            "DATA_flash_bytes_not_available_as_simple_code_space": 256 * 1024,
+            "fast_instruction_fetch_flash_bytes": 256 * 1024,
+            "slower_instruction_fetch_flash_bytes": 256 * 1024,
+            "slower_flash_instruction_fetch_possible": True,
             "sram_bytes": 64 * 1024,
             "reference": "https://www.gigadevice.com.cn/product/mcu/mcus-product-selector/gd32f303vet6",
         },
         "images": images,
         "flash": {
-            "code_area_half_open": [hex(CODE_FLASH_START), hex(CODE_FLASH_END)],
+            "total_main_flash_half_open": [hex(FLASH_START), hex(MAIN_FLASH_END)],
+            "fast_fetch_flash_half_open": [hex(FLASH_START), hex(FAST_FETCH_END)],
+            "instruction_fetch_after_256k_has_higher_latency": True,
             "application_base": hex(APP_BASE),
             "lower_64k_separate_area_content_UNDUMPED": True,
             "prior_conservative_application_boundary_UNVERIFIED": hex(CONSERVATIVE_APP_END),
-            "silicon_code_area_end_IS_NOT_loader_approved_app_end": True,
+            "physical_flash_and_256k_latency_split_ARE_NOT_loader_app_limits": True,
             "original_v322_spot_crc_and_vectors_match": (
                 stock[:8] == current[:8]),
             "possible_last_reserved_flash_pages_unknown": True,
