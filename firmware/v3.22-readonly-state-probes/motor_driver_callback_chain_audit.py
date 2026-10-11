@@ -235,7 +235,11 @@ def mutation_tests(image: bytes) -> dict:
     failed_closed = []
     for name, at in markers.items():
         mutant = bytearray(image)
-        mutant[at - APP_BASE] ^= 1
+        # BX r3 encodes the low bit as an unused bit in Thumb. Flip bit
+        # 2 instead: it changes BX to BXNS and must fail the exact pin.
+        mask = 4 if name in (
+            "device_indirect_branch", "GPIO_indirect_branch") else 1
+        mutant[at - APP_BASE] ^= mask
         normalized = bytearray(mutant)
         normalized[CRC_OFF:META_END] = bytes(META_END - CRC_OFF)
         struct.pack_into("<H", mutant, CRC_OFF, crc16_bypass(normalized))
