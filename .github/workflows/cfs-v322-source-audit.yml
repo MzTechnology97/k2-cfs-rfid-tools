@@ -627,6 +627,23 @@ jobs:
           assert not d["safe_to_flash_v323"]
           print("PASS: historical vs current PWM callback Thumb disassembly for review only")
           PY
+          python cfs_startup_reachability_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-reset-path-analysis.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-reset-path-analysis.json") as f: d=json.load(f)
+          assert d["v313"]["vector_points_into_saved_image"]
+          assert d["v322"]["vector_points_into_saved_image"]
+          assert d["historical_raw_flash"]["vector_points_into_saved_image"]
+          assert d["exact_early_application_vector_pair_same_v313_v322"]
+          assert not d["data_scatter_table_proves_executed_startup_path"]
+          assert not d["actual_CFS_reset_observed"]
+          assert not d["release_approved"]
+          print("PASS: v3.13/v3.22 verified reset vectors, historic reset entry inspected offline")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
