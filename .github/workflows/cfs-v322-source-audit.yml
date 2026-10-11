@@ -622,7 +622,7 @@ jobs:
           with open("/tmp/cfs-v313-v322-scatter-provenance.json") as f: d=json.load(f)
           assert d["same_original_first_scatter_descriptor"]
           assert d["input_length"] == 716
-          assert d["searched_relative_offset_range"] == [-128,128]
+          assert d["searched_relative_offset_range"] == [-2048,2048]
           assert not d["no_assumed_runtime_name_mapping"] is False
           assert not d["safe_to_write_while_motor_active"]
           assert not d["safe_to_flash_v323"]
