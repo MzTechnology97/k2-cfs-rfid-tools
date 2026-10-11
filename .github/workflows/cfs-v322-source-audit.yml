@@ -589,6 +589,26 @@ jobs:
           assert not d["motor_safety_release_authorized"]
           print("PASS: pinned old vs new CFS stream under same 92-byte decoder, no live claims")
           PY
+          python cfs_historical_pwm_name_xrefs.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --json-out /tmp/cfs-original-2025-pwm-names.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-original-2025-pwm-names.json") as f:
+              d=json.load(f)
+          assert d["historic_compressed_stream_decoded"]
+          assert d["legacy_source_consumed"] == 599
+          assert d["legacy_synthetic_data_size"] == 2844
+          assert {x["name"] for x in d["five_ROM_names"]} == {
+              "pwm1", "pwm3", "pwm4", "pwm5", "pwm8"
+          }
+          assert not d["layout_safely_transferable_to_v322"]
+          assert not d["real_v322_PWM1_callback_known"]
+          assert not d["live_CFS_hardware_access"]
+          assert not d["motor_stop_feedback_proven"]
+          print("PASS: original older CFS PWM ROM-name xref scan against independently decoded SRAM, never confuse with v3.22")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Remove disposable compiled image
         if: always()
