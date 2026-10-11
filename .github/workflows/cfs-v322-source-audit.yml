@@ -334,6 +334,44 @@ jobs:
           assert not d["firmware_release_approved"]
           print("PASS: PWM 4 handled/2 rejected requests, 14 timer bases, 10 CRC-valid mutants")
           PY
+      - name: Validate extended CFS PWM 0x1E04/0x1E05 shim (offline)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python extended_pwm_1e04_1e05_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-extended-pwm.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-extended-pwm.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["exact_Thumb_pins"]) == 23
+          c = v["cases"]
+          assert len(c) == 9
+          assert [x["request"] for x in c[:4]] == [
+              "0x1e04", "0x1e04", "0x1e05", "0x1e05"
+          ]
+          assert [x["status_word_after"] for x in c[:4]] == [
+              "0x1", "0x1", "0x0", "0x0"
+          ]
+          assert [x["backend_callback_invocations"] for x in c] == [
+              0, 0, 0, 0, 0, 1, 1, 1, 1
+          ]
+          assert [x["returned"] for x in c] == [
+              "0x0", "0x0", "0x0", "0x0", "0x0",
+              "0x5a", "0x5a", "0x0", "0x5a"
+          ]
+          refs = v["static_reference_inventory"]
+          assert not refs["direct_Thumb_BL_sites_in_saved_APP"]
+          assert all(not x for x in refs["raw_address_word_sites_in_saved_APP"].values())
+          assert not refs["function_runtime_unreachable_proven"]
+          assert not refs["actual_pwm1_device_callback_binding_proven"]
+          assert d["fail_closed"]["count"] == 11
+          assert not d["runtime_pwm1_callback_identity_proven"]
+          assert not d["motor_idle_proven"]
+          assert not d["firmware_release_authorized"]
+          print("PASS: 9 mock cases, 23 original instructions, 11 CRC-valid rejects; runtime pwm1 link NOT proven")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
