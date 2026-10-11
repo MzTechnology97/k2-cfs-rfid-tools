@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-11",
+  "scope": "saved SHA-pinned original CFS 1.5.3 and validated v3.22 Thumb code; fake registry, no CFS device IO",
+  "original_sha256": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+  "v322_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "original_and_v322_differential_cases_equal": true,
+  "startup": "0x0801DFE6",
+  "motor_device_root": "0x20004960",
+  "device_pointer_location": "0x20004A14",
+  "initial_zero_store": "0x0801DFEE",
+  "original_name_address": "0x0801E28C",
+  "name": "pwm1",
+  "name_type": 9,
+  "lookup_caller": "0x0801E082",
+  "typed_lookup_wrapper": "0x08023774",
+  "underlying_device_registry": "0x0802E1B4",
+  "lookup_result_stored_at": "0x0801E086",
+  "lookup_results_tested": [
+    {
+      "synthetic_pointer": "0x2000075C",
+      "stored_pointer": "0x2000075C",
+      "is_in_five_object_array": true
+    },
+    {
+      "synthetic_pointer": "0x20003000",
+      "stored_pointer": "0x20003000",
+      "is_in_five_object_array": false
+    },
+    {
+      "synthetic_pointer": "0x0",
+      "stored_pointer": "0x0",
+      "is_in_five_object_array": false
+    }
+  ],
+  "thumb_instruction_pins": 10,
+  "crc_corrected_mutations_rejected": 8,
+  "real_pwm1_registry_identity_found": false,
+  "pwm1_is_one_of_five_objects_proven": false,
+  "actual_rotor_speed_or_encoder_feedback_found": false,
+  "motor_idle_proven": false,
+  "safe_to_flash_expanded_app": false,
+  "live_device_accessed": false,
+  "proprietary_binary_uploaded": false
+}
