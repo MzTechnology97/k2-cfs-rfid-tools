@@ -479,15 +479,22 @@ jobs:
           assert original["candidate_ROM_routine"] == "0x801016c"
           assert original["candidate_minus_handler"] == "0xd000"
           info = d["counterfactual_reference_decoder"]
-          assert info["output_bytes"] == 3012
-          assert 0 < info["source_bytes_consumed"] <= 716
-          assert len(info["five_candidate_objects"]) == 5
+          assert not info["candidate_algorithm_matches_source"]
+          assert info["rejection_reason"] == (
+              "invalid backwards reference to uninitialized output"
+          )
+          bad = info["deterministic_failure"]
+          assert (bad["token"], bad["src_bytes"], bad["decoded_len"],
+                  bad["offset"]) == (2, 14, 10, 160)
+          assert not info["five_candidate_objects"]
+          assert info["no_real_device_name_recovered"]
+          assert not info["counterfactual_decompression_succeeded"]
           assert not info["real_bootloader_decompressor_executed"]
           assert not d["physical_CFS_accessed"]
           assert not d["actual_runtime_pwm1_name_pointer_proven"]
           assert not d["independent_motor_stop_proven"]
           assert not d["expanded_v323_firmware_safe_to_flash"]
-          print("PASS: 3012 B candidate output, 5 name fields, 7 checksum-valid corruption rejections")
+          print("PASS: reject incompatible APP decoder / 7 CRC-valid mutants, no fabricated names")
           PY
       - name: Remove disposable compiled image
         if: always()
