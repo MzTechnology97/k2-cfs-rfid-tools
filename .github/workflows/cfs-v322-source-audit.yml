@@ -421,7 +421,27 @@ jobs:
         working-directory: firmware/v3.22-readonly-state-probes
         run: |
           python pwm1_init_ram_origin_probe.py \
-            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-name-origin.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-name-origin.json") as f:
+              d = json.load(f)
+          table = d["reset_scatter_table"]
+          assert (table["from"], table["to"]) == ("0x803aa10", "0x803aa30")
+          assert [r["four_words"] for r in table["entries"]] == [
+              ["0x802db6c", "0x20000000", "0xbc4", "0x800316c"],
+              ["0x802de38", "0x20000bc4", "0x6324", "0x80031c8"],
+          ]
+          assert d["pre_existing_device_name_ptr_RAM_fields"] == [
+              "0x200007b0", "0x20000810", "0x20000870",
+              "0x200008d0", "0x20000930"
+          ]
+          assert len(d["direct_memcpy_hypothesis_name_fields"]) == 5
+          assert not d["pwm1_runtime_callback_proven"]
+          assert d["static_ROM_does_not_prove_initialized_RAM_content"]
+          print("PASS: exact reset scatter descriptors, 5 PWM name fields")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
