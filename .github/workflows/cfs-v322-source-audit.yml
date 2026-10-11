@@ -134,6 +134,70 @@ jobs:
           assert not d["runtime_use_of_last_flash_page_proven"]
           print("PASS: 11 Creality database/FMC callsites, alias safety, 4B offline estimate")
           PY
+      - name: Validate original Creality CFS motor command routes (offline)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_command_callgraph_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --scan-all --self-test >/tmp/cfs-motor-command-callgraph.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-command-callgraph.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert v["callsite_total"] == 102
+          assert v["forward_wrapper_static_BL"] == 33
+          assert v["reverse_wrapper_static_BL"] == 17
+          assert v["zero_command_wrapper_static_BL"] == 50
+          assert v["direct_duty_setter_static_BL"] == 2
+          assert v["full_scan_completed"]
+          assert len(v["wrapper_tails"]) == 3
+          assert d["fail_closed"]["count"] == 9
+          assert v["callsite_inventory_sha256"] == "d66b17e67f80af1a8e9eb89ac435fadb4250a8c5c441a5580468e94b45617081"
+          assert not v["zero_duty_command_proves_motor_idle"]
+          assert not v["all_physical_motor_start_stop_events_proven"]
+          assert not v["safe_to_install_trace_hook"]
+          assert not v["safe_to_flash_expanded_app"]
+          print("PASS: 102 original ROM command calls, 50 zero-duty sites, 9 CRC-valid rejects")
+          PY
+      - name: Emulate original shared motor duty zero/nonzero branches (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_duty_zero_branch_emulate.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-duty-zero-branch.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-duty-zero-branch.json") as f:
+              result = json.load(f)
+          p = result["v322"]
+          assert len(p["pinned_thumb_instructions"]) == 31
+          c = p["simulation_cases"]
+          assert [x["duty_requested"] for x in c] == [0, 1, 127, 255, 300]
+          assert c[0]["control_branch"] == "zero"
+          assert c[0]["simulator_paused_at"] == "0x801e14a"
+          assert c[0]["low_level_hardware_calls_replaced_by_mocks"] == 4
+          assert all(x["control_branch"] == "nonzero" for x in c[1:])
+          assert all(x["simulator_paused_at"] == "0x802f190" for x in c[1:])
+          assert all(x["low_level_hardware_calls_replaced_by_mocks"] == 2 for x in c[1:])
+          assert c[-1]["RAM_snapshot_before_external_state_update"]["current_requested_duty"] == 255
+          assert c[0]["RAM_snapshot_before_external_state_update"]["current_requested_duty"] == 0
+          assert result["fail_closed_mutations"]["count"] == 9
+          helper = p["software_RAM_status_helper"]
+          assert helper["helper_entry"] == "0x801e1aa"
+          assert len(helper["direct_callers"]) == 3
+          assert [x["software_status_byte"] for x in helper["inverted_RAM_byte_emulations"]] == [0, 1, 20, 255]
+          assert [x["helper_result"] for x in helper["inverted_RAM_byte_emulations"]] == [1, 0, 0, 0]
+          assert helper["no_independent_motor_sensor"]
+          assert helper["not_suitable_as_standalone_motor_active_guard"]
+          assert all(x["only_data_reads"] == [
+              {"address": "0x801e244", "size": 4},
+              {"address": "0x2000499c", "size": 1},
+          ] for x in helper["inverted_RAM_byte_emulations"])
+          assert not result["motor_idle_proven"]
+          assert not result["flash_release_authorized"]
+          print("PASS: 5 original Thumb duty-path cases, no real motor or serial effects")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
