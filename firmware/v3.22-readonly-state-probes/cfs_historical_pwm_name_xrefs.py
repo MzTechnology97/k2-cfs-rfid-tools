@@ -100,7 +100,11 @@ def analyze(flash:bytes, ram:bytes):
             older_live=struct.unpack_from("<I",ram,pos+of)[0]
             fields[hex(of)]={
                 "initial":hex(val),
+                "historical_snapshot_value":hex(older_live),
                 "same_in_historical_snapshot":val==older_live,
+                "snapshot_value_points_into_archived_flash":(
+                    FLASH_BASE<=older_live<FLASH_BASE+len(flash)
+                ),
                 "in_historical_Flash_or_zero":val==0 or
                     FLASH_BASE<=val<FLASH_BASE+len(flash),
             }
@@ -113,6 +117,10 @@ def analyze(flash:bytes, ram:bytes):
             ),
         })
     callback_words={x["fields"]["0x38"]["initial"] for x in old_named_devices}
+    runtime_callbacks={
+      x["name"]:x["fields"]["0x38"]["historical_snapshot_value"]
+      for x in old_named_devices
+    }
     result={
       "historic_compressed_stream_decoded":True,
       "legacy_source_consumed":status["source_consumed"],
@@ -121,6 +129,10 @@ def analyze(flash:bytes, ram:bytes):
       "initialized_RAM_pointer_fields_to_five_pwm_names":ram_hits[:100],
       "historical_named_objects_and_device_operation_fields":old_named_devices,
       "old_five_objects_share_callback_plus_0x38":len(callback_words)==1,
+      "historic_running_RAM_callback_plus_0x38_by_PWM_name":runtime_callbacks,
+      "historic_running_RAM_five_callbacks_share_one_function":(
+          len(set(runtime_callbacks.values())) == 1
+      ),
       "old_callback_value_at_plus_0x38_if_shared":(
           next(iter(callback_words)) if len(callback_words)==1 else None),
 
