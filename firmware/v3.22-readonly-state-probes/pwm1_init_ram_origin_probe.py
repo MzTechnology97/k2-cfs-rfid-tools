@@ -72,9 +72,25 @@ def scan(buf):
     {'record_at':hex(a),'four_words':[hex(read32(buf,a+4*j)) for j in range(4)]}
     for a in range(start,stop,16)
   ]
+  # First descriptor covers SRAM holding all five +0x54 name fields.
+  # Whether handler 0x0800316c is a copy/decompress/relocation
+  # function remains unknown without the undumped vendor bootloader.
+  src, dest, size, handler = [int(z,16) for z in scatter[0]['four_words']]
+  candidates=[]
+  for field in NAMES:
+    if not dest <= field <= dest + size - 4:
+      raise ValueError('object name field outside reset region')
+    rom_at = src + field - dest
+    value = read32(buf,rom_at)
+    candidates.append({'name_field':hex(field),'rom_at_if_copy':hex(rom_at),
+      'copied_word_if_memcpy':hex(value),
+      'looks_like_valid_RAM_or_ROM_ptr':
+       (0x20000000<=value<0x20010000 or APP_BASE<=value<APP_BASE+len(buf))})
+  print('DIRECT_COPY_HYPOTHESIS_ONLY',json.dumps(candidates))
   print('RESET_SCATTER_DESCRIPTORS',json.dumps({'from':hex(start),'to':hex(stop),'entries':scatter}))
   return {
    "reset_scatter_table":{"from":hex(start),"to":hex(stop),"entries":scatter},
+   "direct_memcpy_hypothesis_name_fields":candidates,
    "object_RAM_addresses":[hex(a) for a in FIVE],
    "pre_existing_device_name_ptr_RAM_fields":[hex(a) for a in NAMES],
    "ROM_data_name_evidence":[{"at":hex(a),"string":
