@@ -69,6 +69,31 @@ def main():
         for line in g["instructions"]:
             print(line["at"], line["text"], line["literal"] or "")
     print("NAMEFIELDS", json.dumps(report["metadata_field_ops"]))
+    # Exhaustive halfword scan is deliberately only a CANDIDATE search.
+    # Decoder may see plausible instructions inside ROM DATA tables.
+    cs = Cs(CS_ARCH_ARM, CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN)
+    cs.detail = True
+    hits = []
+    end = min(len(b), 0x25000)
+    for offset in range(0, end - 4, 2):
+        addr = APP_BASE + offset
+        ins = next(cs.disasm(b[offset:offset+4], addr, count=1), None)
+        if ins is None or not ins.mnemonic.startswith(("str", "stm")):
+            continue
+        for op in ins.operands:
+            if (op.type == ARM_OP_MEM and op.mem.base != ARM_REG_PC
+                    and op.mem.disp == 0x54):
+                hits.append((addr, ins.mnemonic, ins.op_str))
+    print("ALL_STR_OFFSET_0x54_CANDIDATES", json.dumps([
+        {"at": hex(a), "ins": m+" "+op} for a,m,op in hits]))
+    for a,mn,op in hits[:40]:
+        print("CANDIDATE_CONTEXT", hex(a), "(may be data!)")
+        lo=a-12
+        for i in cs.disasm(b[lo-APP_BASE:a+10-APP_BASE],lo):
+            print(hex(i.address),i.mnemonic,i.op_str)
+    report["global_halfword_54_store_candidates"] = [
+        {"at":hex(a),"op":m+" "+op} for a,m,op in hits]
+    report["halfword_decode_can_contain_data_false_positives"] = True
     print("NAMES", json.dumps(report["candidate_name_strings"]))
     if options.json_out:
         options.json_out.write_text(json.dumps(report, indent=2)+"\n")
