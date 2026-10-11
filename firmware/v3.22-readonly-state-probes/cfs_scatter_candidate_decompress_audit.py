@@ -56,6 +56,22 @@ OBJ_BASE = 0x2000075C
 OBJ_STRIDE = 96
 NUM_OBJECTS = 5
 ROM_STRINGS = ("pwm1", "pwm3", "pwm4", "pwm5", "pwm8")
+PIN_BYTES = {
+    0x0801016C: "0a44",
+    0x0801016E: "4ff0000c",
+    0x08010172: "10f8013b",
+    0x08010176: "13f00704",
+    0x08010180: "1d11",
+    0x08010188: "641e",
+    0x0801018C: "10f8016b",
+    0x08010192: "01f8016b",
+    0x08010198: "13f0080f",
+    0x080101B4: "14f8016b",
+    0x080101B8: "01f8016b",
+    0x080101C0: "9142",
+    0x080101C4: "7047",
+}
+
 PINS = {
     0x0801016C: "add",
     0x0801016E: "mov.w",
@@ -90,8 +106,10 @@ def verify_image(image: bytes):
     for address, expected_mnemonic in PINS.items():
         off = address - APP_BASE
         decoded = next(dis.disasm(image[off:off+4], address, count=1), None)
-        if decoded is None or decoded.mnemonic != expected_mnemonic:
-            raise ValueError(f"candidate original Thumb mismatch at {address:#x}")
+        raw=bytes.fromhex(PIN_BYTES[address])
+        if (decoded is None or decoded.mnemonic != expected_mnemonic
+                or image[off:off+len(raw)] != raw):
+            raise ValueError(f"candidate original Thumb encoding mismatch at {address:#x}")
         instructions.append({
             "address":hex(address), "mnemonic":decoded.mnemonic,
             "bytes":decoded.bytes.hex(),
