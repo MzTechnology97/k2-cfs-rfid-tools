@@ -265,6 +265,41 @@ jobs:
           assert not d["firmware_release_allowed"]
           print("PASS: 5 original object constructors, 3 callback pointers each, 8 CRC-valid corruptions")
           PY
+      - name: Verify original CFS pwm1 named device pointer lookup (offline)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_pwm1_named_lookup_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-pwm1-device-lookup.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm1-device-lookup.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["instructions"]) == 10
+          assert v["static"]["name_literal"] == {
+              "at": "0x801e28c", "value": "pwm1"
+          }
+          assert v["static"]["lookup_device_type"] == 9
+          assert v["clearing"]["cleared_RAM_field"] == "0x20004a14"
+          assert v["clearing"]["original_store_observed"]
+          cases = v["named_lookup_cases"]
+          assert [x["synthetic_registry_result"] for x in cases] == [
+              "0x2000075c", "0x20003000", "0x0"
+          ]
+          assert all(x["lookup"] == {
+              "original_ROM_name_pointer": "0x801e28c",
+              "literal": "pwm1", "lookup_type": 9
+          } for x in cases)
+          assert all(x["stored_at"] == "0x20004a14" for x in cases)
+          assert all(x["synthetic_registry_result"] == x["stored_value"]
+                     for x in cases)
+          assert d["mutations"]["count"] == 8
+          assert not d["real_CFS_motor_instance_identity_proven"]
+          assert not d["all_CFS_motors_idle_proven"]
+          assert not d["firmware_release_authorized"]
+          print("PASS: pwm1 type9 lookup, original ptr store, 3 mock cases, 8 CRC-valid rejects")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
