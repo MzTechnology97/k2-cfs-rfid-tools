@@ -18,7 +18,7 @@ REGIONS = (
     ("name_preinitializer", 0x08028530, 0x08028578),
     ("five_pwm_object_init", 0x080283BE, 0x08028430),
     ("device_reg_tail", 0x0802644A, 0x08026488),
-    ("pre_device_name_writers", 0x08027F40, 0x08028054),
+    ("earlier_gpio_init_code", 0x08027F92, 0x08028006),
     ("aux_metadata_init", 0x08028054, 0x080280C0),
 )
 TARGET_RAM_FIELDS = {0x48, 0x4C, 0x50, 0x54}
@@ -85,16 +85,40 @@ def main():
             if (op.type == ARM_OP_MEM and op.mem.base != ARM_REG_PC
                     and op.mem.disp == 0x54):
                 hits.append((addr, ins.mnemonic, ins.op_str))
-    print("ALL_STR_OFFSET_0x54_CANDIDATES", json.dumps([
-        {"at": hex(a), "ins": m+" "+op} for a,m,op in hits]))
-    for a,mn,op in hits[:40]:
-        print("CANDIDATE_CONTEXT", hex(a), "(may be data!)")
-        lo=a-12
-        for i in cs.disasm(b[lo-APP_BASE:a+10-APP_BASE],lo):
-            print(hex(i.address),i.mnemonic,i.op_str)
-    report["global_halfword_54_store_candidates"] = [
-        {"at":hex(a),"op":m+" "+op} for a,m,op in hits]
+    # A halfword-wide sweep is NOT a recursively validated code map.
+    # It produces hundreds of false positives, especially in ROM DATA.
+    print("RAW_HALFWORD_STR54_COUNT", len(hits))
+    safe = [{"at":hex(a),"op":m+" "+op} for a,m,op in hits
+            if 0x08027F92 <= a < 0x08028006]
+    print("TARGETED_EXECUTABLE_STR54", json.dumps(safe))
+    candidate_code = {
+        0x08027F94: ("ldr", "r4, [pc, #0x98]"),
+        0x08027F98: ("subs", "r4, #0x10"),
+        0x08027F9C: ("add.w", "r0, r4, #0x70"),
+        0x08027FA0: ("str", "r0, [r4, #0x54]"),
+        0x08028004: ("pop", "{r4, r5, r6, pc}"),
+    }
+    for address, expected in candidate_code.items():
+        ins = next(cs.disasm(b[address-APP_BASE:address-APP_BASE+4],
+                             address,count=1),None)
+        if ins is None or (ins.mnemonic,ins.op_str) != expected:
+            raise ValueError("gpio init Thumb sequence unexpectedly changed")
+    gpio_root = struct.unpack_from("<I",b,0x08028030-APP_BASE)[0]
+    if gpio_root != 0x200006E8:
+        raise ValueError("original gpio-root literal changed")
+    gpio_field = gpio_root - 0x10 + 0x54
+    expected_name_fields = tuple(0x200007B0 + 96*i for i in range(5))
+    if gpio_field != 0x2000072C or gpio_field in expected_name_fields:
+        raise ValueError("potential name field alias would invalidate audit")
+    report["verified_unrelated_GPIO_field_store"] = {
+        "instruction":"0x08027FA0",
+        "target_RAM":hex(gpio_field),
+        "five_name_fields":[hex(a) for a in expected_name_fields],
+        "is_one_of_five_PWM_names":False,
+    }
+    report["halfword_scan_raw_candidate_count"] = len(hits)
     report["halfword_decode_can_contain_data_false_positives"] = True
+    print("NON_PWM_NAME_FIELD_STORE",json.dumps(report["verified_unrelated_GPIO_field_store"]))
     print("NAMES", json.dumps(report["candidate_name_strings"]))
     print("NOTE: 0x080284F8..0x08028530 is treated as DATA, not executable Thumb; earlier STR +0x54 there were false disassembly hits")
     if options.json_out:
