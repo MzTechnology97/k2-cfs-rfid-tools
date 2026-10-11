@@ -198,6 +198,40 @@ jobs:
           assert not result["flash_release_authorized"]
           print("PASS: 5 original Thumb duty-path cases, no real motor or serial effects")
           PY
+      - name: Verify original CFS motor driver callback interfaces (NO DEVICE IO)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python motor_driver_callback_chain_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-driver-callbacks.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-driver-callbacks.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["verified_Thumb_instructions"]) == 27
+          assert v["static"]["device_dispatch_is_indirect"]
+          assert v["static"]["gpio_dispatch_is_indirect"]
+          c = v["mock_callback_trials"]
+          assert len(c) == 5
+          assert [(x["interface"], x["synthetic_callback_enabled"])
+                  for x in c] == [
+                      ("device", True), ("device", True),
+                      ("device", False), ("gpio", True), ("gpio", True)
+                  ]
+          assert [x["dispatcher_returned"] for x in c] == [
+              "0x0", "0x5a", "0xffffffd3", "0x0", "0x5a"
+          ]
+          assert [x["actual_mock_callback_invocations"] for x in c] == [
+              1, 1, 0, 1, 1
+          ]
+          assert d["fail_closed_tests"]["count"] == 9
+          assert not d["MCU_motor_idle_confirmed"]
+          assert not d["release_approved"]
+          assert not v["validated_hardware_callback_implementation"]
+          assert not d["hardware_or_serial_interface_opened"]
+          print("PASS: 2 indirect callchains, arbitrary callback return, 9 CRC-valid mutations")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
