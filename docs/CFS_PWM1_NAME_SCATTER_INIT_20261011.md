@@ -59,6 +59,26 @@ decompression or some other data transformation. Reading four
 bytes at the hypothetical direct-copy source offsets is a
 counterfactual test only, not reconstructed actual RAM state.
 
+### A direct-copy hypothesis fails a basic plausibility check
+
+Using the first descriptor's ROM first word as an ordinary
+linear source and copying it to RAM would yield the following
+32-bit values in the five +0x54 name pointer fields:
+
+| Device | Word under naive direct memcpy | Pointer-like? |
+| ---: | --- | --- |
+| 0 | `0x5F545220` | No |
+| 1 | `0x2300E9D1` | No |
+| 2 | `0x126BF240` | No |
+| 3 | `0x6BA86060` | No |
+| 4 | `0x42841034` | No |
+
+These are neither valid APP Flash addresses nor valid SRAM
+addresses. Therefore a direct memcpy interpretation does
+**not** explain how the five names become valid.
+The actual loader handler (residing below the dumped
+application, at `0x0800316C`) has not been inspected.
+This result does NOT justify inventing another loader mapping.
 This is a concrete reason NOT to claim the five names have
 been identified, even though the register class/type 9 and
 `pwm1` lookup code are now understood.
