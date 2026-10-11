@@ -131,3 +131,35 @@ commands for version, transfer-block size, erase, update and start-app,
 https://github.com/Lamar1007/CFSTool/blob/main/PROTOCOL.md .
 A bootloader probe is not a substitute for a safe image/partition readback;
 do not switch the active CFS into bootloader mode simply to infer a maximum.
+
+## 2026-10-11 — Read-only post-motion trace export proof of concept
+
+[PROPOSED_TRACE_WIRE_CONTRACT.md](PROPOSED_TRACE_WIRE_CONTRACT.md) describes
+a **future, not-yet-implemented** `0x57/0x15` command with selector
+`0xFF` for the frozen 20-byte header, and 0..29 for 16-byte event data.
+It never accepts a RAM address or changes a motor/configuration value. The
+C model in [trace_readback.c](trace_readback.c) implements explicit little
+endian serialization; it **does not** register a live firmware serial
+handler.
+
+[trace_readback_host.py](trace_readback_host.py) models a future safe host
+decoder: double-read header and reject changes in generation/count/head/
+last tick, truncated replies, inconsistent partially filled rings and
+sequence gaps. It is **not loaded in Kalico** and contains no serial or
+G-code calls. Tests are [test_trace_readback.c](test_trace_readback.c)
+(ASan/UBSan, zero source mutation, bounds, freeze, chronology, endian)
+and [test_trace_readback_host.py](test_trace_readback_host.py) (corrupted
+and torn readouts).
+
+The read-only export helper adds **204 bytes ARM `-O2` text** (248 bytes
+at `-Os`), *in addition* to the 380-byte synthetic ring-plus-hook
+prototype. Thus **at least 584 bytes** of currently modeled code would
+be needed before any real UART dispatcher, time source or synchronization,
+versus only **36 bytes** of conservative known-space headroom. The minimum
+unfunded code-space amount is **548 bytes**, and the actual requirement
+will be larger. No extra flash is assumed safe.
+
+The original v3.13/v3.22 image has a contiguous 131-byte zero region
+at `0x0803AACD..0x0803AB4F`; adjacent bytes belong to a dense static
+table, rather than a verified no-reference code cave. No independent
+reachability or data-use proof exists. **Do not overwrite this region**.
