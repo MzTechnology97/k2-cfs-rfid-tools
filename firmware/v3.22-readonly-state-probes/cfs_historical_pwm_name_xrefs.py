@@ -83,12 +83,47 @@ def analyze(flash:bytes, ram:bytes):
                              "pwm_name":prefix.decode("ascii"),
                              "ROM_pointer":hex(val),
                              "matched_in_snapshot":struct.unpack_from("<I",ram,off)[0]==val})
+    # The earlier CFS constructor uses object+0x54 for name and
+    # object+0x38 for a generic device callback. Inspect these fields
+    # in the ARCHIVED old SRAM only; v3.22 pointer identity unproven.
+    old_named_devices=[]
+    for entry in ram_hits:
+        field=int(entry["initialized_field"],16)
+        obj=field-0x54
+        pos=obj-RAM_START
+        selectors=(0x08,0x14,0x30,0x34,0x38,0x40,0x54)
+        if pos<0 or pos+max(selectors)+4>len(recovered):
+            raise ValueError("historical named device field outside reconstructed SRAM")
+        fields={}
+        for of in selectors:
+            val=struct.unpack_from("<I",recovered,pos+of)[0]
+            older_live=struct.unpack_from("<I",ram,pos+of)[0]
+            fields[hex(of)]={
+                "initial":hex(val),
+                "same_in_historical_snapshot":val==older_live,
+                "in_historical_Flash_or_zero":val==0 or
+                    FLASH_BASE<=val<FLASH_BASE+len(flash),
+            }
+        old_named_devices.append({
+            "name":entry["pwm_name"],
+            "reconstructed_object":hex(obj),
+            "fields":fields,
+            "has_expected_name_pointer_at_plus_0x54":(
+                fields["0x54"]["initial"]==entry["ROM_pointer"]
+            ),
+        })
+    callback_words={x["fields"]["0x38"]["initial"] for x in old_named_devices}
     result={
       "historic_compressed_stream_decoded":True,
       "legacy_source_consumed":status["source_consumed"],
       "legacy_synthetic_data_size":len(recovered),
       "five_ROM_names":names,
       "initialized_RAM_pointer_fields_to_five_pwm_names":ram_hits[:100],
+      "historical_named_objects_and_device_operation_fields":old_named_devices,
+      "old_five_objects_share_callback_plus_0x38":len(callback_words)==1,
+      "old_callback_value_at_plus_0x38_if_shared":(
+          next(iter(callback_words)) if len(callback_words)==1 else None),
+
       "total_RAM_pointer_fields":len(ram_hits),
       "some_named_objects_inferred_by_string_pointer_ONLY":bool(ram_hits),
       "layout_safely_transferable_to_v322":False,
