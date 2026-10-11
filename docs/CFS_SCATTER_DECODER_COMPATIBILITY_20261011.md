@@ -177,6 +177,68 @@ must not be assumed identical in every runtime behavior.
 No actual device name or independent motor-idle signal
 has been recovered by this comparison.
 
+## v3.13 to v3.22 source provenance (2026-10-11 follow-up)
+
+An additional SHA-pinned offline test compares
+the first scatter record and its exact 716-byte input
+region between the known working intermediate CFS
+v3.13 builder image (SHA-256
+`9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff`)
+and the rebuilt v3.22 (SHA-256
+`40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`).
+
+- Both images contain the same scatter descriptors and
+  **all 716 input bytes match byte-for-byte**.
+  The input region SHA-256 is
+  `6c798b603b4139169f60d03cc7d1be58444f6514d2a7f077230ebd5269e27a66`.
+- The same bounded APP/2025-loader token decoder rejects
+  both at token 2, after 14 bytes consumed and 10 produced,
+  on a 160-byte reference to not-yet-initialized output.
+- A **bounded 2 KiB alignment search** upstream and
+  downstream (clipped to the second descriptor's source
+  boundary) did not find a valid alternative input start.
+  This is a negative local search, not proof no valid stream
+  exists elsewhere in Flash.
+- Therefore **the v3.22 changes did not introduce this
+  source-data discrepancy**. v3.13 is still an intermediate
+  modified image, **not the SHA-pinned vendor stock 1.5.3**,
+  so the test alone cannot establish stock behavior.
+
+This is a constrained forensic puzzle, not permission to
+change the user's CFS Flash or treat the loader as identical
+without a current-device original dump.
+
+## Historical versus v3.22 PWM callback entry behavior
+
+The independently observed historical running-CFS PWM
+object `+0x38` points to Thumb routine `0x08014555`,
+which begins with a normal push/prologue and branches on
+the command selector around `0x1E04/0x1E05`.
+
+The rebuilt v3.22 manufacturer constructor stores
+`0x0801939D` in `[obj+0x38]`, but a disassembly starting
+at `0x0801939C` begins with `ldrb r2,[r4,#9]`, XORs
+bytes, and reaches `pop {r3,r4,r5,pc}` shortly afterward.
+This is *not* the same control-dispatch entry as the
+historical function. **Do not assume callback equivalence,
+safe calling convention or motor-state feedback.**
+
+The literal value and the entire checked 128-byte ROM
+window around `0x08019350..0x080193D0` are **identical
+between v3.13 and v3.22**, so this difference was **not
+introduced by the v3.22 patches**. The surrounding code
+suggests a possible internal-entry/calling-context issue,
+but no deployed-CFS callback invocation was observed,
+and declaring an actual firmware bug from disassembly
+alone would be premature.
+
+Tests:
+`cfs_scatter_v313_v322_source_provenance.py`,
+`cfs_pwm_callback_crossgen_static_audit.py` and
+`cfs_pwm_callback_entry_provenance.py`.
+All are reproducible with SHA-pinned offline CI and
+**fail closed** on flash, motor-safe or callback claims.
+
 ## Prerequisites for genuine callback identity
 
 1. Recover or otherwise authenticate the original
