@@ -70,6 +70,64 @@ the actual first-region source. Possible explanations
 include different helper implementation, compressed
 format, entry assumptions or emulator support.
 
+## Additional independent historical Flash/RAM evidence (2026-10-11)
+
+The public research repository
+[**fake-name/cfs-reverse-engineering**](https://github.com/fake-name/cfs-reverse-engineering)
+contains a real GD32 CFS Flash dump of 524,288 bytes and a 65,535-byte
+RAM snapshot from a **different, older 2025 firmware**, not from
+the user's operational v3.22. GitHub Actions downloads these
+read-only artifacts only in its ephemeral runner. Each downloaded
+file is checked against its published immutable Git blob SHA-1:
+
+- Flash Git blob: `44e2d48a144356c1ae2b3fe0b4e23175c050e28e`
+- RAM Git blob: `80e1103c16dd5e17ddf5c84af6e976ad14bd0d38`
+
+The 92-byte ORIGINAL historical bootloader routine at
+**`0x0800316C` matches all 92 corresponding bytes** at
+`0x0801016C` in rebuilt SHA-pinned v3.22 APP. This is
+the strongest *offline* evidence so far that they contain
+the same decompressor. The zero-initialization routines
+at `0x080031C8` / `0x080101C8` matched 31 of 32
+inspected bytes, so are **not claimed byte-identical**.
+
+The historical CFS image also contains a genuine scatter table:
+
+| Source | RAM destination | Output | Handler |
+| --- | --- | ---: | --- |
+| `0x080278D0` | `0x20000000` | 2,844 B | `0x0800316C` |
+| `0x08027B28` | `0x20000B1C` | 18,692 B | `0x080031C8` |
+
+Unlike the saved v3.22 stream, **the historical compressed
+source successfully decodes** under the exact same
+33-instruction Thumb-derived token grammar: 222 tokens,
+**599 of 600 available source bytes consumed**, and
+2,844 bytes produced. A total of **2,321 bytes** of that
+reconstruction match the corresponding historical RAM
+snapshot; differences are expected because the snapshot
+was captured from an already-running system. This is
+independent empirical evidence that the parser is sound
+for at least one real original CFS generation.
+
+The v3.22 packed source starting at `0x0802DB6C`
+continues to fail under that same grammar after 14
+source bytes and 10 output bytes, requiring an invalid
+160-byte prior output reference. **This is now a genuine
+cross-generation input/descriptor inconsistency to
+investigate**, rather than simply the absence of a
+bootloader dump. It could reflect a stale or incompatible
+source pointer, changed compression data, build
+packaging, or another unverified assumption; the evidence
+does not authorize choosing one explanation yet.
+
+**Critical limitations:** The installed unit's loader
+bytes have not been read, and the old reconstructed RAM
+does **not** prove the object layout or callback addresses
+of v3.22. The build in GitHub CI and the deployed MCU
+must not be assumed identical in every runtime behavior.
+No actual device name or independent motor-idle signal
+has been recovered by this comparison.
+
 ## Prerequisites for genuine callback identity
 
 1. Recover or otherwise authenticate the original
