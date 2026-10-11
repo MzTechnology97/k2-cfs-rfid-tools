@@ -24,7 +24,9 @@ def stable_reader(count=30, generation=123, altered_second=False,
             else:
                 g = generation
             reads.append(index)
-            return HEADER.pack(MAGIC, g, 13, count, 13, 1, 1000+(start+count-1)*7)
+            return HEADER.pack(MAGIC, g, 13 if count == 30 else count,
+                               count, 13 if count == 30 else 0, 1,
+                               1000+(start+count-1)*7)
         assert 0 <= index < count
         reads.append(index)
         seq = (start+index) & 0xFFFF
@@ -62,7 +64,9 @@ def test_bad_header_fails():
     for blob in (b"", b"X"*20,
                  HEADER.pack(MAGIC, 1, 0, 31, 0, 1, 0),
                  HEADER.pack(MAGIC, 1, 0, 30, 0, 0, 0),
-                 HEADER.pack(MAGIC, 1, 30, 30, 0, 1, 0)):
+                 HEADER.pack(MAGIC, 1, 30, 30, 0, 1, 0),
+                 HEADER.pack(MAGIC, 1, 4, 2, 0, 1, 0),
+                 HEADER.pack(MAGIC, 1, 2, 2, 1, 1, 0)):
         fail(lambda b=blob: read_frozen_snapshot(lambda _: b))
 
 
