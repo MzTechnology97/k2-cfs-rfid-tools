@@ -20,31 +20,39 @@ serial traffic.
 Chip *assumption* GD32F303VET6 must be corroborated by board silkscreen/marking
 or authenticated CFS silicon identification. Official vendor product page
 [GD32F303VET6](https://www.gigadevice.com.cn/product/mcu/mcus-product-selector/gd32f303vet6)
-and the GD32F303xx datasheet classify **512 KiB total on-chip flash as 256 KiB
-CODE flash + 256 KiB DATA flash**, **not 512 KiB of executable application
-space**. The part has **64 KiB SRAM** and uses a **Cortex-M4**. Legacy
+and the GD32F30x reference manual distinguish the first **256 KiB of Flash
+with fast instruction fetch** from the further **256 KiB with slower instruction
+fetch**. Instructions can be fetched beyond the first 256 KiB, but execution
+latency is higher; the split does **NOT** mark the latter half non-executable.
+The part has **64 KiB SRAM** and uses a **Cortex-M4**.
+See the GD32F30x User Manual §2.1-2.3
+(https://www.gd32mcu.com/data/documents/userManual/GD32F30x_User_Manual_Rev2.9.pdf). Legacy
 `-mcpu=cortex-m3` test builds use a subset of Thumb instructions and are
 byte-identical to the currently installed image, but do *not* prove that a
 future FPU/context-switch instrumentation is ABI-safe.
 
 | Region / invariant | Range or value | Confidence |
 | --- | --- | --- |
-| Physical code-flash area (conditional on exact silicon) | `0x08000000..0x0803FFFF` (256 KiB) | vendor silicon capacity, not loader authorisation |
+| Physical MAIN Flash (conditional on exact silicon) | `0x08000000..0x0807FFFF` (512 KiB) | vendor silicon total capacity, not loader authorisation |
+| Faster code fetch region | `0x08000000..0x0803FFFF` (first 256 KiB) | performance threshold, **not execution ban** beyond it |
 | Firmware application link base | `0x08010000` | verified image/vector |
 | Lower 64 KiB before application | `0x08000000..0x0800FFFF` | *contents not dumped*; consistent with loader, not proof |
 | Original app153 end (exclusive) | `0x0803AE38` | SHA/CRC/length pinned |
 | Working v3.22 end (exclusive) | `0x0803B7DC` | SHA/CRC/length pinned |
 | Conservative build-policy boundary | `0x0803B800` | **UNVERIFIED**, NOT a bootloader-certified limit |
 | Remaining bytes below that arbitrary policy boundary | **36 bytes** | arithmetic only |
-| Bytes to physical 256 KiB code-area end | **18,468 bytes** | **NOT free or approved for use** |
+| Bytes until 256 KiB **fast-fetch boundary** | **18,468 bytes** | **NOT free or approved for use** |
+| Bytes to full 512 KiB silicon Flash end | **280,612 bytes** | **NOT free or approved for use** |
 | Unflashed `sizeopt2` comparison | 178,120 bytes; 56B to old policy bound | experimental; not regression/boot validated |
 | Loader max accepted image / erase map / last reserved page | **UNKNOWN** | release blocker |
 
-Why the 18,468-byte theoretical gap is **not usable headroom**:
+Why neither of the 18,468-byte / 280,612-byte theoretical gaps is **approved usable headroom**:
 there is no bootloader dump, no authoritative app-length limit, and no proof
 that `0x0803B800..0x0803FFFF` lacks sector state, calibration, configuration,
-recovery metadata or CFS-specific loader reservation. The separate 256 KiB
-**DATA** flash region must not be repurposed as ordinary code by assumption.
+recovery metadata or CFS-specific loader reservation. The slower-fetch second 256 KiB of Flash may be physically executable,
+but relocating code there would require loader support, verified links,
+latency profiling and interrupt/timing regression. Do not equate the
+datasheet's CODE/DATA access categorisation with an execute-permission bit.
 Aligned four-byte scans show no literal word directly in the suspected
 `0x0803B800..0x0803FFFF` range, but that is **not absence-of-use proof**
 (computed addresses, pointer arithmetic, instructions and loader code are
@@ -61,6 +69,17 @@ from an independently acquired bootloader image, manufacturer/Creality
 memory script, or genuinely read-only debug access. **Do not enter loader
 mode on the reference CFS merely to read a token**: that operation
 changes device state and needs separate authorisation.
+
+## Erase page implications
+
+The GD32F30x HD / bank0 **2 KiB erase-page geometry** makes the historical
+`0x0803B800` threshold the start of 2 KiB page **119** (zero-based).
+The v3.22 image ends at `0x0803B7DC`, inside page **118**
+(`0x0803B000..0x0803B7FF`), leaving 36 bytes until page 119.
+The first 256 KiB runs through page 127: **pages 119–127 are nine
+undocumented 2 KiB pages (18,432 bytes)**. Their function or reservation
+cannot be inferred from this coincidence alone. The 128-byte `0xE0`
+host transport chunk is **not** a 2 KiB erase page.
 
 ## SRAM geometry
 
