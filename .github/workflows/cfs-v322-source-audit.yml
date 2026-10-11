@@ -300,6 +300,40 @@ jobs:
           assert not d["firmware_release_authorized"]
           print("PASS: pwm1 type9 lookup, original ptr store, 3 mock cases, 8 CRC-valid rejects")
           PY
+      - name: Audit stock PWM decoder and GD32 timer bases (offline only)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python pwm_hal_dispatch_readonly_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test >/tmp/cfs-pwm-hal.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-hal.json") as f:
+              d = json.load(f)
+          v = d["v322"]
+          assert len(v["static"]["pinned_Thumb_instructions"]) == 31
+          assert len(v["timer_base_selector_cases"]) == 14
+          assert v["timer_base_selector_cases"][0]["timer_register_base"] == "0x40012c00"
+          assert v["timer_base_selector_cases"][-1]["timer_register_base"] == "0x40002000"
+          c = v["generic_pwm_dispatch_cases"]
+          assert [x["request_code"] for x in c] == [
+              "0x1e00", "0x1e01", "0x1e02",
+              "0x1e03", "0x1e04", "0x1e05"
+          ]
+          assert [x["target"] for x in c] == [
+              "0x802820c", "0x802820c", "0x802828e",
+              "0x80285e0", "unsupported-return", "unsupported-return"
+          ]
+          assert all(x["result"] == 5 for x in c[-2:])
+          assert c[0]["enable_or_disable_value"] == 1
+          assert c[1]["enable_or_disable_value"] == 0
+          assert d["mutations"]["count"] == 10
+          assert not v["actual_pwm1_registry_driver_identity_proven"]
+          assert not v["PWM_output_zero_proves_motor_stopped"]
+          assert not d["physical_CFS_access"]
+          assert not d["firmware_release_approved"]
+          print("PASS: PWM 4 handled/2 rejected requests, 14 timer bases, 10 CRC-valid mutants")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
