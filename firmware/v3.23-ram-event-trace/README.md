@@ -163,3 +163,38 @@ The original v3.13/v3.22 image has a contiguous 131-byte zero region
 at `0x0803AACD..0x0803AB4F`; adjacent bytes belong to a dense static
 table, rather than a verified no-reference code cave. No independent
 reachability or data-use proof exists. **Do not overwrite this region**.
+
+## October 11: corrected wrapped sequence and verified C-to-Python readback
+
+The synthetic C motor-entry logger originally assigned the sample sequence
+from `ring.header.count`. Since this count stays at **30** once full,
+that would repeat sequence 30 indefinitely and invalidate a post-motion
+recording. This is now corrected: when the ring already contains records,
+the next sequence is derived from its previous record and incremented
+modulo 65536, including safe indexing after a 30-event wrap.
+
+A new Unicorn test, `abi/integrated/emulate_ring_wrap.py`, checks **70**
+consecutive synthetic motor-entry records (30 retained, 40 overwritten),
+plus a separate sequence wrap from `65535` to `0`. The test also enforces
+writes to the synthetic ring/stack only. There is still **no actual MCU
+clock/hook/interrupt validation**, and the ring's RAM address remains
+unproven.
+
+The existing frozen readout model now also has a full end-to-end protocol
+test: C serializes a 20-byte header + 30 chronological 16-byte records
++ repeated 20-byte header, and the Python reader reconstructs the exact
+timestamps, sequence and diagnostic words. A changed second header,
+corrupt record length, invalid ring pointer metadata or nonconsecutive
+sequence is rejected; unfrozen reads remain forbidden. The full-ring
+consistency rule checks `head == overwritten % capacity` before the
+16-bit overwritten counter saturates.
+
+GitHub Actions run
+[38126338934](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38126338934)
+**passed** the buffer model, differential Thumb ABI tests, 70-event wrap,
+memory audit, C-to-Python wire interoperability, and the check that
+no flashable v3.23 CFS firmware has been generated.
+
+This is still a **source-only experimental prototype**. Flash/SRAM
+boundaries, stack high-water, task/interrupt concurrency and real motor
+start/stop coverage remain release blockers. The printer stays on v3.22.
