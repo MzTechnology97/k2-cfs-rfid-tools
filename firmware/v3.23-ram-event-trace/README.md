@@ -198,3 +198,42 @@ no flashable v3.23 CFS firmware has been generated.
 This is still a **source-only experimental prototype**. Flash/SRAM
 boundaries, stack high-water, task/interrupt concurrency and real motor
 start/stop coverage remain release blockers. The printer stays on v3.22.
+
+## 2026-10-11: sustained ARM ring stress + realistic readback footprint
+
+The integrated synthetic logger is now tested using
+[`abi/integrated/emulate_ring_stress.py`](abi/integrated/emulate_ring_stress.py).
+Unlike the initial one-event differential, it preserves **one** ring across
+**85 consecutive Thumb motor-entry callbacks**:
+
+- Exactly 30 most recent events retained in chronological order; 55 older
+  entries overwritten and correctly counted.
+- An explicitly seeded 16-bit sequence wraps **65535 → 0** without introducing
+  duplicates; earlier local pre-fix test code incorrectly reused the saturated
+  count=30 as a sequence. The source branch already had a fixed logger, now
+  protected by a repeatable regression test.
+- Frozen trace refuses further writes; malformed ring head is rejected.
+- Caller registers, APSR, SP and live original stack bytes stay identical at
+  each synthetic motor continuation, with writes confined to the 512-byte
+  ring and synthetic stack. Sidecar and post-ring canaries are not modified.
+- **Peak extra synthetic stack depth = 52 bytes**, compared with the original
+  entry instruction's 24-byte push. This is an emulation result, **not** a
+  measurement of available hardware RTOS task stack.
+
+With the sequence-safe ring logger, the linked ARM Thumb motor hook, logger
+and ring occupy **432 bytes at -Os**, rather than the earlier 380-byte
+pre-fix prototype. Including the frozen GET-only readback serializer increases
+the linked test image to **692 bytes**, still **excluding** the actual MCU UART
+protocol command dispatch, a verified monotonic tick source, stop-event
+coverage, stack/heap guards and flash metadata.
+
+The current v3.22 ends at `0x0803B7DC` and has **36 bytes** left to the
+conservative, *unverified* cap `0x0803B800`; at least **656 additional
+bytes** would need to be reclaimed for the 692-byte prototype **alone**.
+The complete deployable feature would require more. Neither the 432-byte
+nor 692-byte synthetic image is flashable on the CFS; both are linked at a
+**fake emulator-only executable address**.
+
+All tests remain offline; no MCU flash, motor task modification or power
+cycling was performed. The real-time and independent motor-active safety
+questions remain open.
