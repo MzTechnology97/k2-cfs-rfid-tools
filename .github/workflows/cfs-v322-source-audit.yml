@@ -482,7 +482,7 @@ jobs:
           import json
           with open("/tmp/cfs-scatter-contract.json") as f:
               d=json.load(f)
-          assert d["manufacturer_Thumb"]["full_instruction_count"] == 32
+          assert d["manufacturer_Thumb"]["full_instruction_count"] == 33
           assert d["manufacturer_Thumb"]["all_IT_and_branch_instructions_verified"]
           tests=d["controlled_synthetic_codec_tests"]
           assert tests["synthetic_tests_total"] == 9
