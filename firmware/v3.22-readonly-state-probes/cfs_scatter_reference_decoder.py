@@ -64,7 +64,12 @@ def candidate_decode(image: bytes) -> dict:
         if tag & 8:
             off=take_byte()
             if off==0 or off>len(out):
-                raise ValueError("invalid scatter history distance")
+                raise ValueError(
+                    "invalid scatter history distance: "
+                    + json.dumps({"token":count,"src_bytes":pointer-(source-APP_BASE),
+                        "decoded_len":len(out),"offset":off,"tag":hex(tag),
+                        "literal_count":lit_n,"repeat_count":rep_n,
+                        "first_tokens":first_tokens}))
             rep_n+=2
             if rep_n>output_limit-len(out):
                 raise ValueError("backref exceeds declared destination")
