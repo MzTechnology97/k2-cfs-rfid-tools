@@ -16,6 +16,23 @@ device name with `ldr r1,[r0,#0x54]` at `0x08028406` and passes it to
 before each registration, but the instructions inspected here do not
 prove where its initial value came from.
 
+## Nearby store-to-name-field false positives
+
+Original function `0x08027F92` does contain a genuine `STR` at
+`0x08027FA0` to an object field at offset `+0x54`.
+However its base register is loaded from the original ROM
+literal at `0x08028030 = 0x200006E8` and decremented by
+`0x10`. The actual computed store target is therefore
+**`0x2000072C`**, not any of the five PWM name pointer
+fields (`0x200007B0` through `0x20000930`).
+
+A second apparent `STR +0x54` at `0x08028044` lies in
+ROM literal/data bytes **after the function has returned at
+`0x08028004`**. It is not evidence of an executed store.
+
+These are why a halfword-by-halfword disassembly scan must
+be treated as **candidate discovery only**, not as a callgraph
+or proof that a RAM field is assigned.
 ## New startup data
 
 The reset scatter-loader at `0x08010138` reads two PC-relative
