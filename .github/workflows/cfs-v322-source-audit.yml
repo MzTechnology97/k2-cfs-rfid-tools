@@ -383,7 +383,10 @@ jobs:
           with open("/tmp/cfs-pwm1-registry.json") as f:
               d = json.load(f)
           v = d["v322"]
-          assert len(v["static"]["pinned_registry_thumb_instructions"]) == 24
+          assert len(v["static"]["pinned_registry_thumb_instructions"]) == 29
+          assert v["static"]["separate_five_object_constructor_registers_type9"]
+          assert not v["static"]["five_original_device_names_resolved"]
+          assert not v["static"]["concrete_pwm1_object_is_one_of_five_proven"]
           assert v["static"]["original_name"] == "pwm1"
           assert v["static"]["original_lookup_type"] == 9
           cases = v["named_registry_walk_cases"]
@@ -401,7 +404,7 @@ jobs:
           ]
           assert all(x["original_name_type"] == 9 for x in cases)
           assert all(not x["real_runtime_object_identity_proven"] for x in cases)
-          assert d["tamper_tests"]["count"] == 9
+          assert d["tamper_tests"]["count"] == 11
           assert d["real_device_registry_contents_not_observed"]
           assert not d["runtime_motor_object_identity_proven"]
           assert not d["independent_motor_stop_feedback_proven"]
