@@ -1,0 +1,61 @@
+{
+  "date": "2026-10-11",
+  "scope": "strictly offline differential original CFS 1.5.3 vs validated v3.22; actual Thumb executed with synthetic callback",
+  "source_sha256": {
+    "creality_stock_153": "5b076563f474da1e8741ee88a9b019c2dcb1b7de6c1c651f201f1be61c345dea",
+    "validated_v322": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7"
+  },
+  "candidate_extended_pwm_entry": "0x0802639C",
+  "high_level_callers_containing_related_cmd_ids": [
+    "0x080264AA",
+    "0x080264B8",
+    "0x080264F2",
+    "0x080264FE"
+  ],
+  "genuine_thumb_instruction_pins": 23,
+  "differential_emulation_cases": 9,
+  "high_level_1e04": {
+    "original_request": "+0x14 field",
+    "writes_value": 1,
+    "backend_called": false,
+    "return": 0
+  },
+  "high_level_1e05": {
+    "original_request": "+0x14 field",
+    "writes_value": 0,
+    "backend_called": false,
+    "return": 0
+  },
+  "other_codes": {
+    "request_ids": [
+      "0x1E00",
+      "0x1E02",
+      "0x1E03",
+      "0x1E06"
+    ],
+    "callback_location": "[[device+0x40]+0x00]",
+    "synthetic_callback_status_forwarded": true,
+    "with_missing_callback_returns": 0
+  },
+  "original_stock_and_v322_behavior_match": true,
+  "original_stock_and_v322_thumb_bytes_match": true,
+  "recomputed_crc_mutants_rejected": 11,
+  "full_halfword_thumb_direct_BL_scan": {
+    "scan_method": "all even addresses of each saved APP; decode a single Thumb BL opcode",
+    "entry": "0x0802639C",
+    "stock_direct_callsites": 0,
+    "v322_direct_callsites": 0
+  },
+  "full_raw_pointer_search": {
+    "stock_matches_for_entries_0x0802639C_and_0x0802639D": 0,
+    "v322_matches_for_entries_0x0802639C_and_0x0802639D": 0
+  },
+  "no_known_direct_refs_proves_dead_code": false,
+  "actual_runtime_named_pwm1_callback_binding_proven": false,
+  "original_underlying_hardware_driver_invoked": false,
+  "real_motor_enable_or_stop_measured": false,
+  "motor_idle_proven": false,
+  "safe_to_flash_v323": false,
+  "CFS_device_operations": false,
+  "original_vendor_binary_uploaded": false
+}
