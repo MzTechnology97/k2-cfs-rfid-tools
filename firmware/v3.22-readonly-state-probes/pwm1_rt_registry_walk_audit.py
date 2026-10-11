@@ -195,10 +195,11 @@ def emulate_case(image: bytes, label: str, names: tuple[str,...],
                 "max_bytes": n, "match": result == 0,
             })
             return_stub(uc, result)
-        elif address == RT_RETURN_HELPER:
-            trace["registry_exit"].append(hex(uc.reg_read(UC_ARM_REG_R0)))
-            return_stub(uc)
         elif address == APP_AFTER_STORE:
+            # Do not stub the shared 0x0802DFA0 return epilogue:
+            # execute the original Thumb pop/return machinery so
+            # APP_STORE is reached only through genuine saved LR.
+
             uc.emu_stop()
 
     def mem_write(uc, access, addr, size, value, _):
