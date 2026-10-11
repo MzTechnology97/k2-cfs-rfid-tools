@@ -638,6 +638,12 @@ jobs:
           assert d["v313"]["vector_points_into_saved_image"]
           assert d["v322"]["vector_points_into_saved_image"]
           assert d["historical_raw_flash"]["vector_points_into_saved_image"]
+          assert d["v313"]["vector_reset_thumb"] == "0x801a969"
+          assert d["v322"]["vector_reset_thumb"] == "0x801a969"
+          assert d["v322"]["startup_code"][0]["op"] == "add.w"
+          assert d["v322"]["startup_code"][0]["args"] == "r0, r5, r5, lsl #3"
+          assert not d["current_APP_entry_has_normal_reset_handler_prologue_VERIFIED"]
+          assert not d["current_APP_source_is_known_to_execute_scatter_descriptors"]
           assert d["exact_early_application_vector_pair_same_v313_v322"]
           assert not d["data_scatter_table_proves_executed_startup_path"]
           assert not d["actual_CFS_reset_observed"]
