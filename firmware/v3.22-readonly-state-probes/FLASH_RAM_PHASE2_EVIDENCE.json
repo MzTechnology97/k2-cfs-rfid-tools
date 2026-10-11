@@ -297,15 +297,23 @@
   "source_unused_SYMBOL_CANDIDATES": {
     "config_v2_ensure": {
       "source_occurrences": 1,
-      "candidate_only_no_relocation_removal_authorised": true
+      "candidate_only_no_relocation_removal_authorised": true,
+      "same_entrypoint_as_called_config_ptr": true,
+      "bl_config_ptr_source_calls": 1,
+      "confirmed_live_via_alias": true,
+      "safe_to_remove": false
     },
     "config_defaults": {
       "source_occurrences": 1,
-      "candidate_only_no_relocation_removal_authorised": true
+      "candidate_only_no_relocation_removal_authorised": true,
+      "direct_symbol_references_excluding_label": 0,
+      "independent_offline_build_test_only_saved_bytes": 4,
+      "safe_to_remove_in_installed_firmware": false
     },
     "SIDECAR_SIZE": {
       "source_occurrences": 1,
-      "candidate_only_no_relocation_removal_authorised": true
+      "candidate_only_no_relocation_removal_authorised": true,
+      "source_constant_only_binary_bytes": 0
     }
   },
   "release_gates": {
