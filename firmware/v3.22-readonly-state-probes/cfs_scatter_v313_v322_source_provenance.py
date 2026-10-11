@@ -5,7 +5,7 @@ No CFS/CM5 IO, no new flashable firmware, no vendor data bytes emitted.
 This script separates:
   * the original 0x0803AA10 scatter descriptor *facts*;
   * whether the exact compressed source changed in the v3.22 builder;
-  * a very small exploratory scan around the referenced source.
+  * a bounded 2 KiB exploratory source-alignment scan around the referenced source.
 No scan hit implies a valid loader, a valid type-9 PWM mapping or motor idle.
 """
 from __future__ import annotations
@@ -19,7 +19,7 @@ from cfs_scatter_two_generation_input_audit import bounded_thumb_grammar, Reject
 
 NAME_FIELDS = (0x200007B0, 0x20000810, 0x20000870,
                0x200008D0, 0x20000930)
-MAX_SHIFT=128
+MAX_SHIFT=2048
 
 def analyze(v313:bytes, v322:bytes):
     src, dst, n, handler = EXPECTED_SCATTER_FIRST
