@@ -2,6 +2,9 @@
 import argparse, hashlib, pathlib, struct, subprocess, tempfile, json
 
 APP_BASE=0x08010000
+# Conservative build-policy bound, NOT a bootloader-certified application end.
+# GD32F303VE has 256 KiB code Flash (plus separate 256 KiB data Flash).
+UNVERIFIED_BUILD_LIMIT=0x0803B800
 HANDLER_ADDR=0x0803AE38
 CRC_OFF=0x20C
 LEN_OFF=0x20E
@@ -128,8 +131,8 @@ def main():
     crc=crc16_bypass(check)
     struct.pack_into('<H',image,CRC_OFF,crc)
     struct.pack_into('<I',image,LEN_OFF,len(image))
-    if APP_BASE+len(image)>0x0803B800:
-        raise SystemExit('OVERFLOW: image would exceed 0x0803B800 proven compact region; not built')
+    if APP_BASE+len(image)>UNVERIFIED_BUILD_LIMIT:
+        raise SystemExit('OVERFLOW: image exceeds conservative UNVERIFIED 0x0803B800 policy boundary; not built')
     pathlib.Path(args.out).write_bytes(image)
 
     allowed=set(range(CRC_OFF,META_END))
@@ -153,12 +156,16 @@ def main():
       'runtime_config_api':{
         'opcode':'0x57',
         'legacy_v1_subcommands':{'info':'0x0D','set':'0x0E','reset':'0x0F'},
+        'legacy_v1_subcommands_dispatched': False,
         'v2_subcommands':{
           'info':'0x10','get':'0x11','set':'0x12',
           'reset':'0x13','describe':'0x14',
         },
         'layout_version':2,
         'catalog_revision':1,
+        'v2_describe_0x14_dispatched': False,
+        'effective_advanced_runtime_parameter_ids': [7,8],
+        'advanced_ids_9_through_27_storage_only': True,
         'parameter_count':28,
         'capability_mask': '0xD7',
         'mode': 'EXPERIMENTAL_TIMING_ID7_ID8_SAFE_BOX_STATE_GUARD',
@@ -213,6 +220,9 @@ def main():
       'v322_other_motion_hooks_enabled': False,
       'v319_heap_start': '0x20006F28',
       'v322_flash_end_limit': '0x0803B800',
+      'v322_flash_end_limit_bootloader_verified': False,
+      'physical_code_flash_end': '0x08040000 (physical, NOT loader-authorised)',
+      'physical_data_flash_code_allocation_allowed': False,
       'v322_diag': '21 advanced RAM overrides, two stock timing callsites hooked (IDs 7/8), remaining 19 advanced settings not applied, no RFID motor hooks',
       'active_advanced_motion_hooks': [7,8],
       'never_flash_automatically':True,
