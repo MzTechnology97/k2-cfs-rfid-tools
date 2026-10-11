@@ -67,9 +67,10 @@ jobs:
           assert b["header_crc_valid"] and c["header_crc_valid"]
           assert c["nominal_heap_window_bytes"] == 37080
           assert c["bytes_to_unverified_0x0803b800"] == 36
-          assert c["bytes_to_silicon_code_area_end_NOT_ALLOCATABLE"] == 18468
+          assert c["bytes_to_fast_fetch_end_NOT_AUTHORISED"] == 18468
+          assert c["bytes_to_total_flash_end_NOT_AUTHORISED"] == 280612
           assert module.literal_observations(curr)[
-              "code_flash_0x0803b800_to_0x0803ffff"]["count"] == 0
+              "pre_256k_end_0x0803b800_to_0x0803ffff"]["count"] == 0
           print("PASS: v3.13/v3.22 offline CPU vectors + CRC + memory map")
           PY
       - name: Remove disposable compiled image
