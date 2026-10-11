@@ -146,7 +146,13 @@ def emulate_candidate(image: bytes):
             trace["returned"]=True
             uc.emu_stop()
     def mmio_read(uc,access,address,size,value,_):
-        if not (src<=address and address+size<=EXPECTED_SCATTER_SECOND[0]):
+        if dest <= address and address + size <= dest + n:
+            # The original decompressor uses overlapping LZ-style
+            # look-back copying. Read only bytes already initialized.
+            if not all(x in written for x in range(address,address+size)):
+                raise ValueError(f"uninitialized decompressor lookback at {address:#x}")
+            return
+        if not (src <= address and address + size <= EXPECTED_SCATTER_SECOND[0]):
             raise ValueError(f"candidate read outside encoded source at {address:#x}")
         trace["read_min"] = min(trace["read_min"] or address, address)
         trace["read_max"] = max(trace["read_max"] or address+size,address+size)
