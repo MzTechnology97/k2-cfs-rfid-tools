@@ -35,11 +35,35 @@ def inspect(blob:bytes,tag:str):
     if len(entry)!=1:
         raise ValueError("Thumb callback entry not an instruction boundary in nearby decode")
     idx=rows.index(entry[0])
+    callback_ops={
+      0x0801939C:("ldrb","r2, [r4, #9]"),
+      0x080193AE:("pop","{r3, r4, r5, pc}"),
+    }
+    near={int(row["pc"],16):row for row in rows}
+    for addr,(mn,operand) in callback_ops.items():
+        got=near.get(addr)
+        if got is None or (got["op"],got["args"])!=(mn,operand):
+            raise ValueError("callback entry behavior changed at "+hex(addr))
+    reg_cs=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_LITTLE_ENDIAN)
+    register_stores={}
+    for addr,expected in (
+        (0x0802646E,("ldr","r0, [pc, #0x3f8]")),
+        (0x08026470,("str","r0, [r4, #0x38]")),
+    ):
+        off=addr-APP_BASE
+        ins=next(reg_cs.disasm(blob[off:off+4],addr,count=1),None)
+        if ins is None or (ins.mnemonic,ins.op_str)!=expected:
+            raise ValueError("manufacturer callback registration sequence changed")
+        register_stores[hex(addr)]=ins.mnemonic+" "+ins.op_str
     return {
         "flavor":tag,
         "callback_pointer_literal":hex(raw),
         "window_sha256":hashlib.sha256(payload).hexdigest(),
         "code_window_start":hex(START),
+        "manufacturer_callback_register_stores":register_stores,
+        "entry_uses_r4_before_an_obvious_prologue":True,
+        "early_pop_from_registration_entry":hex(0x080193AE),
+        "independent_standard_AAPCS_callback_validated":False,
         "entry_instruction":entry[0],
         "entry_instruction_index_from_start":idx,
         "immediate_prior_instructions":rows[max(0,idx-10):idx],
