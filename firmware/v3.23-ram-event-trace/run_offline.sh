@@ -19,5 +19,11 @@ compact = text_size("build/trace_ring-arm-size.o")
 print("RAM ring ARM .text:", standard, "bytes -O2;", compact, "bytes -Os")
 assert compact <= standard and compact > 0
 PY
+# Model a frozen, GET-only event transfer (never touches serial devices).
+gcc -std=c11 -O2 -Wall -Wextra -Werror -fsanitize=address,undefined -fno-omit-frame-pointer trace_ring.c trace_readback.c test_trace_readback.c -o build/test_trace_readback
+./build/test_trace_readback
+arm-none-eabi-gcc -std=c11 -O2 -Wall -Wextra -Werror -mcpu=cortex-m3 -mthumb -ffreestanding -nostdlib -c trace_readback.c -o build/trace_readback-arm-O2.o
+arm-none-eabi-gcc -std=c11 -Os -Wall -Wextra -Werror -mcpu=cortex-m3 -mthumb -ffreestanding -nostdlib -c trace_readback.c -o build/trace_readback-arm-Os.o
+arm-none-eabi-size build/trace_readback-arm-O2.o build/trace_readback-arm-Os.o
 echo "NO firmware BIN generated or installed."
 if [ "$#" -eq 1 ]; then python3 preflight_v323.py --firmware "$1"; fi
