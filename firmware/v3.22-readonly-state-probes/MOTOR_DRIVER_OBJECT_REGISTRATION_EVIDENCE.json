@@ -24,7 +24,7 @@
   "field_0x14": "0x1D",
   "device_callback_dispatcher": "0x08023A92",
   "motor_controller_device_pointer_RAM": "0x20004A14",
-  "motor_controller_device_instance_matches_one_of_these_five": false,
+  "motor_controller_device_instance_matches_one_of_these_five": null,
   "motor_instance_match_not_established": true,
   "original_Thumb_instructions_pinned": 28,
   "crc_valid_mutations_rejected": 8,
