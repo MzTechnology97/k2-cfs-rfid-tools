@@ -61,7 +61,20 @@ def scan(buf):
       spots.append(hex(APP_BASE+idx))
       idx+=1
     matches[hex(ptr)]=spots[:40]
+  # Reset ROM has a PC-relative 4-word scatter descriptor table.
+  descriptor_base = 0x08010164
+  start = descriptor_base + read32(buf,descriptor_base)
+  stop = descriptor_base + read32(buf,descriptor_base+4)
+  if not (APP_BASE <= start <= stop <= APP_BASE + len(buf)
+          and (stop-start)%16==0 and stop-start < 4096):
+    raise ValueError('scatter range outside pinned APP')
+  scatter = [
+    {'record_at':hex(a),'four_words':[hex(read32(buf,a+4*j)) for j in range(4)]}
+    for a in range(start,stop,16)
+  ]
+  print('RESET_SCATTER_DESCRIPTORS',json.dumps({'from':hex(start),'to':hex(stop),'entries':scatter}))
   return {
+   "reset_scatter_table":{"from":hex(start),"to":hex(stop),"entries":scatter},
    "object_RAM_addresses":[hex(a) for a in FIVE],
    "pre_existing_device_name_ptr_RAM_fields":[hex(a) for a in NAMES],
    "ROM_data_name_evidence":[{"at":hex(a),"string":
