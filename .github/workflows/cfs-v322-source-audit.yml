@@ -568,6 +568,27 @@ jobs:
           assert not d["any_firmware_flashing"]
           print("PASS: historical CFS G32 bootloader diff and private name-field bounds checked; hardware remains unchanged")
           PY
+          python cfs_scatter_two_generation_input_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-two-generation-scatters.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-two-generation-scatters.json") as f:
+              d=json.load(f)
+          assert d["old_scatter_source_bytes"] == 600
+          assert d["old_scatter_output_bytes"] == 2844
+          assert d["new_scatter_source_bytes"] == 716
+          assert d["new_scatter_output_bytes"] == 3012
+          assert d["same_bytes_at_historical_bootloader_vs_APP_candidate"]
+          assert not d["public_original_2025"]["any_device_names_authenticated"]
+          assert not d["current_saved_APP_v322"]["any_device_names_authenticated"]
+          assert not d["actual_deployed_bootloader_verified"]
+          assert not d["physical_CFS_access"]
+          assert not d["motor_safety_release_authorized"]
+          print("PASS: pinned old vs new CFS stream under same 92-byte decoder, no live claims")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Remove disposable compiled image
         if: always()
