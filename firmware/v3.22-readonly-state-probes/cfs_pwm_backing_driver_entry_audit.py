@@ -41,6 +41,12 @@ PINS={
   0x080193AE:("ldr","r4, [r4]"),
   0x080193B0:("cbz","r4, #0x80193b6"),
   0x080193B2:("blx","r4"),
+  0x0801B3B8:("b","#0x801b28e"),
+  0x0801B28E:("push.w","{r4, r5, r6, r7, r8, sb, sl, fp, ip, lr}"),
+  0x0801B296:("ldrd","r0, r3, [r6, #4]"),
+  0x0801B29C:("movs","r1, #0x18"),
+  0x0801B29E:("bl","#0x8023770"),
+  0x0801B2B8:("bl","#0x802384c"),
 }
 
 def trial(image:bytes):
@@ -68,9 +74,9 @@ def trial(image:bytes):
         raise ValueError("original backing driver Thumb address not decodable")
     downstream={}
     for role,start,n in (
-        ("gpio_set_clear",0x0801B20C,96),
-        ("gpio_get",0x0801B28E,96),
-        ("other_command_fallback",0x0801B5E0,64),
+        ("request_1e00_or_1e01",0x0801B20C,96),
+        ("request_1e02_initializes_GPIO_and_configures_driver",0x0801B28E,96),
+        ("other_unclassified_code",0x0801B5E0,64),
     ):
         downstream[role]=[
             {"at":hex(i.address),"opcode":i.mnemonic+" "+i.op_str}
