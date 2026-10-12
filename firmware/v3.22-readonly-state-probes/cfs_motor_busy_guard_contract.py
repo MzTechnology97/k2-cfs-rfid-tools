@@ -65,8 +65,15 @@ def current_handler_guard(asm: str) -> dict:
         m = re.search(rf"(?m)^{label}:\s*$", code)
         if not m:
             raise ValueError(f"stock handler {label} not found")
-        nxt = re.search(r"(?m)^[a-zA-Z_][a-zA-Z_0-9]*:\s*$", code[m.end():])
-        body = code[m.end(): m.end()+nxt.start()] if nxt else code[m.end():]
+        # The handlers contain internal labels (set_sidecar_ready,
+        # reset_all_flags, reset_done). The entire logical operation
+        # must be examined, not just the first basic block.
+        terminator = ("op_config_v2_reset:" if label.endswith("_set")
+                      else "compact_defaults_u16:")
+        end = code.find(terminator, m.end())
+        if end < 0:
+            raise ValueError(f"{label}: missing verified operation terminator")
+        body = code[m.end():end]
         instructions = [line for line in body.splitlines() if line and not line.startswith(".")]
         sequence = [
             "ldr r0, box_operating_state_ptr",
