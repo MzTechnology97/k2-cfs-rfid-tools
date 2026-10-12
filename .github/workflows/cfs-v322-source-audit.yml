@@ -761,6 +761,30 @@ jobs:
           assert not d["live_hardware_touched"]
           print("PASS: callback code entry provenance, no production assumptions")
           PY
+      - name: Verify five-device +0x38 callback entry stack ABI risk (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_callback_entry_abi_sanity.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-callback-frame.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-callback-frame.json") as f: d=json.load(f)
+          assert d["code_byte_identical_across_two_versions"]
+          v=d["v322"]
+          assert v["constructor_literal"] == "0x801939d"
+          assert v["thumb_entry"] == "0x801939c"
+          assert v["instruction_count"] == 12
+          assert not v["has_local_entry_push"]
+          assert v["returns_with_callee_stack_POP"]
+          assert not v["independent_AAPCS_entry_safety_proven"]
+          assert not v["normal_BX_dispatch_to_this_exact_object_proven"]
+          assert not v["actual_motor_idle_sensing_proven"]
+          assert not d["callback_ABI_compatibility_verified"]
+          assert d["do_not_install_motor_guard_on_this_unverified_address"]
+          print("PASS: 12 actual Thumb instructions indicate nonstandalone callback ABI, no firmware hook")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
