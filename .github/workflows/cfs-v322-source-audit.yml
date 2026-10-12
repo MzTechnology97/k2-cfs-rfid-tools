@@ -1022,6 +1022,32 @@ jobs:
           assert not d["v323_flash_safe"]
           print("PASS: v3.13/v3.22 five original GPIO pins + software duty shadows pinned, NO physical stop proof")
           PY
+      - name: Prove CFS PWM 0x1E04 and 0x1E05 return constants, NOT motor-stop feedback (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_control_status_not_motor_feedback.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-reply-is-not-motor-status.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-reply-is-not-motor-status.json") as f: d=json.load(f)
+          v=d["v322"]
+          assert d["pwm_control_dispatch_equal_in_v313_v322"]
+          assert len(v["pinned_Thumb_sites"]) == 22
+          p=v["synthetic_original_opcode_probes"]
+          assert [(i["request"],i["caller_buffer_plus_0x14"],i["hardware_MMIO_read_count"]) for i in p] == [
+              ("0x1e04",1,0),("0x1e05",0,0)
+          ]
+          assert not v["1E04_1E05_reads_physical_motor_feedback"]
+          assert not v["1E02_indirect_driver_hardware_behavior_proven"]
+          assert not v["GPIO_or_encoder_motor_IDLE_signal_proven"]
+          assert not v["v323_MCU_motor_busy_guard_implemented"]
+          assert not v["v323_flash_approved"]
+          assert not d["hardware_motor_STOP_confirmed"]
+          assert not d["real_CFS_CM5_accessed"]
+          print("PASS: 1E04/1E05 control replies are constants; cannot certify physical motor stop")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
