@@ -44,6 +44,46 @@ against the open GD32F30x standard peripheral header:
 In that header `GPIO_MODE_AF_PP = 0x18` and
 `GPIO_OSPEED_50MHZ = 0x03`.
 
+## Independent TIMER evidence and channel-selector hypothesis
+
+Additional **unchanged raw original OEM binary data** strengthens
+the proposed alternate-function mapping:
+
+- Physical ROM `0x0801B4C4` and `0x08023E54` each store
+  `0x40012C00`, the GD32F30x **TIMER0 peripheral base**.
+- ROM `0x0801B4CC` and `0x08023E5C` each store
+  `0x40000800`, the **TIMER3 peripheral base**.
+
+The GD32F30x
+[TIMER register definitions](https://github.com/jelin-sh/GD32-ARMClang-CMake/blob/master/Platform/Inc/gd32f30x_timer.h)
+confirm both addresses; timer capture/compare value registers
+are distinct from GPIO pin registers.
+
+Moreover, the original per-device SRAM words `+0x50` and `+0x5C`
+have these values, unchanged in v3.13 and v3.22:
+
+| PWM name | GPIO AF pad | Raw `+0x50` | Raw `+0x5C` | Compatible channel if AFIO remap set |
+| --- | --- | ---: | ---: | --- |
+| pwm1 | PE13 | 2 | 2 | TIMER0_CH2 (TIMER0 full remap) |
+| pwm3 | PD12 | 0 | 1 | TIMER3_CH0 (TIMER3 remap) |
+| pwm4 | PD13 | 1 | 1 | TIMER3_CH1 (TIMER3 remap) |
+| pwm5 | PD15 | 3 | 1 | TIMER3_CH3 (TIMER3 remap) |
+| pwm8 | PD14 | 2 | 1 | TIMER3_CH2 (TIMER3 remap) |
+
+The correspondence is exact and highly suggestive, but
+**the meaning of +0x50/+0x5C and the boot-time AFIO remap
+register assignments are not yet independently proved**.
+Do not promote this channel proposal to a verified live
+timer-to-physical-motor binding. Static storage of TIMER0/TIMER3
+addresses also does not prove timers were enabled or stopped.
+
+The AF pin correspondence follows GD32F30x TIMER alternate-function
+mapping. The direct GPIO descriptors, AF configuration loop and four
+TIMER ROM literal values **are** directly verified against the
+saved manufacturer bytes. Establishing actual GPIO remap state,
+timer channel enable/duty semantics, and a physical motor stop
+signal requires additional evidence.
+
 ## Read status is not physical motor stop
 
 In the same original firmware there are GPIO accessors:
