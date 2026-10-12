@@ -868,6 +868,31 @@ jobs:
               assert not x["v323_firmware_release_allowed"]
           print("PASS: corrected original 0x08003000 link base with scatter SRAM and 5 PWM names")
           PY
+      - name: Gate v3.23 release using CORRECT physical 0x08003000 APP map (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_corrected_release_gate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-v323-release-gate.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-v323-release-gate.json") as f: d=json.load(f)
+          f=d["flash"]; g=d["gates"]
+          assert f["actual_app_link_base"]=="0x8003000"
+          assert f["actual_v322_APP_end_exclusive"]=="0x802e7dc"
+          assert f["actual_last_2KiB_page_index"]==92
+          assert f["old_incorrect_last_2KiB_page_index"]==118
+          assert f["old_incorrect_bytes_to_policy"]==36
+          assert f["corrected_bytes_to_arbitrary_old_policy_NOT_CERTIFIED_FREE"]==53284
+          assert len(d["required_release_gates"])==9
+          assert d["required_gates_met"]==0
+          assert not d["approve_v323_firmware_flash"]
+          assert not d["approve_v323_motor_active_writes"]
+          assert not d["performed_device_or_CM5_actions"]
+          assert not d["modified_original_firmware_bytes"]
+          print("PASS: corrected physical page=92, +53284B arithmetic only; v3.23 MCU flash safety BLOCKED")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
