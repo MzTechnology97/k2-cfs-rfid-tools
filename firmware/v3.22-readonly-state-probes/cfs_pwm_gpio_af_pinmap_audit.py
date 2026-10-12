@@ -43,6 +43,16 @@ OEM_OBJECTS = (
 )
 
 # Original v3.22 firmware instruction pins, physically decoded.
+# Physically indexed manufacturer TIMER pointers. A ROM reference to
+# a TIMER base is NOT proof that a specific alternate-function pin is
+# wired to that timer, nor that the timer running implies motor rotation.
+TIMER_ROM_WORDS={
+    0x0801B4C4:(0x40012C00,"TIMER0"),
+    0x0801B4CC:(0x40000800,"TIMER3"),
+    0x08023E54:(0x40012C00,"TIMER0"),
+    0x08023E5C:(0x40000800,"TIMER3"),
+}
+
 INIT_PINS={
     0x0801B3D8:("movs","r2, #3"),
     0x0801B3DA:("ldr","r3, [r0, #0x4c]"),
@@ -139,6 +149,17 @@ def check_instruction_contract(image):
 
 def inspect(image):
     audited(image)
+    detected_timer_literals=[]
+    for physical_pc,(expected,timer) in TIMER_ROM_WORDS.items():
+        ofs=physical_pc-LINK_BASE
+        found=struct.unpack_from("<I",image,ofs)[0]
+        if found!=expected:
+            raise ValueError(f"{timer}: original ROM pointer differs at {physical_pc:#x}")
+        detected_timer_literals.append({
+            "timer":timer,"literal_PC":hex(physical_pc),
+            "peripheral_BASE":hex(found),
+            "proven_PWM_device_channel_or_motor":False,
+        })
     checked=check_instruction_contract(image)
     ram=original_RAM(image)
     pins=verify_pinmap(ram)
@@ -149,6 +170,9 @@ def inspect(image):
       "mode_per_GD32F30x_header":"GPIO_MODE_AF_PP",
       "GD32F30x_GPIO_init_speed_value":3,
       "original_Thumb_instruction_pins":checked,
+      "original_TIMER0_and_TIMER3_ROM_references":detected_timer_literals,
+      "timer_peripheral_register_reads_performed":False,
+      "TIMER0_or_TIMER3_counter_enable_proves_rotor_stop":False,
       "in_memory_decoded_RAM_mutations_rejected":rejected,
       "mutations_rejected_count":len(rejected),
       "GD32_GPIO_port_mode_function_read_only":True,
