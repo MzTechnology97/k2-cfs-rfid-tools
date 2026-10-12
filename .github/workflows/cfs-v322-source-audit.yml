@@ -893,6 +893,26 @@ jobs:
           assert not d["modified_original_firmware_bytes"]
           print("PASS: corrected physical page=92, +53284B arithmetic only; v3.23 MCU flash safety BLOCKED")
           PY
+      - name: Flag nominal-vs-physical v3.22 builder addresses before any v3.23 release (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v322_builder_address_space_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --builder build-v3_22.py --handler handler-v3_22.S \
+            --linker link.ld --json-out /tmp/cfs-builder-link-base-review.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-builder-link-base-review.json") as f: d=json.load(f)
+          assert d["nominal_minus_physical_bytes"]==0xD000
+          assert d["validated_vendor_APP_link_origin"]=="0x8003000"
+          assert d["actual_physical_handler_location_if_APP_starts_at_verified_base"]=="0x802de38"
+          assert d["verified_physical_saved_APP_end_exclusive"]=="0x802e7dc"
+          assert d["outside_saved_vendor_APP_reference_count"]>=1
+          assert any(x["symbol"]=="STOCK_MEMCMP" for x in d["out_of_image_references"])
+          assert not d["external_absolute_references_AUTOMATICALLY_relocated"]
+          assert not d["may_flash_or_change_runtime_motor_guard"]
+          print("PASS: corrected Flash base, unverified builder absolute symbol entries remain a release blocker")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
