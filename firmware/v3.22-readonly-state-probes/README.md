@@ -1,5 +1,8 @@
 # CFS v3.22 — read-only internal-state probes
 
+> **ADDRESS CORRECTION — 2026-10-12:** The saved APP is **linked at `0x08003000`**, not `0x08010000`. Its 178,140-byte image ends physically at `0x0802E7DC`, *not* at the older documentation's `0x0803B7DC`. These older labels were based on a nominal file-offset origin 0xD000 too high. The original saved reset vector, all five PWM device names and three callback prologues have been verified in offline CI. The existing experimental builder still uses the old nominal origin for offsets/ELF placement, and its absolute external ROM references have **not yet been migrated or runtime-validated**. Do **not** reinterpret apparent extra Flash capacity as a loader-approved expansion, alter pointer literals blindly, or flash a new build. See [verified link-base and PWM recovery](../../docs/CFS_REAL_LINK_BASE_AND_PWM_NAME_RECOVERY_20261012.md).
+
+
 **EXPERIMENTAL · HARDWARE BOOT/READ-ONLY/LOAD/UNLOAD VALIDATED · NOT A FIX FOR THE INDEPENDENT MCU MOTION GUARD**
 
 This branch adds four read-only diagnostic IDs to the existing CFS v3.21 code. It does not change physical motor control, the two v3.20 timing hooks or the firmware's existing SET/RESET guard. The reference CFS was subsequently flashed with v3.22 `0xD7`, and normal communications and physical operations were validated on 2026-10-10.
