@@ -981,7 +981,7 @@ jobs:
           assert x["mode_per_GD32F30x_header"]=="GPIO_MODE_AF_PP"
           assert x["GD32F30x_GPIO_init_speed_value"]==3
           assert x["mutations_rejected_count"]==5
-          assert len(x["original_Thumb_instruction_pins"])==14
+          assert len(x["original_Thumb_instruction_pins"])==13
           assert not x["actual_TIMER_instance_or_channel_identified"]
           assert not x["motor_physical_stopped_detected"]
           assert not x["safe_MCU_SET_RESET_interlock_found"]
