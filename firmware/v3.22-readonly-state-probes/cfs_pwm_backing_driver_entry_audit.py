@@ -66,6 +66,21 @@ def trial(image:bytes):
                       DRIVER_PC)]
     if not listing:
         raise ValueError("original backing driver Thumb address not decodable")
+    downstream={}
+    for role,start,n in (
+        ("gpio_set_clear",0x0801B20C,96),
+        ("gpio_get",0x0801B28E,96),
+        ("other_command_fallback",0x0801B5E0,64),
+    ):
+        downstream[role]=[
+            {"at":hex(i.address),"opcode":i.mnemonic+" "+i.op_str}
+            for i in c.disasm(
+                image[start-LINK_BASE:start-LINK_BASE+n],start
+            )
+        ]
+        if not downstream[role]:
+            raise ValueError("undecodable saved CFS driver branch "+role)
+
 
     u=Uc(UC_ARCH_ARM,UC_MODE_THUMB)
     u.mem_map(ROM_BASE,0x80000)
@@ -97,6 +112,8 @@ def trial(image:bytes):
       "synthetic_original_Thumb_reaches_driver_entry":True,
       "backing_driver_body_was_executed":False,
       "first_decoded_original_driver_instructions":listing,
+      "bounded_downstream_original_Thumb_branch_disassembly":downstream,
+      "downstream_gpio_get_is_rotor_feedback_PROVEN":False,
       "driver_register_or_GPIO_feedback_semantics_proven":False,
       "driver_MCU_running_motion_STOPPED_proven":False,
       "safe_to_hook_or_flash_v323":False,
