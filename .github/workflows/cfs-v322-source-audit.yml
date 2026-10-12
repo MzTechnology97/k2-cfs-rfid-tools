@@ -1048,6 +1048,32 @@ jobs:
           assert not d["real_CFS_CM5_accessed"]
           print("PASS: 1E04/1E05 control replies are constants; cannot certify physical motor stop")
           PY
+      - name: Trace CFS original PWM 0x1E02 request to real backing driver WITHOUT executing MMIO
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_backing_driver_entry_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-backing-driver.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-backing-driver.json") as f: d=json.load(f)
+          x=d["v322"]
+          assert d["v313_equal"]
+          assert x["original_initialized_RAM_root"]=="0x20000758"
+          assert x["original_initialized_RAM_driver_Thumb_pointer"]=="0x801b395"
+          assert x["original_real_driver_PC"]=="0x801b394"
+          assert x["RTThread_control_opcode"]=="0x1e02"
+          assert x["synthetic_original_Thumb_reaches_driver_entry"]
+          assert not x["backing_driver_body_was_executed"]
+          assert len(x["first_decoded_original_driver_instructions"])>=3
+          assert not x["driver_register_or_GPIO_feedback_semantics_proven"]
+          assert not d["physical_motor_active_feedback_proven"]
+          assert d["no_hardware_MMIO_executed"]
+          assert d["no_real_CFS_or_Kalico_modified"]
+          assert d["no_firmware_flash_approved"]
+          print("PASS: 0x1E02 request reaches authentic backend 0x0801B394; hardware feedback remains unknown")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
