@@ -18,6 +18,7 @@ from flash_ram_phase2_audit import APP_BASE,pinned
 
 WINDOWS=(
     ("suspicious_callback_predecessor",0x08019300,0x080193b8),
+    ("other_constructor_targets_region",0x080193b4,0x08019460),
     ("pwm_constructor_and_literal",0x08026440,0x08026488),
     ("known_extended_pwm_handler",0x08026380,0x080263d0),
 )
