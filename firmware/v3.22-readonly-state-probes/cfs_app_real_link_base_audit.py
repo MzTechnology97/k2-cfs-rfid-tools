@@ -70,6 +70,11 @@ def audited(image:bytes):
          "operands":ins.op_str}
         for ins in code.disasm(image[off(image,reset&~1):off(image,reset&~1)+32],reset&~1)
     ]
+    if [(x["mnemonic"], x["operands"]) for x in reset_code[:4]] != [
+        ("ldr","r0, [pc, #0x24]"),("blx","r0"),
+        ("ldr","r0, [pc, #0x24]"),("bx","r0")
+    ]:
+        raise ValueError("real linked reset does not decode expected ARM entry trampoline")
     # For each address previously labelled "interior" in the
     # 0x08010000 misbased disassembly, test linked physical bytes.
     op_sites=[]
@@ -78,6 +83,14 @@ def audited(image:bytes):
             raise ValueError(f"original +{field:#x} callback literal not found under 0x08003000")
         start=pointer&~1
         instructions=list(code.disasm(image[off(image,start):off(image,start)+12],start))
+        prologue=instructions[0].mnemonic+" "+instructions[0].op_str
+        required={
+            0x30:"push {r4, r5, r6, r7, lr}",
+            0x34:"push {r4, r5, r6, r7, lr}",
+            0x38:"push {r4, lr}",
+        }[field]
+        if prologue!=required:
+            raise ValueError(f"callback {field:#x} not at real function prologue: {prologue}")
         op_sites.append({
             "object_offset":hex(field),
             "physical_literal_address":hex(lit),
@@ -89,8 +102,9 @@ def audited(image:bytes):
     src,end=rec1[0],rec2[0]
     packed=image[off(image,src):off(image,end)]
     result,unpacked=bounded_thumb_grammar(packed,rec1[2])
-    if not result["valid"] or len(unpacked)!=rec1[2]:
-        raise ValueError("linked 0x08003000 APP failed compressed RAM decoding")
+    if (not result["valid"] or len(unpacked)!=rec1[2]
+            or result["source_consumed"]!=716 or result["tokens"]!=251):
+        raise ValueError("linked 0x08003000 APP scatter token/decode invariant changed")
     names=[]
     for obj in OBJECTS:
         field=obj+0x54
