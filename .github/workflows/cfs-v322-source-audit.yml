@@ -669,6 +669,28 @@ jobs:
           assert not d["live_CFS_queried"]
           print("PASS: old authenticated PWM callback and v3.22 extended shim compared without equating to live driver")
           PY
+          python cfs_pwm_callback_literal_provenance.py \
+            --historical-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-callback-registration-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-callback-registration-provenance.json") as f:
+              d=json.load(f)
+          assert d["old_original_ROM_callback_thumb_ptr"] == "0x8014555"
+          assert d["modern_constructor_callback_thumb_ptr"] == "0x801939d"
+          assert d["modern_constructor_writes_plus_0x38_at"] == "0x8026470"
+          assert d["v313_and_v322_PC_relative_load_sites_equal"]
+          assert d["older_original_PC_relative_load_candidates"]
+          assert d["modern_original_PC_relative_load_candidates"]
+          assert not d["modern_name_to_object_binding_proven"]
+          assert not d["modern_callback_0x0801939D_standard_entry_proven"]
+          assert not d["safe_motor_active_hook_proven"]
+          assert not d["independent_rotor_idle_proven"]
+          assert not d["v323_release_authorized"]
+          print("PASS: original callback literal callsite provenance, runtime PWM1 identity unresolved")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
