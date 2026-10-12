@@ -836,6 +836,9 @@ jobs:
               "0x80193c5","0x8019401","0x801939d"
           ]
           assert x["plus38_entered_after_two_preregister_loads_by_sequential_flow"]
+          assert x["all_three_original_constructor_pointers_reach_sequential_code_interiors"]
+          assert x["plus30_predecessor"].startswith("0x080193C2")
+          assert x["plus34_predecessor"].startswith("0x080193FC")
           assert x["plus38_returns_by_pop_from_an_earlier_stack_frame"]
           assert d["same_v313_and_v322"]
           assert not x["constructor_code_proves_which_named_pwm_instance"]
