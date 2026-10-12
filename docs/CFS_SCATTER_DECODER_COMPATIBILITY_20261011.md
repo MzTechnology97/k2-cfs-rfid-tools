@@ -169,6 +169,34 @@ v3.22 branch. Neither address alone proves motor
 running/idle feedback, driver hardware ownership,
 or which specific real v3.22 name maps to which object.
 
+### New callback ABI warning: 0x0801939D is not a validated standalone entry
+
+The original v3.13 and rebuilt v3.22 both contain an identical
+128-byte original ROM window around the Thumb literal
+`0x0801939D`. In v3.22 the constructor explicitly writes that
+literal into each of its five objects at offset `+0x38`.
+
+However, decoding the instruction stream at Thumb
+`0x0801939C` reveals that the **entry begins with**
+`ldrb r2,[r4,#9]` rather than a normal register-save
+prologue. The following control path returns via
+`pop {r3,r4,r5,pc}` (at `0x080193AE` or
+`0x080193B2`), despite no matching `push` at that
+entry. It appears to share a frame established by code
+earlier in the ROM block.
+
+This is **not proof that the pointer is invalid**:
+a nonstandard calling convention, a saved-frame tail
+entry or a different owner for the struct pointer
+could explain it. It is proof that the **ordinary
+standalone ARM AAPCS callback ABI is unverified**.
+Do not install an MCU hook, direct call or motor-active
+interlock at `0x0801939D` merely because this word
+is found in a field that superficially resembles a
+RT-Thread callback. An offline CI contract now compares
+the 12 instruction sub-block in both v3.13/v3.22 and
+requires these safety flags to remain false.
+
 **Critical limitations:** The installed unit's loader
 bytes have not been read, and the old reconstructed RAM
 does **not** prove the object layout or callback addresses
