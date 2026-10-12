@@ -64,6 +64,38 @@ registers were read from the operating printer and no
 motor movement was commanded. This test only decodes
 a locally saved, exact SHA-pinned binary.
 
+## The original RT-Thread PWM 0x1E04/0x1E05 callback is not a motor sensor
+
+Original physically linked `0x080110CC` invokes the generic
+PWM driver wrappers `0x08019516` and `0x08019488`.
+Those wrappers call the generic RT-Thread dispatcher
+`0x08016A92`, which selects the object's callback
+from `[device+0x38]`; that real original callback
+starts at `0x0801939C`.
+
+The `0x0801939C` handler computes `r1-0x1E00-4`.
+It takes two special branches for request IDs
+`0x1E04` and `0x1E05`. In those branches it stores
+a **constant one or zero** to `[response+0x14]`,
+respectively; this branch never reads motor encoder,
+GPIO input-status, or TIMER counter registers.
+Therefore those command responses are **not independent
+motion-state observations**.
+
+`cfs_pwm_control_status_not_motor_feedback.py`
+pins the complete 22-instruction original dispatch/response
+chain and additionally runs the true saved Thumb instructions
+under two bounded synthetic request scenarios, asserting
+that no hardware-MMIO reads occur. The original v3.13
+and current saved v3.22 have identical behavior. The
+indirect driver path for other request IDs, including
+`0x1E02`, is explicitly **outside this narrow proof**.
+
+This matters because a value of `0` from a callback,
+a zero commanded PWM duty, and `BOX_STATE=IDLE`
+are three different concepts. None can serve alone
+as the physical-motor-stop guard required by issue #9.
+
 ## Regression and safe next steps
 
 The CI now runs
