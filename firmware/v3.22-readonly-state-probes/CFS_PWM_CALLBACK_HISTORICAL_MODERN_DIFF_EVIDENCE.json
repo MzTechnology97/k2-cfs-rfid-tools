@@ -40,5 +40,37 @@
   "safe_to_enable_v323_motor_control_writes": false,
   "safe_to_flash_v323": false,
   "live_MCU_or_serial_access": false,
-  "proprietary_firmware_uploaded": false
+  "proprietary_firmware_uploaded": false,
+  "original_constructor_operations_2026_10_12": [
+    {
+      "field": "+0x30",
+      "literal": "0x08026860",
+      "thumb": "0x080193C5",
+      "pcrel_ldr": "0x08026466",
+      "store": "0x08026468",
+      "entry_is_ordinary_function_prologue_proven": false
+    },
+    {
+      "field": "+0x34",
+      "literal": "0x08026864",
+      "thumb": "0x08019401",
+      "pcrel_ldr": "0x0802646A",
+      "store": "0x0802646C",
+      "entry_is_ordinary_function_prologue_proven": false
+    },
+    {
+      "field": "+0x38",
+      "literal": "0x08026868",
+      "thumb": "0x0801939D",
+      "pcrel_ldr": "0x0802646E",
+      "store": "0x08026470",
+      "entry_is_ordinary_function_prologue_proven": false
+    }
+  ],
+  "three_constructor_destinations_have_verified_sequential_fallthrough_predecessors": true,
+  "synthetic_AAPCS_call_to_plus_0x38_returned_using_caller_stack_not_LR": true,
+  "synthetic_AAPCS_call_identical_behavior_v313_v322": true,
+  "normal_real_RTThread_callback_invocation_context_authenticated": false,
+  "live_CFS_device_name_to_callback_recovered": false,
+  "safe_to_patch_any_constructor_pointer": false
 }
