@@ -650,6 +650,25 @@ jobs:
           assert not d["release_approved"]
           print("PASS: v3.13/v3.22 verified reset vectors, historic reset entry inspected offline")
           PY
+          python cfs_pwm_historical_callback_shim_identity.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-historical-callback-shim-diff.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-historical-callback-shim-diff.json") as f:
+              d=json.load(f)
+          assert d["history_common_callback_ptr"]=="0x8014555"
+          assert d["v322_extended_shim_entry"]=="0x802639d"
+          assert d["v322_unrelated_constructor_callback_literal"]=="0x801939d"
+          assert d["historical_function"]["full_function_bytes"] == 40
+          assert d["v322_function"]["full_function_bytes"] == 40
+          assert not d["v322_registered_pwm1_callback_proven"]
+          assert not d["actual_physical_motor_stop_feedback_proven"]
+          assert not d["safe_for_v323_firmware_release"]
+          assert not d["live_CFS_queried"]
+          print("PASS: old authenticated PWM callback and v3.22 extended shim compared without equating to live driver")
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
