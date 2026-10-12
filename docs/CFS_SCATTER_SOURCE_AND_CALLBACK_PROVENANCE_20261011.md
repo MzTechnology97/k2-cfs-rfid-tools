@@ -80,6 +80,34 @@ not proof that the deployed firmware executes an invalid stack-pop.
 Confirm the actual stock 1.5.3 callback bytes and actual device invocation
 before assuming a physical motor-controller callback ABI.
 
+## Offline direct-entry ABI execution (2026-10-12)
+
+A new opt-in offline test,
+`cfs_pwm_callback_synthetic_abi_probe.py`, exercises the
+**original saved Thumb bytes** at `0x0801939C` in Unicorn
+for both SHA-pinned v3.13 and v3.22. It supplies a conventional
+independent-call setup: `LR` contains a distinct synthetic
+return address, while the synthetic stack starts with four
+deliberately different words. Two isolated return paths are
+tested (checksum matching and mismatching).
+
+If the callback is called as an ordinary, independent AAPCS
+function with no preparatory stack frame, the ROM's
+`POP {r3,r4,r5,pc}` returns using **the word already in the
+caller's stack**, not the return address in `LR`. The
+test explicitly checks that `SP` advances 16 bytes, the
+three registers are restored from synthetic stack contents
+and the two return codes remain `0` and `0xF4`.
+
+This emulation does **not** prove that the deployed MCU
+makes such an invalid call: there may be an unexamined
+continuation/trampoline or special stack contract. It
+also does not prove the five *named* v3.22 devices use
+that function or that any physical rotor is stopped.
+The proper next requirement is a concrete callsite and
+a verified stack-layout/control-flow path, not a motor
+hook added at `0x0801939D`.
+
 ## Remaining gates
 
 - Actual `pwm1` object/name in deployed v3.22 is unverified.
