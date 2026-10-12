@@ -982,6 +982,11 @@ jobs:
           assert x["GD32F30x_GPIO_init_speed_value"]==3
           assert x["mutations_rejected_count"]==5
           assert len(x["original_Thumb_instruction_pins"])==13
+          assert [y["timer"] for y in x["original_TIMER0_and_TIMER3_ROM_references"]]==[
+             "TIMER0","TIMER3","TIMER0","TIMER3"
+          ]
+          assert not x["TIMER0_or_TIMER3_counter_enable_proves_rotor_stop"]
+          assert not x["timer_peripheral_register_reads_performed"]
           assert not x["actual_TIMER_instance_or_channel_identified"]
           assert not x["motor_physical_stopped_detected"]
           assert not x["safe_MCU_SET_RESET_interlock_found"]
