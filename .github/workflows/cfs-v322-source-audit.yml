@@ -938,6 +938,30 @@ jobs:
               assert d[key] is False
           print("PASS: 10 fail-closed motor activity/epoch/ISR fixtures, real MCU interlock remains blocked")
           PY
+      - name: Rebase 102 original motor BL sites to physical Flash PCs (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_command_real_address_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-real-addresses.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-real-addresses.json") as f: d=json.load(f)
+          x=d["v322"]
+          assert d["versions_same_physically_rebased_callgraph"]
+          assert x["real_APP_link_base"]=="0x8003000"
+          assert x["corrected_PC_delta"]==-0xD000
+          assert x["physical_rebased_BL_count"]==102
+          assert [x[k] for k in ("physical_forward_BL","physical_reverse_BL",
+                   "physical_zero_command_BL","physical_direct_controller_BL")] == [33,17,50,2]
+          assert x["corrected_common_controller_PC"]=="0x80110cc"
+          assert not x["physical_encoder_idle_feedback_proven"]
+          assert not x["covers_other_indirect_or_async_motion_paths"]
+          assert not x["safe_to_authorize_MCU_writes"]
+          assert not d["v323_flash_release_authorized"]
+          print("PASS: 102 original CFS motor BLs rebased and verified at physical Flash PCs")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
