@@ -285,6 +285,45 @@ other structures or bootloader initialization has **not**
 been excluded. This is not evidence that the current
 CFS does not work.
 
+### Followed the actual constructor writers back to their original ROM literals
+
+This analysis now has **two independent byte-for-byte matches
+across generations**, verified on the saved original Thumb bytes:
+
+| Piece | Historical physical Flash | v3.13 / v3.22 APP | Result |
+| --- | --- | --- | --- |
+| Constructor snippet before registration | `0x0801461A` (32 B) | `0x08026462` (32 B) | **32/32 bytes identical** in all three |
+| Name-aware PWM dispatcher | `0x08014554` (40 B) | `0x0802639C` (40 B) | **40/40 bytes identical** in all three |
+| Constructor loads callback pointer | `0x08014626` | `0x0802646E` | Both use PC-relative `LDR r0` |
+| Constructor writes callback | `0x08014628` | `0x08026470` | Both write `r0` to `[r4+0x38]` |
+| Callback value held in a ROM literal | `0x08014A20` = `0x08014555` | `0x08026868` = `0x0801939D` | **Different targets** |
+
+SHA-256 of the identical 32-byte constructor sections:
+`dc05fd17e099777114f4fd59d56f8db95c291ecbc95ec514d8666f748c4edb86`.
+
+Thus the old/new *constructor instructions* are the same,
+but the literal holding the callback destination is changed.
+The historical assigned callback definitely handles
+`0x1E04`/`0x1E05`, and a modern byte-identical
+implementation is present, but the modern literal
+does not point to that implementation.
+
+The modern literal `0x0801939D` is unchanged between
+v3.13 and v3.22. It points into a code region that
+already assumes a prepared `r4` and has an early
+stack `pop`; it has not been authenticated as a valid
+independent RT-Thread PWM callback entry. This could
+reflect a different registration step, a later runtime
+overwrite, changed device ownership or another
+unresolved aspect of firmware packaging. **It must not
+be characterized as a confirmed malfunction solely
+from static analysis.**
+
+The modern `pwm1` runtime registry remains unobserved.
+There is no independent encoder/rotor-idle feedback,
+and the v3.23 motor safety/Flash/RAM gates are **still
+closed**.
+
 ## Prerequisites for genuine callback identity
 
 1. Recover or otherwise authenticate the original
