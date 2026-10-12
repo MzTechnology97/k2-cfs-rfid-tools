@@ -843,6 +843,31 @@ jobs:
           assert not d["safe_to_flash_v323"]
           print("PASS: three original constructor pointers and unsafe standalone +0x38 fallthrough invariant")
           PY
+      - name: Prove physical APP link base and decode original PWM SRAM correctly (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_app_real_link_base_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-app-link-base.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-app-link-base.json") as f: d=json.load(f)
+          assert d["same_ROM_names_and_three_callbacks_both_versions"]
+          for key in ["v313","v322"]:
+              x=d["analysis"][key]
+              assert x["corrected_LINK_BASE"]=="0x8003000"
+              assert x["difference_bytes"]==0xD000
+              assert x["decompression"]["valid"]
+              assert x["five_names_in_expected_historical_order_proven"]
+              assert [v["decoded_name"] for v in x["five_PWM_RAM_name_fields"]]==[
+                 "pwm1","pwm3","pwm4","pwm5","pwm8"
+              ]
+              assert not x["real_bootloader_content_on_user_MCU_authenticated"]
+              assert not x["actual_live_CFS_RAM_read"]
+              assert not x["v323_firmware_release_allowed"]
+          print("PASS: corrected original 0x08003000 link base with scatter SRAM and 5 PWM names")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
