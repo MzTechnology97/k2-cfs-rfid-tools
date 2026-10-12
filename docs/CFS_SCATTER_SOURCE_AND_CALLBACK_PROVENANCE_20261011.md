@@ -124,6 +124,27 @@ The new `cfs_pwm_constructor_three_pointer_provenance.py`
 checks each original ROM literal, its PC-relative LDR and its STR
 offset, as well as the immediate predecessor of the third target.
 
+All three pointer destinations are statically identifiable
+*interior instruction boundaries* in the pinned manufacturer's
+Thumb control flow:
+
+- `0x080193C4` (`+0x30`) begins with `movs r1,#0x13`;
+  it immediately follows `movs r2,#0x80` at `0x080193C2`,
+  within a function whose visible independent prologue
+  `PUSH {r3,r4,r5,lr}` is at `0x080193B4`.
+- `0x08019400` (`+0x34`) begins `mov r0,r5`;
+  it immediately follows `add.w r4,r0,r4,lsl #4` at
+  `0x080193FC`, depending on registers prepared earlier.
+- `0x0801939C` (`+0x38`) begins a checksum subpath
+  whose prior loads prepare `r0` and `r1`;
+  it ends with a four-word stack POP.
+
+These are deterministic instruction-level facts, **not**
+proof that a real live device dispatches directly to any of
+those addresses. A special trampoline, interpreter, or
+later callback replacement remains possible; no write
+hook or firmware fix is authorized from this evidence.
+
 For the third pointer, the original code enters an existing checksum
 path by normal sequential execution: `0x08019398` loads `r0`
 from `[r4+6]`, `0x0801939A` loads `r1` from `[r4+7]`, then
