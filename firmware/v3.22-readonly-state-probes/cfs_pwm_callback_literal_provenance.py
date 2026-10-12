@@ -18,6 +18,7 @@ current APP is pinned exact saved v3.22. Read-only.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import struct
 from pathlib import Path
@@ -34,6 +35,9 @@ OLD_PTR = 0x08014555
 NEW_PTR = 0x0801939D
 NEW_WRITER_LDR = 0x0802646E
 NEW_WRITER_STR = 0x08026470
+OLD_CONSTRUCTOR_REGION = 0x0801461A
+NEW_CONSTRUCTOR_REGION = 0x08026462
+CONSTRUCTOR_SECTION_LEN = 32
 
 
 def u32(blob, base, address):
@@ -100,7 +104,28 @@ def compare(old,new,mid):
                        NEW_WRITER_STR,count=1),None)
     if i is None or (i.mnemonic,i.op_str)!=("str","r0, [r4, #0x38]"):
         raise ValueError("modern constructor no longer writes callback field +0x38")
+    old_constructor = old[
+        OLD_CONSTRUCTOR_REGION-FLASH_BASE:
+        OLD_CONSTRUCTOR_REGION-FLASH_BASE+CONSTRUCTOR_SECTION_LEN]
+    new_constructor = new[
+        NEW_CONSTRUCTOR_REGION-APP_BASE:
+        NEW_CONSTRUCTOR_REGION-APP_BASE+CONSTRUCTOR_SECTION_LEN]
+    mid_constructor = mid[
+        NEW_CONSTRUCTOR_REGION-APP_BASE:
+        NEW_CONSTRUCTOR_REGION-APP_BASE+CONSTRUCTOR_SECTION_LEN]
+    if any(len(x)!=CONSTRUCTOR_SECTION_LEN
+           for x in (old_constructor,new_constructor,mid_constructor)):
+        raise ValueError("manufacturer constructor comparison truncated")
     return {
+        "original_constructor_32_byte_window_old_vs_v322_identical":
+            old_constructor == new_constructor,
+        "original_constructor_v313_v322_32_byte_window_identical":
+            mid_constructor == new_constructor,
+        "constructor_old_sha256":hashlib.sha256(old_constructor).hexdigest(),
+        "constructor_v322_sha256":hashlib.sha256(new_constructor).hexdigest(),
+        "old_v322_constructor_byte_differences":sum(
+            a!=b for a,b in zip(old_constructor,new_constructor)
+        ),
         "older_actual_pwm_name_to_callback_observed":True,
         "old_original_ROM_callback_thumb_ptr":hex(OLD_PTR),
         "old_original_ROM_literal_field":hex(OLD_LIT),
