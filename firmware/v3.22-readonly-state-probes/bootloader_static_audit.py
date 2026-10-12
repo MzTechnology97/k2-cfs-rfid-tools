@@ -13,6 +13,10 @@ import json
 import struct
 from pathlib import Path
 
+# WARNING 2026-10-12: this archival audit imports legacy APP_BASE
+# 0x08010000 which is not the physical saved CFS link address.
+# Older computed Flash page/headroom claims are SUPERSEDED. See
+# cfs_v323_corrected_release_gate.py (physical APP origin 0x08003000).
 from flash_ram_phase2_audit import (
     APP_BASE, CONSERVATIVE_APP_END, CRC_OFF, META_END,
     crc16_bypass, report_image, pinned
