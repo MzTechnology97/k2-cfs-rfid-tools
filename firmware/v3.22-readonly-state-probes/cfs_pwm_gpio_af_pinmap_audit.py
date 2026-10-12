@@ -28,6 +28,18 @@ from flash_ram_phase2_audit import pinned
 from cfs_app_real_link_base_audit import LINK_BASE, audited
 from cfs_scatter_two_generation_input_audit import bounded_thumb_grammar
 
+# These are raw OEM object words at +0x50/+0x5C. Interpreting them
+# as TIMER channel/group is a HYPOTHESIS, not validated runtime binding.
+RAW_SELECTOR_WORDS={
+    "pwm1":(2,2), "pwm3":(0,1), "pwm4":(1,1),
+    "pwm5":(3,1), "pwm8":(2,1),
+}
+CONDITIONAL_TIMER_CHANNEL_IF_AF_REMAP={
+    "pwm1":"TIMER0_CH2", "pwm3":"TIMER3_CH0",
+    "pwm4":"TIMER3_CH1", "pwm5":"TIMER3_CH3",
+    "pwm8":"TIMER3_CH2",
+}
+
 ROM_INPUT_START=0x0802DB6C
 ROM_INPUT_END=0x0802DE38
 RAM_BASE=0x20000000
@@ -93,12 +105,14 @@ def verify_pinmap(ram):
         start=obj-RAM_BASE
         if start<0 or start+0x58>len(ram):
             raise ValueError(f"{name}: OEM object outside original RAM")
-        actual_rom,actual_periph,actual_mask=(
+        actual_rom,actual_periph,actual_mask,selector,group=(
             struct.unpack_from("<I",ram,start+offset)[0]
-            for offset in (0x54,0x48,0x4c)
+            for offset in (0x54,0x48,0x4c,0x50,0x5c)
         )
         if (actual_rom,actual_periph,actual_mask)!=(rom,periph,mask):
             raise ValueError(f"{name}: original ROM string/AF GPIO port/pin provenance changed")
+        if (selector,group)!=RAW_SELECTOR_WORDS[name]:
+            raise ValueError(f"{name}: actual OEM channel/group selector differs")
         if mask != 1<<pin:
             raise ValueError(f"{name}: not a valid one-bit GPIO mask")
         output.append({
@@ -110,6 +124,11 @@ def verify_pinmap(ram):
             "pin_index":pin,
             "gpio_pin":port[-1]+str(pin),
             "pin_mask":hex(mask),
+            "OEM_raw_selector_at_plus_0x50":selector,
+            "OEM_raw_group_at_plus_0x5c":group,
+            "conditional_timer_channel_IF_correct_AF_remap":
+                CONDITIONAL_TIMER_CHANNEL_IF_AF_REMAP[name],
+            "runtime_AFIO_remap_configuration_proven":False,
             "gpio_ISTAT_reg_READ_ONLY":hex(periph+8),
             "gpio_OCTL_reg_READ_ONLY":hex(periph+12),
             "port_is_a_TIMER_peripheral":False,
