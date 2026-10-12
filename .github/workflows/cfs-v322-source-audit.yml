@@ -1013,7 +1013,7 @@ jobs:
           assert x["motor_command_shadow_Current"] == "0x20004a1a"
           assert x["motor_command_shadow_Previous"] == "0x20004a1c"
           assert x["motor_shadow_flags_written"] == ["0x20004990","0x20004994"]
-          assert x["verified_instruction_count"] == 25
+          assert x["verified_instruction_count"] == 27
           assert not x["command_zero_is_physical_STOP_proven"]
           assert not x["gpio_pin_is_real_motion_feedback_proven"]
           assert not x["full_feeder_hub_ISR_coverage_proven"]
