@@ -690,6 +690,13 @@ jobs:
               d=json.load(f)
           assert d["old_original_ROM_callback_thumb_ptr"] == "0x8014555"
           assert d["modern_constructor_callback_thumb_ptr"] == "0x801939d"
+          assert d["original_constructor_32_byte_window_old_vs_v322_identical"]
+          assert d["original_constructor_v313_v322_32_byte_window_identical"]
+          assert d["old_v322_constructor_byte_differences"] == 0
+          assert d["constructor_old_sha256"] == d["constructor_v322_sha256"]
+          assert d["constructor_old_sha256"] == (
+              "dc05fd17e099777114f4fd59d56f8db95c291ecbc95ec514d8666f748c4edb86"
+          )
           assert d["modern_constructor_writes_plus_0x38_at"] == "0x8026470"
           assert d["v313_and_v322_PC_relative_load_sites_equal"]
           assert d["older_original_PC_relative_load_candidates"]
