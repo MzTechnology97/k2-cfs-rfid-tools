@@ -63,13 +63,16 @@ def literals(blob:bytes,base:int,ptr:int) -> list[str]:
             if blob[i:i+4]==encoded]
 
 
-def compare(old:bytes,current:bytes):
+def compare(old:bytes,current:bytes,intermediate:bytes):
     verify_public_blob(old,"flash")
     verify_image(current)
     a=inspect(old,FLASH_BASE,HISTORICAL_ROM_SITE)
     b=inspect(current,APP_BASE,CURRENT_ROM_SITE)
     x=old[HISTORICAL_ROM_SITE-FLASH_BASE:HISTORICAL_ROM_SITE-FLASH_BASE+EXACT_BYTES]
     y=current[CURRENT_ROM_SITE-APP_BASE:CURRENT_ROM_SITE-APP_BASE+EXACT_BYTES]
+    middle=intermediate[CURRENT_ROM_SITE-APP_BASE:CURRENT_ROM_SITE-APP_BASE+EXACT_BYTES]
+    if len(middle)!=EXACT_BYTES:
+        raise ValueError("intermediate original Thumb slice incomplete")
     diffs=[{
         "offset":hex(k),
         "historical_byte":hex(z),
@@ -88,6 +91,9 @@ def compare(old:bytes,current:bytes):
         "historical_function":a,
         "v322_function":b,
         "exact_40_original_Thumb_bytes_identical":not diffs,
+        "v313_exact_extended_shim_matches_v322":middle==y,
+        "v313_extended_shim_matches_old_historical_callback":middle==x,
+        "v313_extended_shim_SHA256":hashlib.sha256(middle).hexdigest(),
         "original_byte_difference_count":len(diffs),
         "first_byte_differences":diffs[:20],
         "mnemonic_difference_count":len(mnemonic_diffs),
@@ -111,10 +117,12 @@ def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument("--public-flash",required=True,type=Path)
     p.add_argument("--v322",required=True,type=Path)
+    p.add_argument("--v313",required=True,type=Path)
     p.add_argument("--json-out",type=Path)
     args=p.parse_args()
     data=compare(args.public_flash.read_bytes(),
-                 pinned(args.v322,"running_v322"))
+                 pinned(args.v322,"running_v322"),
+                 pinned(args.v313,"intermediate_v313"))
     out=json.dumps(data,indent=2)+"\n"
     if args.json_out:args.json_out.write_text(out)
     print(out,end="")
