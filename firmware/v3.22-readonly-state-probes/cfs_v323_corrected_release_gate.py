@@ -72,11 +72,7 @@ def readiness(current: bytes, old: bytes) -> dict:
         "v323_complete_binary_offline_regressions_and_recovery_proven": False,
         "v323_hardware_regression_Creality_and_third_party_RFID_passed": False,
     }
-    required_release=tuple(k for k in gates if not k.endswith((
-        "_SHA_accepted","_verified","_reconstructed","_prologues"
-    )))
-    # Do not rely on the awkward suffix heuristic as a safety gate: list
-    # required criteria independently and fail if any field disappears.
+    # Explicit mandatory safety criteria. Do not infer them from names.
     mandatory=(
         "bootloader_app_partition_and_flash_page_ownership_authenticated",
         "loader_accepts_expanded_v323_image_size_proven",
