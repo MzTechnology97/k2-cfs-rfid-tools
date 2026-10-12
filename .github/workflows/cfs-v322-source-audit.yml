@@ -813,12 +813,6 @@ jobs:
           assert not d["real_device_or_serial_accessed"]
           print("PASS: synthetic call entered 0x0801939D, original POP returned via caller-stack PC not LR")
           PY
-      - name: Map predecessor Thumb control flow and literal provenance around original +0x38 callback (OFFLINE)
-        working-directory: firmware/v3.22-readonly-state-probes
-        run: |
-          python cfs_pwm_callback_footprint_trace.py \
-            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
-            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin
       - name: Assert original three-operation-pointer constructor and checksum fallthrough (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
         run: |
