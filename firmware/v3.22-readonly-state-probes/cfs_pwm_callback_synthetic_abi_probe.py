@@ -78,7 +78,7 @@ def emulate_entry(image: bytes, name: str, observed_checksum: int,
 
     def trace_read(u, access, address, size, value, _):
         if FAKE_STACK <= address < FAKE_STACK + 16:
-            observations["stack_reads"].append(hex(address))
+            observations["stack_reads"].append([address, size])
 
     uc.hook_add(UC_HOOK_CODE, trace_code)
     uc.hook_add(UC_HOOK_MEM_READ, trace_read)
@@ -95,7 +95,7 @@ def emulate_entry(image: bytes, name: str, observed_checksum: int,
                           (UC_ARM_REG_R5, FAKE_STACK_VALUES[2])):
         if uc.reg_read(reg) != expected:
             raise ValueError("callback restored registers from synthetic stack incorrectly")
-    if hex(FAKE_STACK + 12) not in observations["stack_reads"]:
+    if not any(start <= FAKE_STACK+12 < start+size\n               for start, size in observations["stack_reads"]):
         raise ValueError("original callback return PC was not popped from stack")
     if ENTRY not in [int(a,16) for a in observations["executed_original_addresses"]]:
         raise ValueError("entrypoint not executed as original saved Thumb")
