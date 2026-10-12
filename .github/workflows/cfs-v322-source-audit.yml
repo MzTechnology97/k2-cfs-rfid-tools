@@ -962,6 +962,33 @@ jobs:
           assert not d["v323_flash_release_authorized"]
           print("PASS: 102 original CFS motor BLs rebased and verified at physical Flash PCs")
           PY
+      - name: Validate five original GD32 PWM GPIO alternate-function pin descriptors (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_gpio_af_pinmap_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gd32-pwm-af-gpio.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gd32-pwm-af-gpio.json") as f: d=json.load(f)
+          assert d["same_for_v313_and_v322"]
+          x=d["v322"]; m=x["OEM_PWM_descriptors"]
+          assert [x["RTThread_PWM_name"] for x in m] == ["pwm1","pwm3","pwm4","pwm5","pwm8"]
+          assert [x["gpio_pin"] for x in m] == ["E13","D12","D13","D15","D14"]
+          assert [x["pin_mask"] for x in m] == ["0x2000","0x1000","0x2000","0x8000","0x4000"]
+          assert x["original_GPIO_init_mode_value"]=="0x18"
+          assert x["mode_per_GD32F30x_header"]=="GPIO_MODE_AF_PP"
+          assert x["GD32F30x_GPIO_init_speed_value"]==3
+          assert x["mutations_rejected_count"]==5
+          assert len(x["original_Thumb_instruction_pins"])==14
+          assert not x["actual_TIMER_instance_or_channel_identified"]
+          assert not x["motor_physical_stopped_detected"]
+          assert not x["safe_MCU_SET_RESET_interlock_found"]
+          assert not d["active_CFS_access"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: five manufacturer PWM AF-output GPIO pins; no physical motor stop claim")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
