@@ -117,12 +117,27 @@ enters the real `0x0801939C` callback with a **synthetic**
 entry**, before any actual driver instruction is executed;
 no physical GPIO/TIMER/encoder is read or touched.
 
-**This identifies the next exact static-analysis target:**
-`0x0801B394`. We still have not characterized the
-backing driver's register reads or authenticated any
-physical motor-stop feedback. A CFS actively feeding may
-report `BOX_STATE=IDLE` and/or have a zero stored
-commanded duty; neither establishes true safe stoppage.
+The next physical original driver at `0x0801B394`
+has been reached successfully in an emulator on **both
+saved v3.13 and v3.22 images**, but the emulation was
+stopped *before its body could touch hardware*.
+
+Static disassembly of its `0x1E02` path identifies
+`0x0801B28E`: it loads the configured GPIO base/mask
+from the backing device descriptor and invokes a GPIO
+configuration helper at `0x08023770`; other calls
+and arithmetic prepare additional peripheral parameters.
+This is **a driver configuration/operation path**, not
+proof of a sensor that reports rotor activity or stop.
+Names like `gpio_get` are deliberately avoided here,
+because the original branch performs GPIO initialization.
+
+The continuation from `0x0801B28E` to potential timer,
+DMA or encoder registers still requires a verified
+instruction/dataflow audit, followed by controlled
+hardware validation. A CFS actively feeding may report
+`BOX_STATE=IDLE` and/or have a zero stored commanded
+duty; neither establishes true safe stoppage.
 
 ## Regression and safe next steps
 
