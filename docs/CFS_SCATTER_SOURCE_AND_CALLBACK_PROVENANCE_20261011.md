@@ -108,6 +108,46 @@ The proper next requirement is a concrete callsite and
 a verified stack-layout/control-flow path, not a motor
 hook added at `0x0801939D`.
 
+## Three original constructor operation pointers and a checksum-tail entry
+
+A follow-up static audit of the *identical v3.13/v3.22 original code*
+shows that the generic constructor assigns **three** Thumb function
+pointers, rather than only the final one, by LDR-literal and STR:
+
+| Device offset | Load / store instructions | Original literal location | Original saved Thumb address |
+| --- | --- | --- | --- |
+| `+0x30` | `0x08026466 / 0x08026468` | `0x08026860` | `0x080193C5` |
+| `+0x34` | `0x0802646A / 0x0802646C` | `0x08026864` | `0x08019401` |
+| `+0x38` | `0x0802646E / 0x08026470` | `0x08026868` | `0x0801939D` |
+
+The new `cfs_pwm_constructor_three_pointer_provenance.py`
+checks each original ROM literal, its PC-relative LDR and its STR
+offset, as well as the immediate predecessor of the third target.
+
+For the third pointer, the original code enters an existing checksum
+path by normal sequential execution: `0x08019398` loads `r0`
+from `[r4+6]`, `0x0801939A` loads `r1` from `[r4+7]`, then
+`0x0801939C` continues using those registers and eventually
+returns through `POP {r3,r4,r5,pc}` rather than `BX LR`.
+Another separately started function has a visible
+`PUSH {r3,r4,r5,lr}` at `0x080193B4`.
+
+A SHA-pinned emulation in the companion
+`cfs_pwm_callback_synthetic_abi_probe.py` already demonstrated
+that direct entry at `0x0801939C` with an independent
+AAPCS-style LR and an unrelated caller stack **uses the return
+PC from that stack**, consuming 16 stack bytes. These findings
+do **not** establish actual runtime misexecution: the original
+caller may use a special continuation or stack contract, and
+we have not proved which specific live CFS device is using
+these fields or whether it overwrites them later.
+
+It is **not justified** to replace `0x0801939D` with the
+byte-identical historical PWM handler shim `0x0802639D`.
+That apparent substitution is an engineering hypothesis,
+NOT an approved firmware change. No motor-idle observation,
+real code hook or flash release is authorized.
+
 ## Remaining gates
 
 - Actual `pwm1` object/name in deployed v3.22 is unverified.
