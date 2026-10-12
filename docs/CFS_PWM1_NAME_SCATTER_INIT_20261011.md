@@ -1,3 +1,5 @@
+> **SUPERSEDED — 2026-10-12.** The real saved APP link base is **0x08003000**, not the assumed 0x08010000. The prior decoder failure, supposed missing PWM names, and suspicious midfunction callback/stack inference were artifacts of mapping file offsets to the wrong Flash addresses. See [the validated correction](CFS_REAL_LINK_BASE_AND_PWM_NAME_RECOVERY_20261012.md). Historic findings below are retained for audit history only; do not use them to justify MCU pointer patches or v3.23 release.
+
 # CFS PWM object names: initialized SRAM provenance and scatter loader
 
 **2026-10-11 — offline ROM audit only.** No Creality bootloader dump was
