@@ -239,6 +239,52 @@ Tests:
 All are reproducible with SHA-pinned offline CI and
 **fail closed** on flash, motor-safe or callback claims.
 
+## Genuine historical PWM callback is byte-identical to modern extended shim
+
+A more decisive cross-generation comparison uses the actual **historical
+runtime callback** discovered in all five named PWM objects, **not**
+the unrelated v3.22 constructor pointer:
+
+| Evidence | Historic CFS | v3.22 saved APP |
+| --- | --- | --- |
+| Actual named PWM callback or candidate | `0x08014555` (verified in historical running SRAM) | `0x0802639D` (candidate extended PWM command shim) |
+| Start of Thumb code | `0x08014554` | `0x0802639C` |
+| Inspected function | 40 bytes, 19 Thumb instructions | 40 bytes, 19 Thumb instructions |
+| Exact code comparison | **40 of 40 bytes identical** | **same SHA-256 for 40 bytes** |
+| Handles requests `0x1E04/05` | writes 1/0 to `[request+0x14]` | same exact instruction sequence |
+| Literal ROM pointer reference | `0x08014A20` contains `0x08014555` | **no** raw `0x0802639D` pointer literal in saved APP |
+| Actual running device pointer-to-handler mapping | verified on 2025 historical RAM snapshot | **NOT verified** |
+
+Both original segments share SHA-256
+`dd29a80b1b541fa7d7c3142ea67ae1385f4268af1eea3938e1387326dd0128aa`.
+
+This is a substantial confirmation of the **semantic identity of the
+old runtime PWM handler and the present `0x0802639C` shim**. It
+changes the interpretation of the earlier candidate-only static
+analysis: the modern shim is an exact copy of code proven to have
+been registered as a PWM callback in an authentic prior-generation
+CFS. It remains unsafe to assume the **modern** runtime `pwm1`
+registry points to it, because no such modern live state was captured.
+
+A separate v3.22 original constructor still loads
+**`0x0801939D` from `0x08026868`** and writes it to
+`[object+0x38]` at `0x08026470`. The `0x0801939C`
+entry decodes in the middle of a function which uses `r4`
+without an obvious fresh prologue and soon executes a `pop`.
+It is **not the same** as the byte-identical extended PWM shim,
+and the v3.13 and v3.22 bytes around it are identical. Thus its
+exact runtime role must be resolved rather than assuming a
+legitimate standard callback or using it as a motor hook.
+
+The static pointer-reference divergence is a blocker for
+declaring the modern CFS callback *registered*: the historical
+firmware has an actual ROM literal for `0x08014555` and the
+v3.22 saved APP has a ROM literal for a different
+`0x0801939D` pointer. Indirect registration through
+other structures or bootloader initialization has **not**
+been excluded. This is not evidence that the current
+CFS does not work.
+
 ## Prerequisites for genuine callback identity
 
 1. Recover or otherwise authenticate the original
