@@ -40,6 +40,10 @@ PRELUDE = (
     (0x080193AE,"pop","{r3, r4, r5, pc}"),
     (0x080193B2,"pop","{r3, r4, r5, pc}"),
     (0x080193B4,"push","{r3, r4, r5, lr}"),
+    (0x080193C2,"movs","r2, #0x80"),
+    (0x080193C4,"movs","r1, #0x13"),
+    (0x080193FC,"add.w","r4, r0, r4, lsl #4"),
+    (0x08019400,"mov","r0, r5"),
 )
 
 def instruction_at(image,pc,cs):
@@ -77,13 +81,23 @@ def analyze(image):
         if (ins.mnemonic,ins.op_str)!=(mnem,args):
             raise ValueError(f"original checksum predecessor differs at {pc:#x}")
         instructions.append({"at":hex(pc),"op":mnem+" "+args})
-    if not (PRELUDE[1][0]+2==PRELUDE[2][0]
-            and PRELUDE[2][0]+2==PRELUDE[3][0]):
-        raise AssertionError("supposed fallthrough is not contiguous")
+    for predecessor, entry in (
+        (0x0801939A,0x0801939C),
+        (0x080193C2,0x080193C4),
+        (0x080193FC,0x08019400),
+    ):
+        ins=instruction_at(image,predecessor,cs)
+        if predecessor+ins.size!=entry:
+            raise ValueError(f"constructor entry {entry:#x} not aligned to source predecessor")
+        if ins.mnemonic.startswith(("b","pop","bx")):
+            raise ValueError("unexpected control-flow transfer immediately before supposed interior entry")
     return {
         "original_constructor_three_literal_writes":writes,
         "checksum_predecessor_original_Thumb":instructions,
         "plus38_entered_after_two_preregister_loads_by_sequential_flow":True,
+        "all_three_original_constructor_pointers_reach_sequential_code_interiors":True,
+        "plus30_predecessor":"0x080193C2 movs r2, #0x80",
+        "plus34_predecessor":"0x080193FC add.w r4, r0, r4, lsl #4",
         "plus38_returns_by_pop_from_an_earlier_stack_frame":True,
         "constructor_code_proves_which_named_pwm_instance":False,
         "normal_AAPCS_direct_entry_proven":False,
