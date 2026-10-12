@@ -96,6 +96,34 @@ a zero commanded PWM duty, and `BOX_STATE=IDLE`
 are three different concepts. None can serve alone
 as the physical-motor-stop guard required by issue #9.
 
+## Initial backing-driver function for forwarded requests
+
+The same reconstructed initial SRAM carries a separate pointer
+at `0x20000758`: **`0x0801B395`**, an original Thumb function
+entry (physical code PC `0x0801B394`). During the device
+initialization loop, the constructor receives
+`0x2000075C - 4 = 0x20000758` as the shared backing context
+and writes it to device field `+0x40` for the five named
+PWM objects. The manufacturer's real callback at
+`0x0801939C` uses `LDR r4,[r0,#0x40]`,
+`LDR r4,[r4]`, then `BLX r4` for operations not
+handled as fixed `0x1E04`/`0x1E05` responses.
+
+The new offline audit
+`cfs_pwm_backing_driver_entry_audit.py` reconstructs the
+manufacturer pointer from original compressed SRAM and
+enters the real `0x0801939C` callback with a **synthetic**
+`0x1E02` request. It **stops emulation at the backing
+entry**, before any actual driver instruction is executed;
+no physical GPIO/TIMER/encoder is read or touched.
+
+**This identifies the next exact static-analysis target:**
+`0x0801B394`. We still have not characterized the
+backing driver's register reads or authenticated any
+physical motor-stop feedback. A CFS actively feeding may
+report `BOX_STATE=IDLE` and/or have a zero stored
+commanded duty; neither establishes true safe stoppage.
+
 ## Regression and safe next steps
 
 The CI now runs
