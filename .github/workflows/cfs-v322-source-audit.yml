@@ -819,6 +819,33 @@ jobs:
           python cfs_pwm_callback_footprint_trace.py \
             --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
             --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin
+      - name: Assert original three-operation-pointer constructor and checksum fallthrough (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_constructor_three_pointer_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-three-constructor-ops.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-three-constructor-ops.json") as f: d=json.load(f)
+          x=d["original_provenance"]
+          sites=x["original_constructor_three_literal_writes"]
+          assert [s["object_field"] for s in sites]==["0x30","0x34","0x38"]
+          assert [s["stored_thumb_pointer"] for s in sites]==[
+              "0x80193c5","0x8019401","0x801939d"
+          ]
+          assert x["plus38_entered_after_two_preregister_loads_by_sequential_flow"]
+          assert x["plus38_returns_by_pop_from_an_earlier_stack_frame"]
+          assert d["same_v313_and_v322"]
+          assert not x["constructor_code_proves_which_named_pwm_instance"]
+          assert not x["normal_AAPCS_direct_entry_proven"]
+          assert not x["caller_stack_preparation_proven"]
+          assert not x["actual_motor_idle_feedback_proven"]
+          assert x["do_not_patch_ROM_or_hook_callback"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: three original constructor pointers and unsafe standalone +0x38 fallthrough invariant")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
