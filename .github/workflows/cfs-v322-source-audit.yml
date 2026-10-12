@@ -913,6 +913,31 @@ jobs:
           assert not d["may_flash_or_change_runtime_motor_guard"]
           print("PASS: corrected Flash base, unverified builder absolute symbol entries remain a release blocker")
           PY
+      - name: Reject MCU motor-busy false-idle and race cases in model (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_busy_guard_contract.py \
+            --handler handler-v3_22.S \
+            --json-out /tmp/cfs-motor-busy-interlock-model.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-busy-interlock-model.json") as f: d=json.load(f)
+          assert set(d["current_handler_paths"]) == {
+              "op_config_v2_set", "op_config_v2_reset"
+          }
+          assert all(x["box_state_only_guard_sequence_found"] for x in d["current_handler_paths"].values())
+          assert d["synthetic_tests_passed"] == 10
+          assert sum(x["candidate_accepts_in_simulation"] for x in d["tests"]) == 1
+          assert next(x for x in d["tests"] if x["case"] == "real_observed_box_idle_during_feeding")["candidate_accepts_in_simulation"] is False
+          for key in ("real_feeder_hub_buffer_feedback_source_authenticated",
+                      "motor_start_and_ISR_coverage_proven",
+                      "atomic_write_commit_implemented_in_MCU",
+                      "release_gate_9_independent_motor_stop_PROVEN",
+                      "real_v323_flash_or_motor_writes_authorized",
+                      "performed_CFS_or_CM5_IO"):
+              assert d[key] is False
+          print("PASS: 10 fail-closed motor activity/epoch/ISR fixtures, real MCU interlock remains blocked")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
