@@ -1499,6 +1499,10 @@ jobs:
               for ref in row["potential_R4_relative_accesses"][:12]:
                   print("CANDIDATE_OFFSET",ref["pc"],ref["instruction"],
                         ref.get("candidate_peripheral_register_if_R4_still_base"))
+              assert row["original_prefix_uses_GPIO_D_value_for_arithmetic"]
+              assert not row["direct_R4_based_MMIO_load_store_in_128B_window"]
+              assert not row["potential_R4_relative_accesses"]
+              assert not row["source_region_is_proven_M1_M2_motor_peripheral_owner"]
               assert not row["definite_control_flow_reachability_from_motor_task_proven"]
               assert not row["R4_register_live_range_proven"]
               assert not row["actual_GPIO_pin_state_observed"]
