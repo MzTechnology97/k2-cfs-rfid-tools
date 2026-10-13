@@ -1119,6 +1119,12 @@ jobs:
           assert d["same_original_GPIO_irq_counter_and_sampler_both_versions"]
           a=d["v322"]
           assert a["genuine_PIN_ID_for_GPIO_interrupt"]=="0x4b"
+          assert a["resolved_interrupt_GPIO_pin"]=="PE11"
+          assert [p["physical_pin"] for p in a["original_board_GPIO_mapping"]] == ["PE3","PE4","PE11"]
+          assert [p["one_hot_mask"] for p in a["original_board_GPIO_mapping"]] == ["0x8","0x10","0x800"]
+          assert a["RT_Thread_upstream_mode_2_corresponds_to_input_pullup"]
+          assert a["RT_Thread_upstream_irq_mode_1_corresponds_to_falling_edge"]
+          assert not a["OEM_actual_falling_edge_or_external_sensor_verified_on_device"]
           assert a["saved_IRQ_callback_Thumb"]=="0x8010fdd"
           assert a["original_counter_RAM"]=="0x20004990"
           assert a["sampled_previous_counter_RAM"]=="0x20004994"
