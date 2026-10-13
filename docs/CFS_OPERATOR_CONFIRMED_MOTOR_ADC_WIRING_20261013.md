@@ -35,12 +35,40 @@ v3.13/v3.22. It enumerates lookup-table records matching all
 operator-confirmed pads, retaining their original logical RT pin,
 record ROM position, clock selector and pin encoding.
 
-The script checks the already authenticated original associations
-`0x43=PE3`, `0x44=PE4`, and `0x4B=PE11`. Pins absent
+The script checks the original associations of all 16 operator-confirmed
+pins, including `0x43=PE3`, `0x44=PE4`, and `0x4B=PE11`. Pins absent
 from the original RT-Thread lookup table are **reported absent**,
 not silently assigned invented IDs. A missing table record does not
 mean that the firmware cannot address the pin directly through GPIO
 or ADC registers.
+
+### All 16 manufacturer logical pin IDs recovered
+
+A complete GitHub Actions run on the exact saved v3.13/v3.22
+manufacturer ROM now resolves **all 16** operator-confirmed pads
+in the original 112-record GPIO lookup table. No target pads
+were absent, and both firmware versions agree:
+
+| Function | Physical pin | RT-Thread logical ID |
+| --- | --- | --- |
+| BLDC PWM | PE13 | `0x4D` |
+| BLDC FG / tach | PE11 | `0x4B` |
+| BLDC direction | PE3 | `0x43` |
+| BLDC brake | PE4 | `0x44` |
+| M1 IN1 / IN2 | PD3 / PD2 | `0x33 / 0x32` |
+| M1 current amplifier | PC5 | `0x25` |
+| M2 IN1 / IN2 | PD1 / PD0 | `0x31 / 0x30` |
+| M2 current amplifier | PC0 | `0x20` |
+| M3 IN1 / IN2 | PD15 / PD14 | `0x3F / 0x3E` |
+| M3 current amplifier | PA1 | `0x01` |
+| M4 IN1 / IN2 | PD13 / PD12 | `0x3D / 0x3C` |
+| M4 current amplifier | PA0 | `0x00` |
+
+The audit now pins all 16 exact associations in both code
+and CI. The GPIO lookup records establish **how the firmware
+could address a pin through the RT-Thread API**, not whether it
+actually uses the pin as a GPIO, configures the alternative
+ADC function, samples current, or knows the motor is stopped.
 
 **Nothing in this source inventory reads a live GPIO/ADC register.**
 The entries identify physical pin mappings only. They do not
