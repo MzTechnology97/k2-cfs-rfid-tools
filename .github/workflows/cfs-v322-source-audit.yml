@@ -1439,6 +1439,34 @@ jobs:
           assert not d["safe_to_flash_v323"]
           print("PASS: M1/M2 GPIO helper candidate audit only; no motor-stop authority")
           PY
+      - name: Prove OEM ADC0_RDATA read helper and candidate original callers (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc0_rdata_source_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-result-provenance.json >/tmp/cfs-adc0-result-provenance-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-result-provenance.json") as f:d=json.load(f)
+          assert d["both_saved_original_versions_identical"]
+          x=d["v322"]
+          assert x["original_Thumb_instruction_sites_checked"]==17
+          assert x["original_ADC0_CTL1_register"]=="0x40012408"
+          assert x["original_ADC0_RDATA_register"]=="0x4001244c"
+          assert x["ADC0_RDATA_helper_physical_PC"]=="0x8022bbc"
+          assert x["original_method_reads_32bit_ADC0_RDATA"]
+          assert x["number_of_direct_BL_candidates"]==len(x["BL_encoded_direct_callsite_candidates"])
+          print("ADC0_RDATA direct BL candidate sites",x["BL_encoded_direct_callsite_candidates"])
+          assert x["possible_EOC_clear_side_effect_on_RDATA_read"]
+          assert not x["safe_to_poll_ADC_RDATA_concurrently_on_live_CFS"]
+          assert not x["OEM_ADC_channels_15_10_1_0_actually_configured_proven"]
+          assert not x["actual_brushed_motor_current_read_consumers_recovered"]
+          assert not x["ADC_result_RAM_locations_or_motor_gain_calibration_proven"]
+          assert not x["MCU_flash_or_SET_RESET_authorized"]
+          assert d["no_real_CFS_ADC_or_GPIO_reads"] and not d["safe_to_flash_v323"]
+          print("PASS: exact OEM ADC0_RDATA Thumb instructions source verified; no motor current claims")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
