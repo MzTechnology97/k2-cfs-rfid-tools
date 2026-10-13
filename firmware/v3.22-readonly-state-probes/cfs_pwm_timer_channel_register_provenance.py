@@ -127,6 +127,37 @@ def inspect(b):
    "safe_MCU_SET_RESET_interlock_implemented":False,
    "safe_to_flash_v323":False,
  }
+def synthetic_fail_closed_output_checks():
+ """Read-only hypothetical TIMERx_CHCTL2 values; never authorize MCU writes."""
+ test_words = [
+   ("TIMER0_CH2_enabled", 0x100, 0),
+   ("TIMER3_CH0_enabled", 0, 0x001),
+   ("TIMER3_CH1_enabled", 0, 0x010),
+   ("TIMER3_CH2_enabled", 0, 0x100),
+   ("TIMER3_CH3_enabled", 0, 0x1000),
+   ("all_mapped_channels_disabled_but_other_motors_UNKNOWN", 0, 0),
+ ]
+ checks=[]
+ for name,t0,t3 in test_words:
+  active=[]
+  for label,_,selector,ch,_,_ in OBJECTS:
+   reg=t0 if selector==0 else t3
+   if reg & (1<<(4*ch)):
+    active.append(label)
+  reason=("known_PWM_command_output_enabled" if active
+          else "no_PWM_enable_does_not_prove_physical_motor_stop")
+  checks.append({
+    "synthetic_case":name,
+    "active_manufacturer_PWM_outputs":active,
+    "synthetic_registers_only":True,
+    "interlock_write_permission":False,
+    "reason":reason,
+    "genuine_driver_or_encoder_stop_measured":False,
+  })
+ if len(checks)!=6 or [len(x["active_manufacturer_PWM_outputs"]) for x in checks]!=[1,1,1,1,1,0]:
+  raise AssertionError("synthetic 5-channel TIMER_CHCTL2 masks changed")
+ return checks
+
 def main():
  ap=argparse.ArgumentParser(description=__doc__)
  ap.add_argument("--v313",type=Path,required=True)
@@ -137,6 +168,7 @@ def main():
  cur=inspect(pinned(args.v322,"running_v322"))
  if old!=cur:raise ValueError("original TIMER CHx/enable register chain differs between v3.13 and v3.22")
  result={"same_original_five_timer_channel_bases_both_versions":True,"v322":cur,
+         "synthetic_channel_enable_safety_fixtures":synthetic_fail_closed_output_checks(),
          "real_CFS_or_Kalico_touched":False,"firmware_patched":False}
  out=json.dumps(result,indent=2)+"\n"
  if args.json_out:args.json_out.write_text(out)
