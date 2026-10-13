@@ -1513,6 +1513,37 @@ jobs:
           assert not d["v323_flash_release_allowed"]
           print("PASS: 2 original GPIO_D literal consumers with bounded Thumb contexts; no motor ownership implied")
           PY
+      - name: Inspect real original RT-Thread GPIO helper and known PE4 brake caller (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_rt_helper_entry_trace.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-rt-helper-entry.json >/tmp/cfs-gpio-rt-helper-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-rt-helper-entry.json") as f: d=json.load(f)
+          assert d["v313_v322_original_helper_contexts_identical"]
+          x=d["v322"]
+          assert x["physical_oem_APP_link_base"]=="0x8003000"
+          assert x["brake_known_GPIO_helper_BL_source"]=="0x801119e"
+          assert x["original_helper_entry"]=="0x8018eec"
+          assert x["known_BL_thumb_encoding_verified"]
+          assert len(x["contexts"])==2
+          for section in x["contexts"]:
+              print("OEM_GPIO_CONTEXT",section["window"])
+              for row in section["bounded_instructions"][:48]:
+                  print("ORIGINAL_THUMB",row["pc"],row["mnemonic"],row["operands"])
+              assert not section["register_liveness_through_branches_PROVEN"]
+              assert not section["GPIO_driver_register_side_effect_PROVEN"]
+          assert not x["pin_table_conversion_or_M1_M2_owner_proven"]
+          assert not x["all_M1_M2_write_callers_identified"]
+          assert not x["real_GPIO_MMIO_access_or_motor_state_measured"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["live_CFS_or_CM5_access"]
+          assert not d["MCU_SET_RESET_motor_active_authorized"]
+          print("PASS: source-pinned GPIO helper and brake caller; M1/M2 control remains unproven")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
