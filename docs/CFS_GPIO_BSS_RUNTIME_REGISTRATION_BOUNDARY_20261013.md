@@ -64,3 +64,40 @@ prove that M1/M2 are not controlled by this helper.
 **No actual CFS/CM5 register reads or writes, no motion, no
 firmware flash, no Kalico changes.** The v3.23 independent
 motor-stop / atomic SET-RESET safety gate remains blocked.
+
+## Verified CI result: original BLDC GPIO argument assignments
+
+GitHub Actions passed the SHA-pinned v3.13/v3.22 audit.
+Among **122 halfword-scanned BL encodings**, **58** sites have
+the *strict* adjacent two-instruction `MOVS r0,#pin` /
+`MOVS r1,#value` pattern (including reverse order).
+Exactly **nine** of those sites target the already-proven
+BLDC direction (PE3 / RT pin `0x43`) or brake
+(PE4 / RT pin `0x44`).
+
+| Source physical Thumb BL PC | Original pin | Literal value |
+| --- | --- | ---: |
+| `0x08011004` | PE3 direction | 0 |
+| `0x08011014` | PE4 brake | 1 |
+| `0x080110C0` | PE3 direction | 1 |
+| `0x0801116C` | PE4 brake | 0 |
+| `0x08011186` | PE4 brake | 0 |
+| `0x0801119E` | PE4 brake | 1 |
+| `0x0801135A` | PE4 brake | 0 |
+| `0x0801139E` | PE4 brake | 1 |
+| `0x0801153E` | PE4 brake | 1 |
+
+All nine are now exact CI regression assertions. These are
+byte-accurate Thumb sequences immediately before the call;
+they do *not* constitute execution traces, timing evidence
+or a measured peripheral state. The scan found no strict
+adjacent-pair M1/M2 pins PD0–PD3 among these nine
+motor-labelled pairs. Other callsites may calculate or
+load the pin identifier in other ways, and
+`B/BLX` indirect dispatch is not ruled out.
+
+The practical next step is to trace **source-accurate
+register dataflow** for the wider 122 candidates and the
+actual RT GPIO device-registration callback. We must not
+treat unclassified callsites as proof that M1 or M2 lacks
+GPIO control.
