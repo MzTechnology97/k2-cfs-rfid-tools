@@ -73,6 +73,15 @@ def analyze(image:bytes):
             calls.append(hex(pc))
     if len(calls)>80:
         raise ValueError("unexpected ADC result helper callsite count")
+    pointer_refs=[]
+    for pos in range(0,len(image)-3,4):
+        word=struct.unpack_from("<I",image,pos)[0]
+        if word in (RESULT_HELPER_PC,RESULT_HELPER_PC|1):
+            pointer_refs.append({
+                "ROM_word_slot":hex(LINK_BASE+pos),
+                "stored_pointer_value":hex(word),
+                "indirect_call_or_reachable_code_proven":False,
+            })
     return {
         "original_Thumb_instruction_sites_checked":len(CODE),
         "original_ADC0_CTL1_register":hex(ADC0_CTL1),
@@ -81,6 +90,9 @@ def analyze(image:bytes):
         "original_method_reads_32bit_ADC0_RDATA":True,
         "BL_encoded_direct_callsite_candidates":calls,
         "number_of_direct_BL_candidates":len(calls),
+        "ROM_word_references_to_helper":pointer_refs,
+        "number_of_ROM_word_pointer_references":len(pointer_refs),
+        "any_call_to_RDATA_helper_from_actual_motor_current_logic_proven":False,
         "possible_EOC_clear_side_effect_on_RDATA_read":True,
         "safe_to_poll_ADC_RDATA_concurrently_on_live_CFS":False,
         "OEM_ADC_channels_15_10_1_0_actually_configured_proven":False,
