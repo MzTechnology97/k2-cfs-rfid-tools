@@ -26,6 +26,34 @@ the expected RAM global base `0x20004960` and callback
 were inspected at the corrected physical saved-image base
 `0x08003000`, not the superseded `0x08010000` origin.
 
+### Physical GPIO mapping recovered from the OEM pin table
+
+The saved original pin-lookup function at `0x0801AB38`
+takes a logical pin number below `0x70` and selects
+a **16-byte table record** using `table + (pin << 4)`.
+Its PC-relative ROM literal at `0x0801AE54` points to
+the board's original table at `0x0802AD5C`.
+The following records have now been checked, byte-for-byte,
+in both saved v3.13 and v3.22:
+
+| Original logical RT pin | OEM table address | GD32 physical GPIO | One-hot mask |
+| --- | --- | --- | --- |
+| `0x43` | `0x0802B18C` | **PE3** | `0x0008` |
+| `0x44` | `0x0802B19C` | **PE4** | `0x0010` |
+| `0x4B` | `0x0802B20C` | **PE11** | `0x0800` |
+
+The pin `PE11` is separate from the five previously mapped
+PWM output pins. The OEM motor initializer configures
+`0x4B` using pin-mode integer `2`, then attaches an
+interrupt using integer `1` and enables it. In the upstream
+RT-Thread pin API, these ordinarily correspond to
+**input with pull-up** and **falling-edge trigger** respectively:
+[RT-Thread Pin device manual](https://www.rt-thread.io/document/site/programming-manual/device/pin/pin/).
+However the actual CFS GPIO driver implementation, physical
+wiring and live interrupt trigger semantics have not been
+independently verified here; do not generalize from upstream
+constants into a confirmed hardware sensor assignment.
+
 ### Dataflow through the motor-activity sampling task
 
 `0x08010E60` (original manufacturer code) loads the same
