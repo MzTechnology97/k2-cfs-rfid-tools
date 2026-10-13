@@ -114,8 +114,6 @@ def verify(image:bytes)->dict:
           "actual_live_AFIO_register_value_observed":False,
           "actual_motor_stop_feedback_verified":False
         })
-    if set(g["original_raw_group"] for g in [])!=set():
-        raise AssertionError("dummy contract changed") # never executed side effect
     return {
       "physical_image_link_base":hex(LINK_BASE),
       "AFIO_hardware_base_from_original_ROM":hex(AFIO_BASE),
