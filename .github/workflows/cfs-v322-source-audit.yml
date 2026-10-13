@@ -1233,7 +1233,12 @@ jobs:
           assert not x["safe_MCU_SET_RESET_interlock_implemented"]
           assert not x["safe_to_flash_v323"]
           assert not d["real_CFS_or_Kalico_touched"]
-          print("PASS: OEM five channel CCR/CHCTL2 hardware register addresses, still no motor-stop feedback")
+          fixtures=d["synthetic_channel_enable_safety_fixtures"]
+          assert len(fixtures)==6
+          assert [len(x["active_manufacturer_PWM_outputs"]) for x in fixtures]==[1,1,1,1,1,0]
+          assert all(not x["interlock_write_permission"] for x in fixtures)
+          assert all(not x["genuine_driver_or_encoder_stop_measured"] for x in fixtures)
+          print("PASS: OEM five channel CCR/CHCTL2 addresses + six fail-closed masks, no physical idle proof")
           PY
       - name: Remove disposable compiled image
         if: always()
