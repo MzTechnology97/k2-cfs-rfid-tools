@@ -94,25 +94,44 @@ motor-start paths.
 
 ### New source-focused path: RT-Thread GPIO helper
 
-The next audit,
-`cfs_gpio_rt_helper_entry_trace.py`, follows a different
-proven source relationship: original manufacturer code at
-`0x0801119E` contains a Thumb `BL` to
-`0x08018EEC`, a helper used in a known BLDC PE4
-brake-related command path. It disassembles only bounded
-original source windows at the helper entry and the call
-predecessor, comparing the exact saved v3.13 and v3.22
-bytes. It prints a targeted instruction excerpt for human
-review in GitHub CI.
+`cfs_gpio_rt_helper_entry_trace.py` now authenticates a
+**source-level GPIO-dispatch trampoline** in the original
+saved v3.13/v3.22 code (GitHub CI original Thumb
+disassembly from run 38466071579):
 
-This is a better next target for M1/M2 ownership research
-than the misleading GPIO_D-base address classifiers.
-However, one demonstrated BLDC brake call into a generic
-pin helper does **not** identify its other 122 candidate
-callers, prove which ones control PD0–PD3, or authenticate
-atomic motor-stop feedback. Reconstruct any actual
-`r0`/pin argument dataflow and RTOS task reachability
-before assigning an actuator.
+| Source PC | Actual manufacturer Thumb instruction | Interpretation |
+| --- | --- | --- |
+| `0x08018EF0` | `MOV r6,r0` | Preserve input logical pin ID |
+| `0x08018EF2` | `MOV r5,r1` | Preserve input value |
+| `0x08018EF4` | `LDR r0,[r4,#0x40]` | Fetch registered GPIO device object |
+| `0x08018F04` | `LDR r0,[r4,#0x40]` | Fetch device for dispatch |
+| `0x08018F06` | `MOV r2,r5` | Forward output value |
+| `0x08018F08` | `MOV r1,r6` | Forward logical pin ID |
+| `0x08018F0A` | `LDR r3,[r0,#4]` | Get device callback function pointer |
+| `0x08018F12` | `BX r3` | Indirect dispatch into OEM pin driver |
+
+The wrapper checks for the registered object and enters
+a fallback path if it is absent. A ROM global pointer is
+accessed by two PC-relative literals at
+`0x08018EEE` and `0x08018F10`, both resolving to
+`0x0801916C`. The actual dynamically installed function
+pointer at `[device+4]` has **not yet been resolved**.
+
+The original brake caller is confirmed:
+`0x0801119A MOVS r1,#1`,
+`0x0801119C MOVS r0,#0x44` (PE4),
+`0x0801119E BL 0x08018EEC`.
+This is an authenticated manufacturer logical-pin
+dispatch to the registered callback, not yet an
+identified hardware MMIO write by M1 or M2.
+
+The helper has 122 possible direct callers elsewhere
+in the ROM. Proving which of those callers actually
+write PD0–PD3 requires tracing their parameter
+registers and control flow, then resolving the
+registered GPIO driver's callback and peripheral
+operations. A known BLDC brake invocation by itself
+does not establish other motor ownership or safe stop.
 
 ## Required follow-up and safety criteria
 
