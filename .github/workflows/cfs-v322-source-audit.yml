@@ -1529,6 +1529,19 @@ jobs:
           assert x["brake_known_GPIO_helper_BL_source"]=="0x801119e"
           assert x["original_helper_entry"]=="0x8018eec"
           assert x["known_BL_thumb_encoding_verified"]
+          assert x["original_callback_dispatch_instruction_sites_checked"]==12
+          assert x["known_PE4_brake_caller_sites_checked"]==4
+          assert x["original_global_object_literal_ROM_PC"]=="0x801916c"
+          assert x["pin_argument_copied_into_callback_r1"]
+          assert x["value_argument_copied_into_callback_r2"]
+          assert x["GPIO_device_loaded_from_global_object_plus_0x40"]
+          assert x["device_callback_pointer_loaded_from_device_plus_0x04"]
+          assert x["callback_invoked_by_indirect_BX_r3"]
+          assert x["original_PE4_brake_call_r0"]=="0x44"
+          assert x["original_PE4_brake_call_r1_value"]==1
+          assert not x["effective_runtime_device_callback_pointer_resolved"]
+          assert not x["driver_MMIO_write_reached_in_this_static_study"]
+          print("GLOBAL_GPIO_OBJECT_CONST",x["saved_original_global_object_root_constant"])
           assert len(x["contexts"])==2
           for section in x["contexts"]:
               print("OEM_GPIO_CONTEXT",section["window"])
