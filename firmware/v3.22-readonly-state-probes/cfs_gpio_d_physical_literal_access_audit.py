@@ -38,6 +38,25 @@ REGISTERS = {
     0x3C:"SPD_speed_selection",
 }
 MAX_FORWARD_BYTES=128
+# The original source loads the GPIO_D base word but immediately
+# operates on it arithmetically rather than dereferencing it. Pin
+# that distinction so later analyses cannot label these as GPIO writes.
+ARITHMETIC_PREFIXES = {
+  "gpio_d_candidate_1":[
+      ("0x801b686","ldr r4, [pc, #0xd4]"),
+      ("0x801b688","asrs r2, r4, #0x14"),
+      ("0x801b68a","subs r1, r0, r4"),
+      ("0x801b68c","lsls r3, r2, #1"),
+      ("0x801b68e","cmp r0, r4"),
+  ],
+  "gpio_d_candidate_2":[
+      ("0x80236f6","ldr r4, [pc, #0x250]"),
+      ("0x80236f8","asrs r1, r4, #0x14"),
+      ("0x80236fa","subs r3, r0, r4"),
+      ("0x80236fc","lsls r2, r1, #1"),
+      ("0x80236fe","cmp r0, r4"),
+  ],
+}
 
 
 def inspect(image: bytes) -> dict:
@@ -80,6 +99,10 @@ def inspect(image: bytes) -> dict:
             rows.append(row)
         if not rows or rows[0]["pc"]!=hex(pc):
             raise ValueError("could not disassemble original GPIO_D consumer")
+        if [(x["pc"],x["instruction"]) for x in rows[:5]] != ARITHMETIC_PREFIXES[title]:
+            raise ValueError("original GPIO_D address arithmetic prefix changed")
+        if r4_refs:
+            raise ValueError("unexpected dereference of r4 holding the GPIO_D base in local window")
         found.append({
             "window":title,
             "original_source_instruction":hex(pc),
@@ -88,6 +111,9 @@ def inspect(image: bytes) -> dict:
             "bounded_forward_window_bytes":MAX_FORWARD_BYTES,
             "assembly_window":rows,
             "potential_R4_relative_accesses":r4_refs,
+            "original_prefix_uses_GPIO_D_value_for_arithmetic":True,
+            "direct_R4_based_MMIO_load_store_in_128B_window":False,
+            "source_region_is_proven_M1_M2_motor_peripheral_owner":False,
             "definite_control_flow_reachability_from_motor_task_proven":False,
             "R4_register_live_range_proven":False,
             "actual_GPIO_pin_state_observed":False,
