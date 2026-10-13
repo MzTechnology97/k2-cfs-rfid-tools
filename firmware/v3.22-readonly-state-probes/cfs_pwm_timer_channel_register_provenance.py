@@ -23,6 +23,10 @@ IMAGE_SRC_HI=0x0802DE38
 TIMER0=0x40012C00
 TIMER3=0x40000800
 PINNED={
+  0x0801B128:("push","{r4, lr}"),
+  0x0801B12C:("ldr","r4, [pc, #0x394]"),
+  0x0801B152:("ldr","r0, [pc, #0x378]"),
+  0x0801B196:("ldr","r7, [pc, #0x378]"),
   0x0801B1A4:("add.w","r4, r7, r0, lsl #5"),
   0x0801B1A8:("ldrsb","r0, [r4, #0x44]!"),
   0x0801B1AC:("bl","#0x801b128"),
@@ -67,8 +71,14 @@ def inspect(b):
   raise ValueError("OEM five PWM names not independently authenticated")
  if rom32(b,0x0801B4C4)!=TIMER0 or rom32(b,0x0801B4CC)!=TIMER3:
   raise ValueError("original TIMER0/TIMER3 switch-table constants changed")
- if rom32(b,0x0801B514)!=0x2000075C:
+ if rom32(b,0x0801B510)!=0x2000075C:
   raise ValueError("five PWM descriptor RAM base original literal changed")
+ if (((0x0801B196+4)&~3)+0x378)!=0x0801B510:
+  raise ValueError("five PWM object initial pointer lookup changed")
+ if (((0x0801B12C+4)&~3)+0x394)!=0x0801B4C4:
+  raise ValueError("OEM TIMER0 channel-selector literal PC changed")
+ if (((0x0801B152+4)&~3)+0x378)!=0x0801B4CC:
+  raise ValueError("OEM TIMER3 channel-selector literal PC changed")
  c=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_LITTLE_ENDIAN)
  checked=[]
  for pc,expected in PINNED.items():
