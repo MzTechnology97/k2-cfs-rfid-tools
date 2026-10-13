@@ -52,17 +52,28 @@ root by both the duty routine and a status getter.
   direct BL callsites are `0x080038AE`, `0x08003932`
   and `0x08003C8A`.
 
-Thus `0x2000499C` is a concrete **software-status /
-possible countdown candidate**, *not* a hardware-confirmed
-motors-stopped signal. The exact countdown/update path, IRQ
-and all feeder/hub/buffer motor start routes have not been
-validated. We do not assume that this flag covers them.
+The companion routine at **`0x08010E60`** confirms that
+`0x2000499C` is a **software countdown** rather than a direct
+hardware rotor or encoder measurement: `0x08010E62` loads the
+same `0x20004960` RAM root; `0x08010EBE` reads its byte
+at `+0x3C`, `0x08010EC4` decrements it when nonzero,
+and `0x08010ED4` writes the result back. A separate branch
+at `0x08010ED2` reloads `0x14`. This countdown is
+also loaded with `0x14` on the zero-duty path at
+`0x0801114C`.
+
+**A zero software countdown does not prove any motor is
+physically stopped.** It is not sourced from encoder
+measurements, may continue to advance irrespective of actual
+mechanical motion and has not been shown to cover every feeder,
+hub, buffer, task or ISR path. No code change may rely on it
+as a sole motor-active interlock.
 
 ## Automated proof / scope limits
 
 `firmware/v3.22-readonly-state-probes/cfs_pwm_gpio_and_motor_status_provenance.py`
 verifies the physical image base, decompresses original SRAM,
-checks all five GPIO descriptors and their names, pins 27
+checks all five GPIO descriptors and their names, pins 35
 manufacturer Thumb instructions in the GPIO/device-control
 chain, verifies the common motor RAM-root literal, and checks
 the three software-status callsites.
