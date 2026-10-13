@@ -1410,6 +1410,35 @@ jobs:
           assert not d["safe_to_flash_v323"]
           print("PASS: original ADC0_CTL1 source xrefs; no brush-motor channel conversion inferred")
           PY
+      - name: Enumerate original GPIO helper BL sites and nearby M1/M2 pin IDs (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_m1_m2_gpio_helper_callsites.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-m1-m2-helper-calls.json >/tmp/cfs-m1-m2-helper-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-m1-m2-helper-calls.json") as f: d=json.load(f)
+          assert d["original_callsite_census_equal"]
+          x=d["v322"]
+          assert x["physical_saved_APP_base"]=="0x8003000"
+          assert x["target_motor_pin_helper_candidate"]=="0x8018eec"
+          assert x["original_brake_related_call_known"]=="0x801119e"
+          assert x["BL_candidates_found"]==len(x["callsites"])
+          for call in x["callsites"]:
+              if call["preceding_nearby_r0_immediate_PD0_PD3_candidates"]:
+                  print("PD0_PD3_REVIEW",call["possible_original_helper_call_pc"],
+                    call["preceding_nearby_r0_immediate_PD0_PD3_candidates"])
+          print("Original GPIO helper BL candidates",x["BL_candidates_found"])
+          print("Near PD0..PD3 immediate calls",x["candidate_nearby_PD0_PD3_sites"])
+          assert not x["all_PD0_PD3_owner_control_paths_recovered"]
+          assert not x["all_direct_and_indirect_GPIO_writes_exhaustively_discovered"]
+          assert not x["hardware_motor_current_or_tach_read_proven"]
+          assert not x["v323_MCU_write_or_flash_authorized"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: M1/M2 GPIO helper candidate audit only; no motor-stop authority")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
