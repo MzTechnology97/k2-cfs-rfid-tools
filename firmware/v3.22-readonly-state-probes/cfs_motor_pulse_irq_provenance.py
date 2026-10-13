@@ -30,6 +30,8 @@ RAM_GLOBAL=0x20004960
 ROM_GLOBAL_LITERAL=0x08011244
 ROM_IRQ_CALLBACK_LITERAL=0x0801125C
 IRQ_THUMB_CALLBACK=0x08010FDD
+GPIO_LOOKUP_TABLE_LITERAL=0x0801AE54
+GPIO_LOOKUP_TABLE_ROM=0x0802AD5C
 
 # Pin original ROM executable locations and exact instructions.
 PINNED={
@@ -45,6 +47,10 @@ PINNED={
     0x0801102C:("movs","r1, #1"),
     0x0801102E:("movs","r0, #0x4b"),
     0x08011030:("bl","#0x8018e94"),
+    0x0801AB38:("cmp","r0, #0x70"),
+    0x0801AB3C:("ldr","r1, [pc, #0x314]"),
+    0x0801AB3E:("add.w","r0, r1, r0, lsl #4"),
+    0x0801AB42:("ldrsh.w","r1, [r0]"),
     0x08018E2E:("push.w","{r3, r4, r5, r6, r7, r8, sb, lr}"),
     0x08018E4E:("ldr","r4, [r0, #0xc]"),
     0x08018E5C:("blx","r4"),
@@ -101,7 +107,34 @@ def pinned_thumb(b:bytes):
         derived=((pc+4)&~3)+disp
         if derived!=ROM_GLOBAL_LITERAL:
             raise ValueError("IRQ or sample loop no longer addresses shared counter")
+    if ((0x0801AB3C+4)&~3)+0x314 != GPIO_LOOKUP_TABLE_LITERAL:
+        raise ValueError("GPIO pin mapping PC literal displacement changed")
+    if word(b,GPIO_LOOKUP_TABLE_LITERAL)!=GPIO_LOOKUP_TABLE_ROM:
+        raise ValueError("original GPIO lookup base literal changed")
     return [hex(p) for p in PINNED]
+
+
+def physical_pin_mapping(image:bytes):
+    # 0x0801AB3E computes table + logical_pin*16. The saved
+    # manufacturer table contains logical ID and GD32 port/pin fields.
+    entries=[]
+    for logical,pin in ((0x43,3),(0x44,4),(0x4B,11)):
+        at=GPIO_LOOKUP_TABLE_ROM+logical*16
+        o=at-LINK_BASE
+        if not 0<=o<=len(image)-16:
+            raise ValueError("GPIO logical pin mapping entry beyond ROM")
+        idx,clock,port,mask,encoded=struct.unpack_from("<HHIII",image,o)
+        if (idx,clock,port,mask,encoded)!=(
+            logical,0x0606,0x40011800,1<<pin,(pin<<8)|4
+        ):
+            raise ValueError(f"original GPIO table mapping differs for logical ID {logical:#x}")
+        entries.append({"logical_RT_Pin":hex(logical),
+                        "physical_pin":f"PE{pin}",
+                        "GD32_GPIOE_base":hex(port),
+                        "one_hot_mask":hex(mask),
+                        "original_table_at":hex(at),
+                        "RT_PIN_mode_writes_are_source_verified":True})
+    return entries
 
 
 def analog_counter_model(now:int, previous:int):
@@ -157,6 +190,11 @@ def analyze(image:bytes):
     instructions=pinned_thumb(image)
     return {
       "genuine_PIN_ID_for_GPIO_interrupt":"0x4b",
+      "original_board_GPIO_mapping":physical_pin_mapping(image),
+      "resolved_interrupt_GPIO_pin":"PE11",
+      "RT_Thread_upstream_mode_2_corresponds_to_input_pullup":True,
+      "RT_Thread_upstream_irq_mode_1_corresponds_to_falling_edge":True,
+      "OEM_actual_falling_edge_or_external_sensor_verified_on_device":False,
       "GPIO_interrupt_config_API_PC":"0x08018E2E",
       "GPIO_interrupt_enable_API_PC":"0x08018E94",
       "gpio_driver_indirect_registration_op_offset":"0x0C",
