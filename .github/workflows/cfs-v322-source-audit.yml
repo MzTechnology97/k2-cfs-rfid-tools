@@ -1579,6 +1579,25 @@ jobs:
           assert x["all_halfword_scan_BL_candidates"]==122
           assert x["PE4_brake_argument_path_source_verified"]
           assert len(x["strict_adjacent_immediate_argument_candidates"])==x["strict_candidate_count"]
+          assert x["strict_candidate_count"]==58
+          assert x["strict_candidates_on_known_pins"]==9
+          expected_known={
+              ("0x8011004","0x43",0),
+              ("0x8011014","0x44",1),
+              ("0x80110c0","0x43",1),
+              ("0x801116c","0x44",0),
+              ("0x8011186","0x44",0),
+              ("0x801119e","0x44",1),
+              ("0x801135a","0x44",0),
+              ("0x801139e","0x44",1),
+              ("0x801153e","0x44",1),
+          }
+          actual_known={
+              (row["call_pc"],row["pin_id"],row["value_argument"])
+              for row in x["strict_adjacent_immediate_argument_candidates"]
+              if row["pin_from_confirmed_gpio_lookup"]
+          }
+          assert actual_known==expected_known
           for row in x["strict_adjacent_immediate_argument_candidates"]:
               if row["pin_from_confirmed_gpio_lookup"]:
                   print("PIN_LITERAL_DIRECT_BL_CANDIDATE",row)
