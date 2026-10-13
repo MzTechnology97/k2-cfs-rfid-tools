@@ -1458,6 +1458,9 @@ jobs:
           assert x["original_method_reads_32bit_ADC0_RDATA"]
           assert x["number_of_direct_BL_candidates"]==len(x["BL_encoded_direct_callsite_candidates"])
           print("ADC0_RDATA direct BL candidate sites",x["BL_encoded_direct_callsite_candidates"])
+          print("ADC0_RDATA ROM pointer candidates",x["ROM_word_references_to_helper"])
+          assert x["number_of_ROM_word_pointer_references"]==len(x["ROM_word_references_to_helper"])
+          assert not x["any_call_to_RDATA_helper_from_actual_motor_current_logic_proven"]
           assert x["possible_EOC_clear_side_effect_on_RDATA_read"]
           assert not x["safe_to_poll_ADC_RDATA_concurrently_on_live_CFS"]
           assert not x["OEM_ADC_channels_15_10_1_0_actually_configured_proven"]
