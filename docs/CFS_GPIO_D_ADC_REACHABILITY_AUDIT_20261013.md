@@ -38,6 +38,16 @@ proven that r4 remains unchanged along a reachable motor-control
 path**, or that those blocks were executed. No motor GPIO register is
 read on the installed CFS.
 
+**CI finding (run 38464929974, successful):** both original
+PC-relative loads are authenticated, but the next 128 bytes of
+straight-line Capstone decode contain **no direct [r4+offset]
+memory operand candidates** in either inspected window. This is a
+negative *local syntax census*, not a demonstration that GPIOD is
+unused: the base might be transferred to another register, consumed
+in a called helper, used outside the scan window, or masked by
+conditional control flow. The subsequent bounded-disassembly log
+helps direct the next follow-up without inventing PD0–PD3 owners.
+
 ### ADC reachability clarification
 
 The original ROM has a generic `ADC0_RDATA` read routine at
