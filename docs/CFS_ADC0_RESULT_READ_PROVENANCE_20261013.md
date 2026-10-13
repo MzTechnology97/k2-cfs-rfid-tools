@@ -35,13 +35,15 @@ The bounded saved-ROM census found **zero directly encoded Thumb
 v3.13 and v3.22 images. This prevents interpreting the helper
 as evidence that a motor current is being sampled.
 
-There are at least two unresolved possibilities: the generic ADC
-library routine might be invoked indirectly through a function
-pointer/dispatch table, or might be **unreachable library code**
-retained in the binary. An additional aligned ROM-word scan for
-direct/Thumb-bit-set pointer values is now included in the audit.
-Even a matching pointer would not, alone, establish a reachable
-motor current measurement.
+The subsequent independent scan also found **zero aligned
+32-bit ROM words** containing either the physical helper pointer
+`0x08022BBC` or the Thumb entry pointer `0x08022BBD`.
+This strengthens the possibility that it is **unreachable
+library code retained in the image**, but does not establish
+dead-code status: indirect addresses may be computed, stored
+through relocation, or reached via a less direct control path.
+
+Neither scan proves any brushed-motor current measurement.
 
 ## Crucial missing link
 
