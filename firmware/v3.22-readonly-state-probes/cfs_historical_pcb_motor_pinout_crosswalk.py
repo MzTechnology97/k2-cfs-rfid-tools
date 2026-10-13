@@ -122,7 +122,7 @@ def crosswalk(image:bytes, pcb:dict) -> dict:
     o=pwm_channels(image)
     irq=gpio_irq(image)
     mapping={p["RTThread_device_name"]:
-             "P"+p["OEM_GPIO_AF_output"] for p in o["full_oem_timer_channel_register_map"]}
+             p["OEM_GPIO_AF_output"] for p in o["full_oem_timer_channel_register_map"]}
     if mapping!=EXPECTED_PWM_OUTPUTS:
         raise ValueError("OEM firmware PWM AF output pin map changed")
     other={p["logical_RT_Pin"]:p["physical_pin"]
