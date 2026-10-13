@@ -38,7 +38,16 @@ BRUSHED={
  "M3":{"IN1":"PD15","IN2":"PD14","current":"PA1","adc_channel_candidate":1},
  "M4":{"IN1":"PD13","IN2":"PD12","current":"PA0","adc_channel_candidate":0},
 }
-LOOKUP_KNOWN={"PE3":0x43,"PE4":0x44,"PE11":0x4b}
+# Every OEM logical-to-physical mapping below was directly recovered
+# from the 112-entry immutable original v3.13/v3.22 PIN table.
+# These are registration IDs, not proof of live ADC conversion.
+LOOKUP_KNOWN={
+    "PE13":0x4d,"PE11":0x4b,"PE3":0x43,"PE4":0x44,
+    "PD3":0x33,"PD2":0x32,"PC5":0x25,
+    "PD1":0x31,"PD0":0x30,"PC0":0x20,
+    "PD15":0x3f,"PD14":0x3e,"PA1":0x01,
+    "PD13":0x3d,"PD12":0x3c,"PA0":0x00,
+}
 OWNERS={
     p:[] for p in dict.fromkeys(
       list(BLDC.values())+
@@ -80,13 +89,12 @@ def inventory(image:bytes):
           "actual_GPIO_or_ADC_register_sampled":False,
         }
         rows.append(row)
-        OWNERS[pad] # no mutation, only source ordering
     by_pad={pad:[] for pad in OWNERS}
     for row in rows:
         by_pad[row["physical_pad"]].append(row)
     for pad,logical in LOOKUP_KNOWN.items():
         if [int(v["oem_RTThread_logical_pin"],16) for v in by_pad[pad]]!=[logical]:
-            raise ValueError(f"independently pinned PE3/PE4/PE11 RT pin lookup mismatch: {pad}")
+            raise ValueError(f"manufacturer source-pinned RT pin lookup mismatch: {pad}")
     return {
       "physical_ROM_APP_link_base":hex(LINK_BASE),
       "manufacturer_pin_table_ROM":hex(TABLE_PC),
@@ -94,6 +102,10 @@ def inventory(image:bytes):
       "BLDC_external_PCB_and_operator_reported_pads":BLDC,
       "four_brushed_driver_pads_from_external_PCB":BRUSHED,
       "resolved_oem_logical_records_by_confirmed_physical_pad":by_pad,
+      "all_16_operator_confirmed_pads_resolved_from_oem_ROM":(
+          len(LOOKUP_KNOWN)==16 and
+          all(len(by_pad[pad])==1 for pad in LOOKUP_KNOWN)
+      ),
       "unresolved_pads_not_in_112_record_oem_table":[pad for pad,items in by_pad.items() if not items],
       "installed_CFS_matches_historical_PCB_wiring_operator_reported":True,
       "installed_CFS_wiring_independently_electrically_measured":False,
