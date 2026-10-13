@@ -1161,9 +1161,14 @@ jobs:
           assert d["motor_RAM_root_from_original_PC_literal"] == "0x20004960"
           assert d["motor_possible_status_or_timeout_byte"] == "0x2000499c"
           assert len(d["getter_3_verified_BL_call_sites"]) == 3
+          assert d["software_countdown_semantics_proven"]
+          assert d["software_countdown_read_PC"] == "0x8010ebe"
+          assert d["software_countdown_subtract_one_PC"] == "0x8010ec4"
+          assert d["software_countdown_writeback_PC"] == "0x8010ed4"
+          assert not d["counter_zero_proves_all_rotors_stopped"]
           assert d["getter_return_when_byte_nonzero"] == 0
           assert d["getter_return_when_byte_zero"] == 1
-          assert d["pinned_instruction_count"] >= 20
+          assert d["pinned_instruction_count"] >= 32
           assert not d["GPIO_READ_helper_direct_motor_feedback_proven"]
           assert not d["all_motors_and_ISR_paths_covered_proven"]
           assert not d["byte_represents_hardware_encoder_or_rotor_stop_proven"]
