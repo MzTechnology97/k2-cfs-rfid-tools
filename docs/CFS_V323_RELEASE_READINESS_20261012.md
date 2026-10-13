@@ -52,6 +52,26 @@ coordinate system and require controlled migration.
    was caused by the old mapping. **Do not patch those pointers.**
 5. Original v3.22 firmware rebuild and RFID regression are green.
 
+## New 13 October motor-status provenance (not a release gate closure)
+
+The saved original v3.22 SRAM contains five distinct GPIO-backed
+`pwm` device objects at GPIOE13, GPIOD12/13/15/14. The real
+motor-command controller at `0x080110CC` references the software
+RAM root `0x20004960`. Original code at `0x0801114C` writes
+`0x14` at `0x2000499C`; a routine at `0x080111AA`
+reads that byte and returns zero when nonzero, one when zero.
+Three direct original Thumb BL references to the getter have been
+identified at `0x080038AE`, `0x08003932` and `0x08003C8A`.
+
+These are **stronger software command/status provenance findings**,
+not independent physical rotor/driver feedback. Even if the byte
+tracks a timeout, it does not establish that every motor and ISR
+start path is covered or that a future read-and-write guard is
+atomic. The nine release conditions remain unchanged and false.
+
+See [read-only GPIO and status-byte audit](CFS_PWM_GPIO_MOTOR_STATUS_PROVENANCE_20261013.md).
+Do not enable motor-active MCU writes from these values.
+
 ## Still must be resolved before a v3.23 build is flash-qualified
 
 - **Physical motor-safety guard (issue #9).** During real active feeding,
