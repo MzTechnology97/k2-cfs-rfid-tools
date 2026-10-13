@@ -1345,6 +1345,40 @@ jobs:
           assert not d["motor_write_safety_release"]
           print("PASS: source-pinned CFS RT pin lookup for operator-confirmed PCB; electrical/ADC safety unverified")
           PY
+      - name: Inventory original ADC0/ADC1/ADC2 and GPIO_D ROM literal usages (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_gpio_literal_xref_discovery.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-gpio-literal-candidates.json >/tmp/cfs-adc-gpio-literal-candidates-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-gpio-literal-candidates.json") as f: d=json.load(f)
+          for key in ("baseline_saved_v313","current_saved_v322"):
+              x=d[key]
+              assert x["physical_saved_APP_origin"]=="0x8003000"
+              assert x["number_of_aligned_ROM_constant_candidates"] == len(
+                  x["raw_literal_and_candidate_xref_records"])
+              assert not x["ADC0_ADC1_ADC2_initialization_and_config_flow_authenticated"]
+              assert not x["motor_current_channel_sequence_proven"]
+              assert not x["motor_current_RAM_destinations_proven"]
+              assert not x["motor_current_ADC_calibration_or_fault_handling_proven"]
+              assert not x["GPIO_D_PD0_PD3_actual_command_ownership_proven"]
+              assert not x["any_real_CFS_register_or_RAM_read_performed"]
+              assert not x["motor_physical_STOPPED_status_proven"]
+              assert not x["v323_flash_or_MCU_SET_RESET_authorized"]
+              print("Saved",key,"candidate literal counts",x["literal_candidates_by_peripheral"])
+              print("Candidates with Thumb PC-literal loads",x["literal_candidates_with_possible_PC_relative_load"])
+              for row in x["raw_literal_and_candidate_xref_records"]:
+                  if row["total_candidate_loads_before_display_cap"]:
+                      print("REVIEW",row["peripheral"],row["literal_ROM_slot"],
+                            row["candidate_register_address"],
+                            row["candidate_thumb_pc_relative_loads"][:6])
+          assert d["source_only_scoping_not_complete_control_flow"]
+          assert d["no_real_device_interaction"] and not d["safe_to_flash_v323"]
+          print("PASS: ADC/PD GPIO ROM candidate discovery, NO claims of ADC channel sampling or motor idle")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
