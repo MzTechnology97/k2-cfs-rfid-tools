@@ -1272,6 +1272,40 @@ jobs:
           assert not d["real_CFS_CM5_Kalico_interacted"]
           print("PASS: pinned 5 PWM command channels + PE11 pulse producer, 16 synthetic fails closed")
           PY
+      - name: Verify public historical CFS PCB PE11 tach + 4 brushed current pins against OEM ROM (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          curl -fsSL --retry 3 --max-time 30 \
+            -o /tmp/cfs-public-historical-PCBs.md \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/21f9a813654b1feb6ba8597f0f48ed4650f51f3d/PCBs.md
+          python cfs_historical_pcb_motor_pinout_crosswalk.py \
+            --pcb-md /tmp/cfs-public-historical-PCBs.md \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-public-board-and-oem-crosswalk.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-public-board-and-oem-crosswalk.json") as f: d=json.load(f)
+          assert d["independent_source_integrity"]["upstream_PCB_doc_git_blob_sha1"] == (
+              "8a8345e299e48221f3b4859e8a0d34eefb95672c")
+          assert d["pinned_v313_and_v322_original_ROM_crosswalk_equal"]
+          assert d["historical_PCB_pinout"]["historical_bldc"] == {
+              "SS":"PE4","FG":"PE11","F/R":"PE3","PWM":"PE13"}
+          assert d["tampered_historical_PCB_pinout_cases_rejected"]==2
+          assert len(d["synthetic_stop_safety_cases"])==8
+          assert not any(x["MCU_write_authorized"] for x in d["synthetic_stop_safety_cases"])
+          x=d["crosswalk"]
+          assert x["saved_CFS_GPIO_IRQ_PE11_matches_historical_BLDC_FG_tach"]
+          assert x["four_current_feedback_analog_pads_from_external_PCB"] == [
+              "PC5","PC0","PA1","PA0"]
+          assert not x["PWM_device_names_cover_all_brushed_driver_input_pins"]
+          assert not x["installed_CFS_PCB_revision_matching_historical_board_proven"]
+          assert not x["safe_to_authorize_MCU_motor_active_writes"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["real_CFS_CM5_or_Kalico_access"]
+          print("PASS: source-pinned 2025 PCB BLDC FG PE11 and four current-sense pads agree with saved CFS ROM")
+          PY
+          rm -f /tmp/cfs-public-historical-PCBs.md
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
