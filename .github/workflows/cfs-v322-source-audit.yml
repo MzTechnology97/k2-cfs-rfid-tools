@@ -1324,6 +1324,18 @@ jobs:
                 for p in ("PE3","PE4","PE11")} == {
               "PE3":["0x43"],"PE4":["0x44"],"PE11":["0x4b"]
           }
+          assert m["all_16_operator_confirmed_pads_resolved_from_oem_ROM"]
+          assert m["unresolved_pads_not_in_112_record_oem_table"]==[]
+          expected={
+              "PE13":"0x4d","PE11":"0x4b","PE3":"0x43","PE4":"0x44",
+              "PD3":"0x33","PD2":"0x32","PC5":"0x25",
+              "PD1":"0x31","PD0":"0x30","PC0":"0x20",
+              "PD15":"0x3f","PD14":"0x3e","PA1":"0x1",
+              "PD13":"0x3d","PD12":"0x3c","PA0":"0x0"
+          }
+          assert {pad:rows[0]["oem_RTThread_logical_pin"] for pad,rows in
+                  m["resolved_oem_logical_records_by_confirmed_physical_pad"].items()
+                 } == expected
           assert m["installed_CFS_matches_historical_PCB_wiring_operator_reported"]
           assert not m["installed_CFS_wiring_independently_electrically_measured"]
           assert not m["ADC_read_path_and_calibration_authenticated"]
