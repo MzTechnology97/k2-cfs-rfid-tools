@@ -63,11 +63,16 @@ reads that byte and returns zero when nonzero, one when zero.
 Three direct original Thumb BL references to the getter have been
 identified at `0x080038AE`, `0x08003932` and `0x08003C8A`.
 
-These are **stronger software command/status provenance findings**,
-not independent physical rotor/driver feedback. Even if the byte
-tracks a timeout, it does not establish that every motor and ISR
-start path is covered or that a future read-and-write guard is
-atomic. The nine release conditions remain unchanged and false.
+Further source-accurate Thumb analysis now **proves this byte
+is a software countdown**, not merely a timeout candidate.
+Routine `0x08010E60` loads the same `0x20004960` root,
+reads the byte at `0x08010EBE`, decrements it at
+`0x08010EC4` when nonzero and writes it back at
+`0x08010ED4`; another branch reloads `0x14`.
+A zero countdown is not independent physical rotor/driver
+feedback. It cannot establish that every motor/ISR start path
+is covered or that a future check-and-write guard is atomic.
+All nine release conditions remain unchanged and false.
 
 See [read-only GPIO and status-byte audit](CFS_PWM_GPIO_MOTOR_STATUS_PROVENANCE_20261013.md).
 Do not enable motor-active MCU writes from these values.
