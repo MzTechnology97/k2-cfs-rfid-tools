@@ -17,9 +17,9 @@ The original manufacturer code at physical Thumb PC
 The GD32F30x manual identifies `0x40012408` as `ADC0_CTL1` and
 `0x4001244C` as the ADC0 routine conversion data register
 `ADC_RDATA`. This is **stronger than finding a constant address in ROM**:
-there is an actual executable helper whose code reads the ADC
-conversion-result register, confirmed by exact manufacturer Thumb
-instructions.
+there is an original Thumb helper whose instructions **would**
+read the ADC conversion-result register if executed. We have
+**not proved that the stock application actually invokes it**.
 
 The saved ROM also contains helpers at `0x08022926` and
 `0x08022932` setting/clearing mask `0x00800000` in
@@ -27,6 +27,21 @@ The saved ROM also contains helpers at `0x08022926` and
 (`ADC0_CTL1 - 4`) and updates selected bits. Those are
 peripheral-control operations, **not direct evidence that the CFS
 application calls them to measure a particular motor**.
+
+## Original callsite census: zero direct BL references
+
+The bounded saved-ROM census found **zero directly encoded Thumb
+`BL` calls to physical address `0x08022BBC`**, in both the
+v3.13 and v3.22 images. This prevents interpreting the helper
+as evidence that a motor current is being sampled.
+
+There are at least two unresolved possibilities: the generic ADC
+library routine might be invoked indirectly through a function
+pointer/dispatch table, or might be **unreachable library code**
+retained in the binary. An additional aligned ROM-word scan for
+direct/Thumb-bit-set pointer values is now included in the audit.
+Even a matching pointer would not, alone, establish a reachable
+motor current measurement.
 
 ## Crucial missing link
 
