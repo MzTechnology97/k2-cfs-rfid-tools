@@ -92,6 +92,28 @@ immediate candidate in the narrow predecessor windows. It therefore
 does not establish which call sites own M1 or M2, nor all task/ISR
 motor-start paths.
 
+### New source-focused path: RT-Thread GPIO helper
+
+The next audit,
+`cfs_gpio_rt_helper_entry_trace.py`, follows a different
+proven source relationship: original manufacturer code at
+`0x0801119E` contains a Thumb `BL` to
+`0x08018EEC`, a helper used in a known BLDC PE4
+brake-related command path. It disassembles only bounded
+original source windows at the helper entry and the call
+predecessor, comparing the exact saved v3.13 and v3.22
+bytes. It prints a targeted instruction excerpt for human
+review in GitHub CI.
+
+This is a better next target for M1/M2 ownership research
+than the misleading GPIO_D-base address classifiers.
+However, one demonstrated BLDC brake call into a generic
+pin helper does **not** identify its other 122 candidate
+callers, prove which ones control PD0–PD3, or authenticate
+atomic motor-stop feedback. Reconstruct any actual
+`r0`/pin argument dataflow and RTOS task reachability
+before assigning an actuator.
+
 ## Required follow-up and safety criteria
 
 1. Review the two GPIO_D bounded Thumb contexts for real
