@@ -45,8 +45,26 @@ memory operand candidates** in either inspected window. This is a
 negative *local syntax census*, not a demonstration that GPIOD is
 unused: the base might be transferred to another register, consumed
 in a called helper, used outside the scan window, or masked by
-conditional control flow. The subsequent bounded-disassembly log
-helps direct the next follow-up without inventing PD0–PD3 owners.
+conditional control flow.
+
+**Further disassembly (CI run 38465378449, successful):**
+the *actual consumer instructions* begin with arithmetic on the
+loaded literal, **not** a GPIO register dereference:
+
+| Thumb PC | First OEM operations | Nearby original code |
+|---|---|---|
+| `0x0801B686` | `LDR r4,[PC,#0xD4]; ASRS r2,r4,#0x14; SUBS r1,r0,r4; LSLS r3,r2,#1; CMP r0,r4` | Branch selection followed by `MOVW r0,#0x602` through `#0x608` |
+| `0x080236F6` | `LDR r4,[PC,#0x250]; ASRS r1,r4,#0x14; SUBS r3,r0,r4; LSLS r2,r1,#1; CMP r0,r4` | Branch selection followed by `MOVW r4,#0x302` through `#0x308` |
+
+Both are **consistent with generic address classification or
+translation to status/error codes**, rather than M1/M2 motor driver
+control. A GPIO_D peripheral address appearing as a constant in a
+ROM function is **not proof of an MMIO transaction**. The audit
+now pins these exact opcode prefixes and rejects any unexpected
+`[r4 + offset]` direct loads/stores in the local 128-byte
+scan. The two sites should no longer be reported as confirmed motor
+GPIO accesses. They do **not** exclude other real GPIOD access paths,
+including the generic RT-Thread GPIO driver.
 
 ### ADC reachability clarification
 
