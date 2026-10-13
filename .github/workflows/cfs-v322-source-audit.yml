@@ -1106,6 +1106,36 @@ jobs:
           assert not d["v323_firmware_flash_release_allowed"]
           print("PASS: five original PWM GPIO port/pin names; RAM command status distinct from motor feedback")
           PY
+      - name: Trace original GPIO IRQ pulse producer and sampler, reject stalled motor case (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_pulse_irq_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-pulse-irq.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-pulse-irq.json") as f: d=json.load(f)
+          assert d["same_original_GPIO_irq_counter_and_sampler_both_versions"]
+          a=d["v322"]
+          assert a["genuine_PIN_ID_for_GPIO_interrupt"]=="0x4b"
+          assert a["saved_IRQ_callback_Thumb"]=="0x8010fdd"
+          assert a["original_counter_RAM"]=="0x20004990"
+          assert a["sampled_previous_counter_RAM"]=="0x20004994"
+          assert a["sampled_difference_float_RAM"]=="0x2000498c"
+          assert a["software_activity_flag_RAM"]=="0x2000499c"
+          assert a["counter_increment_reachable_by_configured_GPIO_callback"]
+          assert len(a["pinned_original_thumb_instructions"]) >= 25
+          assert d["synthetic_test_count"]==6
+          assert not any(x["write_approved"] for x in d["fail_closed_stalled_motor_and_pulse_cases"])
+          assert not a["physical_pulse_occurrence_measured_on_user_CFS"]
+          assert not a["pin_0x4B_verified_as_encoder_not_filament_or_other_sensor"]
+          assert not a["covers_feeder_hub_buffer_and_async_tasks"]
+          assert not a["zero_pulses_prove_motor_stopped"]
+          assert not a["MCU_WRITE_interlock_safe_to_activate"]
+          assert not d["MCU_motor_guard_verified"]
+          print("PASS: pinned GPIO IRQ registration, pulse counter, derived metric, stalled motor rejected")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
