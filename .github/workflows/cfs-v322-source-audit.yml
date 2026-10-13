@@ -1240,6 +1240,38 @@ jobs:
           assert all(not x["genuine_driver_or_encoder_stop_measured"] for x in fixtures)
           print("PASS: OEM five channel CCR/CHCTL2 addresses + six fail-closed masks, no physical idle proof")
           PY
+      - name: Cross-verify OEM PWM+PE11 evidence, reject all 16 synthetic motor-stop claims (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_multisignal_observation_plan.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-multisignal-observation.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-multisignal-observation.json") as f: d=json.load(f)
+          x=d["original_signal_manifest"]
+          assert d["v313_equals_v322"]
+          assert x["unique_timer_channel_pairs"]==5
+          assert x["gpio_pulse_input"]=="PE11"
+          assert x["pulse_counter_RAM"]=="0x20004990"
+          assert x["afio_remap_register"]=="0x40010004"
+          assert [p["device"] for p in x["pwm_command_output_registers"]]==[
+            "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert d["safety_cases_executed"]==16
+          assert len(d["synthetic_safety_cases"])==16
+          assert not any(v["MCU_SET_RESET_permission"] for v in d["synthetic_safety_cases"])
+          assert not any(v["physical_motor_STOPPED_proven"] for v in d["synthetic_safety_cases"])
+          assert next(v for v in d["synthetic_safety_cases"] if v["case"]=="uint32_pulse_wrap")["modulo_uint32_gpio_pulse_delta"]==3
+          assert next(v for v in d["synthetic_safety_cases"] if v["case"]=="all_hypothetically_quiet_still_unqualified")["reason"]=="physical_standstill_and_atomic_commit_not_proven"
+          assert not d["physical_motor_sensors_authenticated"]
+          assert not d["all_motor_driver_and_ISR_owners_recovered"]
+          assert not d["MCU_motion_interlock_implemented"]
+          assert not d["safe_to_flash_extended_v323"]
+          assert not d["real_CFS_CM5_Kalico_interacted"]
+          print("PASS: pinned 5 PWM command channels + PE11 pulse producer, 16 synthetic fails closed")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
