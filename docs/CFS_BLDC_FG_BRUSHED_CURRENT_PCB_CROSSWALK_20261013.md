@@ -21,8 +21,17 @@ reports four BLDC driver connections:
 four original firmware pin assignments substantially strengthens
 the interpretation of PE11 as the BLDC FG/tach input.**
 The historical PCB is from a separate CFS in the public research
-project, and we have **not verified the same PCB revision, wiring,
-driver chip or interrupt activity on the user's device**.
+project. **User confirmation, 13 October 2026:** the CFS in use has
+the same documented connections (BLDC PE13/PE11/PE3/PE4, and the
+brushed-motor driver/current-feedback pinout). This is a reported
+physical-wiring match, not an independently measured PCB trace or
+firmware register value; we have **not authenticated the driver
+silicon/revision, signal activity, electrical scaling, or real IRQ
+execution on the installed unit**.
+
+This confirmation makes the historical board map a justified
+working hypothesis for targeting future read-only motor diagnostics,
+but **does not satisfy any v3.23 release/safety gate**.
 
 An FG tach pulse is evidence of external driver reporting activity
 when it occurs. **No pulses do not prove a BLDC driver is disabled,
