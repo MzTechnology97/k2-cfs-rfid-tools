@@ -1142,6 +1142,35 @@ jobs:
           assert not d["MCU_motor_guard_verified"]
           print("PASS: pinned GPIO IRQ registration, pulse counter, derived metric, stalled motor rejected")
           PY
+      - name: Resolve five CFS GPIO/PWM objects and bound candidate motor status byte (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_gpio_and_motor_status_provenance.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-motor-signal.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-motor-signal.json") as f: d=json.load(f)
+          assert d["corrected_saved_APP_base"] == "0x8003000"
+          assert [x["name"] for x in d["objects"]] == [
+              "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert [x["GPIO_port_name"]+str(x["GPIO_pin_number"]) for x in d["objects"]] == [
+              "GPIOE13","GPIOD12","GPIOD13","GPIOD15","GPIOD14"
+          ]
+          assert d["motor_RAM_root_from_original_PC_literal"] == "0x20004960"
+          assert d["motor_possible_status_or_timeout_byte"] == "0x2000499c"
+          assert len(d["getter_3_verified_BL_call_sites"]) == 3
+          assert d["getter_return_when_byte_nonzero"] == 0
+          assert d["getter_return_when_byte_zero"] == 1
+          assert d["pinned_instruction_count"] >= 20
+          assert not d["GPIO_READ_helper_direct_motor_feedback_proven"]
+          assert not d["all_motors_and_ISR_paths_covered_proven"]
+          assert not d["byte_represents_hardware_encoder_or_rotor_stop_proven"]
+          assert not d["can_authorize_volatile_MCU_SET_RESET"]
+          assert not d["can_authorize_flash_v323"]
+          print("PASS: five GPIO PWM objects and three callers of motor software byte, NO MCU safety claim")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
