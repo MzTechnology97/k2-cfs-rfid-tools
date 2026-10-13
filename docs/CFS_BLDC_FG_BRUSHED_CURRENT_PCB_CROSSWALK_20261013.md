@@ -50,6 +50,16 @@ object map*, not proof that M1/M2 have no firmware control.
 No full direct/indirect driver callgraph or motor-owner inventory
 has yet been established.
 
+The GD32F303 manufacturer [datasheet pin-function tables]
+(https://www.gd32mcu.com/data/documents/datasheet/GD32F303xx_Datasheet_Rev1.9.pdf)
+give the corresponding possible ADC channel indices:
+**PC5→IN15** (ADC0/ADC1), **PC0→IN10** (ADC0/ADC1/ADC2),
+**PA1→IN1** (ADC0/ADC1/ADC2) and **PA0→IN0**
+(ADC0/ADC1/ADC2). These are *silicon peripheral alternate functions*,
+**not evidence** that the saved CFS firmware configures or samples
+those channels. Pin-to-current assignment comes from the historical
+third-party PCB, not directly from the OEM ROM.
+
 The historical PCB document identifies the four current-feedback
 pins with analogue current-sense circuitry. **The CFS saved
 firmware's ADC channel setup, calibration, thresholds,
