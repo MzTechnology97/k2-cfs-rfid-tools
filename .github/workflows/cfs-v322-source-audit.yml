@@ -1204,6 +1204,37 @@ jobs:
           assert not d["active_CFS_or_Kalico_modified"]
           print("PASS: two manufacturer timer remap paths pinned, live motor idle still UNKNOWN")
           PY
+      - name: Prove all 5 OEM TIMER channel compare and output-enable register offsets (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_timer_channel_register_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-timer-five-channel-map.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-timer-five-channel-map.json") as f: d=json.load(f)
+          assert d["same_original_five_timer_channel_bases_both_versions"]
+          x=d["v322"]
+          assert x["OEM_peripheral_timer_selectors_and_channel_indices_proven"]
+          assert x["verified_manufacturer_Thumb_count"]>=25
+          pins=x["full_oem_timer_channel_register_map"]
+          assert [v["TIMER_channel"] for v in pins] == [
+             "TIMER0_CH2","TIMER3_CH0","TIMER3_CH1","TIMER3_CH3","TIMER3_CH2"
+          ]
+          assert [v["original_channel_compare_register"] for v in pins] == [
+             "0x40012c3c","0x40000834","0x40000838","0x40000840","0x4000083c"
+          ]
+          assert [v["channel_output_enable_bit"] for v in pins] == [256,1,16,4096,256]
+          assert x["original_pwm_init_calls_output_state_helper_with_zero"]
+          assert not x["independent_rotor_stop_sensor_identified"]
+          assert not x["driver_enable_all_motors_verified"]
+          assert x["no_duty_or_channel_enable_bit_is_valid_STOP_proof"]
+          assert not x["safe_MCU_SET_RESET_interlock_implemented"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["real_CFS_or_Kalico_touched"]
+          print("PASS: OEM five channel CCR/CHCTL2 hardware register addresses, still no motor-stop feedback")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
