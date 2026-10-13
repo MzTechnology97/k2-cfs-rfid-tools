@@ -1470,6 +1470,42 @@ jobs:
           assert d["no_real_CFS_ADC_or_GPIO_reads"] and not d["safe_to_flash_v323"]
           print("PASS: exact OEM ADC0_RDATA Thumb instructions source verified; no motor current claims")
           PY
+      - name: Verify physical GPIO_D literal consumers and their bounded original Thumb contexts (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_d_physical_literal_access_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpiod-physical-context.json >/tmp/cfs-gpiod-physical-context-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpiod-physical-context.json") as f:d=json.load(f)
+          assert d["original_saved_v313_v322_windows_match"]
+          x=d["v322"]
+          assert x["real_APP_link_base"]=="0x8003000"
+          assert x["GPIO_D_base"]=="0x40011400"
+          assert x["original_loads_validated"]==2
+          assert [c["original_source_instruction"] for c in
+                  x["confirmed_original_GPIO_D_literal_consumers"]]==[
+                      "0x801b686","0x80236f6"]
+          assert [c["original_ROM_literal_slot"] for c in
+                  x["confirmed_original_GPIO_D_literal_consumers"]]==[
+                      "0x801b75c","0x8023948"]
+          for row in x["confirmed_original_GPIO_D_literal_consumers"]:
+              print("GPIO_D_CONSUMER",row["window"],row["original_source_instruction"])
+              for ref in row["potential_R4_relative_accesses"][:12]:
+                  print("CANDIDATE_OFFSET",ref["pc"],ref["instruction"],
+                        ref.get("candidate_peripheral_register_if_R4_still_base"))
+              assert not row["definite_control_flow_reachability_from_motor_task_proven"]
+              assert not row["R4_register_live_range_proven"]
+              assert not row["actual_GPIO_pin_state_observed"]
+          assert not x["M1_M2_PD0_PD3_motor_driver_control_dataflow_proven"]
+          assert not x["motor_running_or_stopped_feedback_proven"]
+          assert not x["independent_motor_interlock_safe_for_flash"]
+          assert d["no_hardware_or_firmware_changes"]
+          assert not d["v323_flash_release_allowed"]
+          print("PASS: 2 original GPIO_D literal consumers with bounded Thumb contexts; no motor ownership implied")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
