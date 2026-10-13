@@ -1493,6 +1493,9 @@ jobs:
                       "0x801b75c","0x8023948"]
           for row in x["confirmed_original_GPIO_D_literal_consumers"]:
               print("GPIO_D_CONSUMER",row["window"],row["original_source_instruction"])
+              print("CANDIDATE_R4_OFFSET_COUNT",len(row["potential_R4_relative_accesses"]))
+              for opcode in row["assembly_window"][:45]:
+                  print("BOUNDED_ORIGINAL_GPIO_D",opcode["pc"],opcode["instruction"])
               for ref in row["potential_R4_relative_accesses"][:12]:
                   print("CANDIDATE_OFFSET",ref["pc"],ref["instruction"],
                         ref.get("candidate_peripheral_register_if_R4_still_base"))
