@@ -1176,6 +1176,34 @@ jobs:
           assert not d["can_authorize_flash_v323"]
           print("PASS: five GPIO PWM objects and three callers of motor software byte, NO MCU safety claim")
           PY
+      - name: Confirm OEM TIMER0/TIMER3 AFIO mux code and original register writes (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_timer_afio_remap_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-timer-afio-remap.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-timer-afio-remap.json") as f: d=json.load(f)
+          assert d["same_oem_AFIO_code_on_v313_and_v322"]
+          a=d["v322"]
+          assert a["AFIO_PCF0_physical_register"]=="0x40010004"
+          assert a["AFIO_PCF0_original_RMW_instructions_pinned"]
+          assert len(a["verified_manufacturer_thumb_instructions"]) >= 20
+          paths=a["two_OEM_mux_configuration_paths"]
+          assert [x["original_gpio_pin_remap_config_argument_r0"] for x in paths] == ["0x1000","0x1600c0"]
+          assert [x["original_selector_r6_plus_0x18"] for x in paths] == [1,2]
+          assert [x["required_AFIO_PCF0_bits"] for x in paths] == ["0x1000","0xc0"]
+          assert a["TIMER0_full_remap_requested_in_original_code"]
+          assert a["TIMER3_remap_requested_in_original_code"]
+          assert not a["live_AFIO_and_TIMER_channel_configuration_read"]
+          assert not a["motor_energized_state_independently_known"]
+          assert not a["motor_active_MCU_WRITE_safe"]
+          assert not a["v323_flash_approved"]
+          assert not d["active_CFS_or_Kalico_modified"]
+          print("PASS: two manufacturer timer remap paths pinned, live motor idle still UNKNOWN")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
