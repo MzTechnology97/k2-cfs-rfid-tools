@@ -53,6 +53,46 @@ The manufacturer's remap function is also called at
 `0x0801063E` from another subsystem; its arguments should
 not be conflated with these timer configurations.
 
+## The original manufacturer channel and compare-register path
+
+A subsequent audit traces the actual five-object TIMER selection,
+channel number, compare value, and output-enable bits. The original
+manufacturer's initialization loop at `0x0801B192` uses the object
+table beginning at `0x2000075C`. At `0x0801B1A8`, it reads the
+**signed timer index at `[obj+0x44]`**, passes it to the
+TIMER peripheral-base selector `0x0801B128`, and at
+`0x0801B1B2` reads the channel index from `[obj+0x50]`.
+It calls the original timer output helper
+`0x08023F62` at `0x0801B1C0` and the original
+per-channel output-state helper `0x080240F2`
+at `0x0801B1DE`, initially passing `r2=0`
+(off output state). This establishes an explicit
+**saved-code/data binding** rather than just a plausible
+datasheet pin mapping.
+
+| Name | Original timer index `+0x44` | Channel `+0x50` | Timer output-compare register | Channel enable bit in timer `+0x20` |
+| --- | ---: | ---: | --- | --- |
+| `pwm1` | 0 | 2 | `0x40012C3C` (TIMER0_CH2CV) | bit 8 (`0x100`) |
+| `pwm3` | 3 | 0 | `0x40000834` (TIMER3_CH0CV) | bit 0 (`0x001`) |
+| `pwm4` | 3 | 1 | `0x40000838` (TIMER3_CH1CV) | bit 4 (`0x010`) |
+| `pwm5` | 3 | 3 | `0x40000840` (TIMER3_CH3CV) | bit 12 (`0x1000`) |
+| `pwm8` | 3 | 2 | `0x4000083C` (TIMER3_CH2CV) | bit 8 (`0x100`) |
+
+The manufacturer's `0x08023F62` dispatch writes to the
+TIMER compare-value offsets `+0x34/+0x38/+0x3C/+0x40`
+for channels 0..3, respectively. Its `0x080240F2`
+dispatch manipulates channel output-enable bits at
+`TIMERx+0x20` (GD32 TIMER_CHCTL2). This address-level
+proof is verified by
+`cfs_pwm_timer_channel_register_provenance.py` on saved
+v3.13 and v3.22 firmware.
+
+The values identify **PWM command outputs and control state**,
+not independent physical feedback. Timer compare may be zero
+while motor drive remains energized, a feeder may coast or
+stall, and other motors/tasks may still be moving. This
+must not be misused to authorize motor-active MCU SET/RESET.
+
 ## What this does NOT prove
 
 - A TIMER's `CHx` output being enabled is not equivalent to the
