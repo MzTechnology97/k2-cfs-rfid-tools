@@ -1557,6 +1557,39 @@ jobs:
           assert not d["MCU_SET_RESET_motor_active_authorized"]
           print("PASS: source-pinned GPIO helper and brake caller; M1/M2 control remains unproven")
           PY
+      - name: Verify GPIO callback is BSS runtime-only and classify exact adjacent arguments (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_dispatch_runtime_boundary_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-runtime-dispatch-provenance.json > /tmp/cfs-gpio-runtime-dispatch-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-runtime-dispatch-provenance.json") as f: d=json.load(f)
+          assert d["saved_v313_v322_source_provenance_identical"]
+          x=d["original_GPIO_dispatch"]
+          assert x["GPIO_dispatch_root_ROM_literal"]=="0x801916c"
+          assert x["GPIO_dispatch_root_RAM_object"]=="0x20004c44"
+          assert x["GPIO_dispatch_device_pointer_field"]=="0x20004c84"
+          assert x["first_initialized_RAM_end_exclusive"]=="0x20000bc4"
+          assert x["device_callback_pointer_requires_runtime_registration"]
+          assert not x["saved_APP_image_directly_contains_callback_at_runtime_field"]
+          assert x["original_GPIO_helper_Thumb_PC"]=="0x8018eec"
+          assert x["all_halfword_scan_BL_candidates"]==122
+          assert x["PE4_brake_argument_path_source_verified"]
+          assert len(x["strict_adjacent_immediate_argument_candidates"])==x["strict_candidate_count"]
+          for row in x["strict_adjacent_immediate_argument_candidates"]:
+              if row["pin_from_confirmed_gpio_lookup"]:
+                  print("PIN_LITERAL_DIRECT_BL_CANDIDATE",row)
+          print("strict_immediate_count",x["strict_candidate_count"])
+          print("strict_known_pin_count",x["strict_candidates_on_known_pins"])
+          assert not x["any_M1_M2_driver_command_ownership_proven"]
+          assert not x["full_callgraph_and_RTOS_registration_reachability_proven"]
+          assert not x["safe_to_enable_v323_MCU_writes_or_flash"]
+          assert not d["read_or_write_on_actual_CFS_or_CM5_performed"]
+          print("PASS: GPIO callback field lies in zero-init BSS; no fictitious ROM callback or motor stop")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
