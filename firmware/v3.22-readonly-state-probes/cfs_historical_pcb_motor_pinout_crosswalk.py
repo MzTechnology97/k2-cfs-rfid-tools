@@ -49,7 +49,7 @@ EXPECTED_PWM_OUTPUTS = {
 
 
 def markdown_section(text: str, heading: str) -> str:
-    pattern = rf"(?m)^#{3,6}\s+{re.escape(heading)}\s*$"
+    pattern = r"(?m)^#{3,6}\s+" + re.escape(heading) + r"\s*$"
     found = re.search(pattern, text)
     if found is None:
         raise ValueError(f"historical PCB heading not found: {heading}")
