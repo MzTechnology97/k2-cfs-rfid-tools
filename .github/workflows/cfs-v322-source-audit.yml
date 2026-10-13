@@ -1074,6 +1074,38 @@ jobs:
           assert d["no_firmware_flash_approved"]
           print("PASS: 0x1E02 request reaches authentic backend 0x0801B394; hardware feedback remains unknown")
           PY
+      - name: Classify original CFS motor GPIO pins and command status without assuming rotor stop
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_gpio_signal_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-gpio-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-gpio-provenance.json") as f: d=json.load(f)
+          assert d["both_original_firmwares_identical"]
+          x=d["v322"]
+          assert [item["name"] for item in x["named_GPIO_port_pin"]] == [
+              "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert [item["nominal_GPIO"] for item in x["named_GPIO_port_pin"]] == [
+              "PE13","PD12","PD13","PD15","PD14"
+          ]
+          q=x["hardware_and_cached_signal_routines"]
+          assert q["motor_command_controller_at"] == "0x080110CC"
+          assert q["command_flag_RAM"] == "0x2000499c"
+          assert q["separate_float_RAM"] == "0x2000498c"
+          assert len(q["original_command_flag_query_callers"]) == 3
+          assert not q["flag_proven_to_be_actual_motor_rotor_stop"]
+          assert not q["GPIO_input_proven_connected_to_motor_feedback"]
+          assert not q["float_proven_independent_encoder_feedback"]
+          assert not x["motor_stop_safeguard_can_be_enabled"]
+          assert not x["all_motor_paths_and_ISRs_covered"]
+          assert not d["actual_installed_CFS_RAM_or_GPIO_read"]
+          assert not d["v323_firmware_flash_release_allowed"]
+          print("PASS: five original PWM GPIO port/pin names; RAM command status distinct from motor feedback")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
