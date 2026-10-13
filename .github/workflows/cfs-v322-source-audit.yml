@@ -1379,6 +1379,37 @@ jobs:
           assert d["no_real_device_interaction"] and not d["safe_to_flash_v323"]
           print("PASS: ADC/PD GPIO ROM candidate discovery, NO claims of ADC channel sampling or motor idle")
           PY
+      - name: Pin four real ADC0_CTL1 Thumb literal loads and bound surrounding OEM code (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc0_ctl1_original_source_trace.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-ctl1-source-trace.json >/tmp/cfs-adc0-ctl1-source-trace-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-ctl1-source-trace.json") as f: d=json.load(f)
+          assert d["both_saved_versions_same_original_ADC0_CTL1_code"]
+          x=d["v322"]
+          assert x["original_ADC0_CTL1_MMIO_register"]=="0x40012408"
+          assert x["original_ADC0_CTL1_ROM_literal_PC"]=="0x8022c88"
+          assert [r["physical_original_Thumb_PC"] for r in x["pinned_literal_loads"]]==[
+              "0x8022926","0x8022932","0x8022988","0x8022bbc"
+          ]
+          for context in x["bounded_disassembly_contexts"]:
+              print("ORIGINAL_ADC0_CONTEXT",context["window"])
+              for row in context["rows"]:
+                  print(row["pc"],row["opcode"])
+          assert not x["ADC0_initialization_or_read_flow_fully_recovered"]
+          assert not x["brushed_M1_M2_M3_M4_ADC_channels_sampled_proven"]
+          assert not x["ADC_conversion_RDATA_RAM_consumer_proven"]
+          assert not x["safe_to_read_ADC_live_without_side_effects_verified"]
+          assert not x["motor_idleness_interlock_proven"]
+          assert not x["firmware_flash_or_SET_RESET_permitted"]
+          assert not d["live_MCU_access_performed"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: original ADC0_CTL1 source xrefs; no brush-motor channel conversion inferred")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
