@@ -1306,6 +1306,33 @@ jobs:
           print("PASS: source-pinned 2025 PCB BLDC FG PE11 and four current-sense pads agree with saved CFS ROM")
           PY
           rm -f /tmp/cfs-public-historical-PCBs.md
+      - name: Enumerate RT-Thread GPIO IDs for operator-confirmed BLDC + four DC motor pins (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_adc_pin_table_inventory.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-adc-pin-table.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-adc-pin-table.json") as f: d=json.load(f)
+          assert d["v313_v322_physical_pin_table_agreement"]
+          m=d["v322"]
+          assert m["physical_ROM_APP_link_base"]=="0x8003000"
+          assert m["manufacturer_pin_table_ROM"]=="0x802ad5c"
+          assert {p:[x["oem_RTThread_logical_pin"] for x in m["resolved_oem_logical_records_by_confirmed_physical_pad"][p]]
+                for p in ("PE3","PE4","PE11")} == {
+              "PE3":["0x43"],"PE4":["0x44"],"PE11":["0x4b"]
+          }
+          assert m["installed_CFS_matches_historical_PCB_wiring_operator_reported"]
+          assert not m["installed_CFS_wiring_independently_electrically_measured"]
+          assert not m["ADC_read_path_and_calibration_authenticated"]
+          assert not m["M1_M2_actual_motor_command_control_paths_authenticated"]
+          assert not m["all_motors_physically_stopped_proven"]
+          assert not m["v323_MCU_write_or_flash_authorized"]
+          assert not d["motor_write_safety_release"]
+          print("PASS: source-pinned CFS RT pin lookup for operator-confirmed PCB; electrical/ADC safety unverified")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
