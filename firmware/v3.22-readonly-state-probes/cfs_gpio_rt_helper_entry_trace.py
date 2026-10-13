@@ -11,7 +11,7 @@ Only verified source bytes are decoded; linear disassembly is not a
 callgraph or register-liveness proof. No RTOS hooks or real MCU access.
 """
 from __future__ import annotations
-import argparse,json
+import argparse,json,struct
 from pathlib import Path
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_MODE_LITTLE_ENDIAN
 from capstone.arm import ARM_OP_MEM
@@ -25,6 +25,30 @@ CONTEXTS=(
     ("known_brake_caller_predecessor",0x08011188,0x080111B0),
 )
 MEM_OP_LIMIT=35
+# Actual manufacturer Thumb disassembly verified by GitHub CI, not
+# source reconstructed from an assumed C signature.
+ORIGINAL_DISPATCH = (
+    (0x08018EEC, "push", "{r4, r5, r6, lr}"),
+    (0x08018EEE, "ldr", "r4, [pc, #0x27c]"),
+    (0x08018EF0, "mov", "r6, r0"),
+    (0x08018EF2, "mov", "r5, r1"),
+    (0x08018EF4, "ldr", "r0, [r4, #0x40]"),
+    (0x08018F04, "ldr", "r0, [r4, #0x40]"),
+    (0x08018F06, "mov", "r2, r5"),
+    (0x08018F08, "mov", "r1, r6"),
+    (0x08018F0A, "ldr", "r3, [r0, #4]"),
+    (0x08018F0C, "pop.w", "{r4, r5, r6, lr}"),
+    (0x08018F10, "ldr", "r0, [pc, #0x258]"),
+    (0x08018F12, "bx", "r3"),
+)
+BRAKE_CALL_INSTRUCTIONS = (
+    (0x08011198,"push","{r4, lr}"),
+    (0x0801119A,"movs","r1, #1"),
+    (0x0801119C,"movs","r0, #0x44"),
+    (0x0801119E,"bl","#0x8018eec"),
+)
+COMMON_GLOBAL_LITERAL_PC=0x0801916C
+
 
 
 def inspect(image):
@@ -35,6 +59,17 @@ def inspect(image):
     i=next(c.disasm(image[call:call+4],KNOWN_BLDC_BRAKE_CALL,count=1),None)
     if i is None or i.mnemonic!="bl" or i.op_str!=f"#0x{HELPER:x}":
         raise ValueError("known original BLDC brake GPIO helper BL changed")
+    for pc,mnemonic,operands in ORIGINAL_DISPATCH + BRAKE_CALL_INSTRUCTIONS:
+        pos=pc-LINK_BASE
+        original=next(c.disasm(image[pos:pos+4],pc,count=1),None)
+        if original is None or (original.mnemonic,original.op_str)!=(mnemonic,operands):
+            raise ValueError(f"verified OEM RT-Thread GPIO dispatch source changed at {pc:#x}")
+    # Two different OEM LDR literal instructions reference this exact
+    # global object pointer; its live data/callback contents remain unknown.
+    for pc,disp in ((0x08018EEE,0x27C),(0x08018F10,0x258)):
+        if ((pc+4)&~3)+disp != COMMON_GLOBAL_LITERAL_PC:
+            raise ValueError("GPIO helper global pointer literal derivation changed")
+    root=struct.unpack_from("<I",image,COMMON_GLOBAL_LITERAL_PC-LINK_BASE)[0]
     views=[]
     for label,start,end in CONTEXTS:
         lo,hi=start-LINK_BASE,end-LINK_BASE
@@ -61,6 +96,20 @@ def inspect(image):
         "brake_known_GPIO_helper_BL_source":hex(KNOWN_BLDC_BRAKE_CALL),
         "original_helper_entry":hex(HELPER),
         "known_BL_thumb_encoding_verified":True,
+        "original_callback_dispatch_instruction_sites_checked":len(ORIGINAL_DISPATCH),
+        "known_PE4_brake_caller_sites_checked":len(BRAKE_CALL_INSTRUCTIONS),
+        "original_global_object_literal_ROM_PC":hex(COMMON_GLOBAL_LITERAL_PC),
+        "saved_original_global_object_root_constant":hex(root),
+        "recovered_call_arguments":"r0=logical_RT_pin, r1=value",
+        "pin_argument_copied_into_callback_r1":True,
+        "value_argument_copied_into_callback_r2":True,
+        "GPIO_device_loaded_from_global_object_plus_0x40":True,
+        "device_callback_pointer_loaded_from_device_plus_0x04":True,
+        "callback_invoked_by_indirect_BX_r3":True,
+        "original_PE4_brake_call_r0":hex(0x44),
+        "original_PE4_brake_call_r1_value":1,
+        "effective_runtime_device_callback_pointer_resolved":False,
+        "driver_MMIO_write_reached_in_this_static_study":False,
         "contexts":views,
         "rt_gpio_id_0x44_PE4_brake_context_unmodified":True,
         "pin_table_conversion_or_M1_M2_owner_proven":False,
