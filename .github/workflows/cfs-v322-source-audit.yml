@@ -1897,6 +1897,30 @@ jobs:
           assert not d["v323_flash_or_MCU_write_permitted"]
           print("PASS: 9 ADC/RDATA no-side-effect contracts; motor-stop and v3.23 remain blocked")
           PY
+      - name: Inspect bounded non-adjacent ADC MOVW/MOVT address construction (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_movw_movt_bounded_reachability.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-movw-movt-bounded.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("/tmp/cfs-adc-movw-movt-bounded.json").read_text())
+          assert d["original_v313_v322_bounded_candidates_identical"]
+          assert d["reference_synthetic_fixture"]["synthetic_bounded_pair_validated"]
+          assert d["reference_synthetic_fixture"]["synthetic_address"]=="0x4001244c"
+          x=d["original_v322"]
+          assert x["correct_saved_APP_origin"]=="0x8003000"
+          assert not x["actual_original_motor_ADC_channel_owner_authenticated"]
+          assert not x["complete_address_construction_coverage_proven"]
+          assert not x["physical_motor_idle_proven"]
+          assert not x["safe_to_read_live_ADC_RDATA"]
+          assert not x["motor_active_SET_RESET_write_or_v323_flash_allowed"]
+          assert not d["no_ADC_EOC_side_effect_and_no_firmware_flash"] is False
+          print("PASS: bounded nonadjacent ADC MOVW/MOVT search; no physical motor-idle or live ADC authorization")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
