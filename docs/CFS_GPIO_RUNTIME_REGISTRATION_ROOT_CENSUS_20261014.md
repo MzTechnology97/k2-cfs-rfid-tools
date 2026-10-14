@@ -111,6 +111,54 @@ and conservatively records all intermediate writes to r1 and
 branch/stack barriers. Even if the source has no such barriers,
 a runtime registration trace is **not** yet proven.
 
+## Registration-field writer: original source-level dataflow verified
+
+The dedicated [CI run 38550226589](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38550226589)
+passed for both saved original v3.13 and v3.22. It disassembles
+the **contiguous original Thumb instructions** between the
+literal load and the unique candidate store:
+
+```asm
+0x08018DFE  LDR  r1, [pc, #0x36c]  ; ROM literal = 0x20004C44
+0x08018E00  MOVS r3, #0x19
+0x08018E02  STRB r3, [r1, #0x14]
+0x08018E04  MOVS r3, #0
+0x08018E06  STR  r3, [r1, #0x1c]
+0x08018E08  STR  r3, [r1, #0x20]
+0x08018E0A  STR  r3, [r1, #0x24]
+0x08018E0C  STR  r3, [r1, #0x28]
+0x08018E0E  STR  r3, [r1, #0x2c]
+0x08018E10  LDR  r3, [pc, #0x35c]
+0x08018E12  STR  r3, [r1, #0x30]
+0x08018E14  LDR  r3, [pc, #0x35c]
+0x08018E16  STR  r3, [r1, #0x34]
+0x08018E18  LDR  r3, [pc, #0x35c]
+0x08018E1A  STR  r4, [r1, #0x40]   ; physical BSS field 0x20004C84
+```
+
+Capstone independently reports **no write to r1**, no
+intervening branch, and no stack barrier in this range.
+Thus the source is sufficient to attribute the store
+**at `0x08018E1A` to `0x20004C84` if that block executes**.
+This is a stronger finding than the earlier local-register census,
+which began tracing only at the literal load and did not
+recognize every intervening instruction.
+
+The original source demonstrably initializes numerous global
+fields and writes the runtime GPIO device pointer field from
+register `r4`. This still does **not** identify the value of
+`r4`, establish when the register-init block is called,
+or authenticate the installed callback at `[device+4]`.
+The run is emulated/source-only; no real MCU execution trace or
+live BSS memory was acquired.
+
+**Next source task:** trace where register r4 obtains the device
+pointer in the function preceding `0x08018DFE`, and connect
+that function's entry/callers to the OEM GPIO registration
+flow. Only then investigate the operation callback and M1/M2
+ownership. An apparent producer of the device pointer is not
+motor-idle feedback.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
