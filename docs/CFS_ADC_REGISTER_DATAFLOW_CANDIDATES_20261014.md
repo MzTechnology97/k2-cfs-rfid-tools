@@ -81,6 +81,33 @@ addresses dynamically, use MOVW/MOVT, indirect calls, DMA or runtime
 function pointers. Calling the ADC unused would therefore
 overstate the evidence.
 
+## ADC0 helper call/pointer reachability census (14 October 2026)
+
+The independent script `cfs_adc_helper_reference_census.py`
+was executed successfully in
+[GitHub Actions run 38528026386](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38528026386)
+against the source-pinned v3.13 and v3.22 images.
+Four original helper entries have **zero direct Thumb BL
+candidates and zero aligned full-word ROM pointer candidates**:
+
+| Original helper entry | Function | Direct BL | Aligned ROM pointer words |
+| --- | --- | ---: | ---: |
+| `0x08022926` | ADC0 CTL1 bit-set | 0 | 0 |
+| `0x08022932` | ADC0 CTL1 bit-clear | 0 | 0 |
+| `0x08022988` | ADC0 CTL0 bit-mask | 0 | 0 |
+| `0x08022BBC` | ADC0 RDATA read | 0 | 0 |
+
+This provides a stronger negative **direct-reference** result
+than the earlier RDATA-only scan, but none of the routines can
+yet be classified as definitely unreachable: computed addresses,
+unaligned pointers, veneers, callbacks populated into RAM at
+runtime and code/data disassembly boundaries remain unresolved.
+
+**Do not develop a live current-telemetry hook around these ADC
+helpers** until a real configuration-to-consumer motor chain is
+demonstrated. A speculative poll of RDATA may clear EOC and
+interfere with the original firmware.
+
 ## Safety status
 
 **Not yet proven:** selection or triggering of ADC channels 15/10/1/0,
