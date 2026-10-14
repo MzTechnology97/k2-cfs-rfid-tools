@@ -1757,6 +1757,29 @@ jobs:
           assert d["no_actual_hardware_operation"] and d["no_v323_release"]
           print("PASS: OEM GPIO BSS global source references, no speculative runtime callback claims")
           PY
+      - name: Triage original GPIO BSS registration neighborhood, source-only (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_registration_neighborhood_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-registration-neighborhood.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-registration-neighborhood.json") as f: d=json.load(f)
+          assert d["v313_v322_unchanged_original_neighborhood"]
+          x=d["v322"]
+          assert x["original_ROM_gpio_root_loads"]==15
+          assert x["original_local_reads_from_0x20004c84"]==7
+          assert not x["source_window_is_verified_executable_CFG"]
+          assert not x["any_0x40_store_targets_BSS_global_proven"]
+          assert not x["actual_GPIO_driver_registration_callback_recovered"]
+          assert not x["M1_M2_GPIO_driver_source_paths_recovered"]
+          assert not x["motor_idle_or_flash_release_authorized"]
+          assert not x["live_CFS_CM5_or_Kalico_access"]
+          assert d["offline_only"] and not d["release_allowed"]
+          print("PASS: narrow GPIO BSS field +0x40 neighborhood inspected without claiming a registration writer")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
