@@ -127,7 +127,7 @@ def inspect(image:bytes):
 def synthetic_contract():
     # Fake bytes are a *decoder contract*, not reconstructed CFS RAM.
     # movw r2,#0x244c; nop; movt r2,#0x4001 -> 0x4001244c.
-    asm = bytes.fromhex("42f64c42 00bf c4f20102".replace(" ",""))
+    asm = bytes.fromhex("42f24c42 00bf c4f20102".replace(" ",""))
     cs=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_LITTLE_ENDIAN)
     cs.detail=True
     seq=list(cs.disasm(asm,LINK_BASE))
