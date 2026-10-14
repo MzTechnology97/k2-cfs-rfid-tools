@@ -19,7 +19,8 @@ import argparse
 import json
 from pathlib import Path
 
-from capstone import Cs, CS_ARCH_ARM, CS_MODE_LITTLE_ENDIAN, CS_MODE_THUMB
+from capstone import (Cs, CS_ARCH_ARM, CS_MODE_LITTLE_ENDIAN, CS_MODE_THUMB,
+                      CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT)
 from capstone.arm import ARM_OP_IMM, ARM_OP_REG
 from flash_ram_phase2_audit import pinned
 from cfs_app_real_link_base_audit import audited, LINK_BASE
@@ -39,10 +40,17 @@ def one(cs, image: bytes, offset: int):
 
 
 def is_flow_barrier(ins) -> bool:
-    # Fail closed rather than tracking values across conditional flows.
+    # Capstone instruction groups catch conditional BEQ/BNE/BPL/BMI
+    # as well as direct/indirect branches and calls. Inspecting only
+    # mnemonic "b" or "b." is NOT sufficient for ARM Thumb.
     m=ins.mnemonic
-    return (m in FLOW or m.startswith("b.") or m in ("b","b.w","it",
-            "itt","ite","ittt","itttt","itet","ittee") or m.startswith("it"))
+    try:
+        classified=any(ins.group(group) for group in (
+            CS_GRP_JUMP,CS_GRP_CALL,CS_GRP_RET,CS_GRP_INT))
+    except Exception:
+        # Never continue an ambiguous trace.
+        return True
+    return classified or m in FLOW or m.startswith("it")
 
 
 def tracked_writes(ins, reg: int) -> bool:
@@ -139,8 +147,28 @@ def synthetic_contract():
     constructed=(seq[0].operands[1].imm&0xffff)|((seq[2].operands[1].imm&0xffff)<<16)
     if constructed!=0x4001244c:
         raise AssertionError(f"fixture ADC register addr changed: {constructed:#x}")
+    # A write to the tracked register or a Thumb branch invalidates
+    # provenance even if a matching MOVT byte sequence follows.
+    movw=asm[:4]
+    movt=asm[-4:]
+    overwrite=movw+bytes.fromhex("0022")+movt  # movs r2,#0
+    branch=movw+bytes.fromhex("00e0")+movt     # b.n (jump)
+    ow=list(cs.disasm(overwrite,LINK_BASE))
+    br=list(cs.disasm(branch,LINK_BASE))
+    if (len(ow)!=3 or ow[1].mnemonic!="movs"
+            or not tracked_writes(ow[1],ow[0].operands[0].reg)):
+        raise AssertionError("intervening register clobber not rejected")
+    if (len(br)!=3 or not is_flow_barrier(br[1])):
+        raise AssertionError("intervening branch not rejected")
+    # A conditional branch also terminates the trace (manually
+    # encoded Thumb BEQ.n +0 at halfword value 0xD000).
+    conditional=movw+bytes.fromhex("00d0")+movt
+    cond=list(cs.disasm(conditional,LINK_BASE))
+    if (len(cond)!=3 or not is_flow_barrier(cond[1])):
+        raise AssertionError("conditional BEQ allowed to cross blocks")
     return {"synthetic_bounded_pair_validated":True,
             "synthetic_address":hex(constructed),
+            "synthetic_clobber_and_two_branch_barriers_validated":True,
             "no_original_CFS_execution_derived_from_fixture":True}
 
 
