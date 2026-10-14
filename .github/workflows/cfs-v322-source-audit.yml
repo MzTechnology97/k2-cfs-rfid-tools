@@ -1862,6 +1862,10 @@ jobs:
           assert a["direct_BL_candidate_sites"]["0x801b684"]==["0x801b53e"]
           for key in ("0x8022926","0x8022932","0x8022bbc","0x80236f4"):
               assert a["direct_BL_candidate_sites"][key]==[]
+          # This negative inventory is scoped to aligned raw ROM pointer
+          # values only; it does not exclude indirect device callbacks.
+          assert all(not hits for hits in
+              a["aligned_full_word_function_pointer_candidates"].values())
           assert a["zero_direct_BL_does_NOT_prove_zero_indirect_calls"]
           for key in ("ADC0_motor_current_channels_configured_and_sampled_proven",
                       "M1_M2_active_drive_state_proven",
