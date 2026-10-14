@@ -1803,6 +1803,8 @@ jobs:
           assert x["original_GPIO_registrar_prologue"]=="0x8018dfa"
           assert x["original_second_argument_saved_to_r4"]
           assert x["original_r4_preserved_until_write_at_0x08018E1A"]
+          assert x["original_registrar_direct_BL_candidates_count"]==0
+          assert x["original_registrar_aligned_ROM_pointer_candidates_count"]==0
           assert not x["candidate_CALLER_supplies_valid_GPIO_device_pointer_proven"]
           assert not x["runtime_registration_executed_proven"]
           assert not x["actual_registered_GPIO_device_pointer_recovered"]
