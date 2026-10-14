@@ -82,6 +82,33 @@ def inspect(image):
             "op":ins.mnemonic+" "+ins.op_str,
             "trace_flags":flags,
         })
+    # This is the manufacturer's actual Thumb entry prologue:
+    # 0x08018DFA PUSH {r4,lr}; 0x08018DFC MOV r4,r1.
+    # The preserved r4 is then written into [global+0x40].
+    proc=ins_at(0x08018DFA)
+    move=ins_at(0x08018DFC)
+    if ((proc.mnemonic,proc.op_str)!=("push","{r4, lr}") or
+            (move.mnemonic,move.op_str)!=("mov","r4, r1") or
+            proc.address+proc.size!=move.address or
+            move.address+move.size!=ROOT_LOAD):
+        raise ValueError("original GPIO registrar entry r1->r4 prologue not authenticated")
+    from capstone.arm import ARM_REG_R4
+    for ins in sequential[1:]:
+        try: _,writes=ins.regs_access()
+        except Exception as exc:
+            raise ValueError("original GPIO registrar r4 liveness unknown") from exc
+        if ARM_REG_R4 in writes:
+            raise ValueError("original device r4 overwritten before GPIO BSS registration")
+    # Direct BL matches are only candidate original ROM encodings.
+    # They are not yet a proven reachable callchain or known argument.
+    caller_candidates=[]
+    for off in range(0,len(image)-3,2):
+        pc=LINK_BASE+off
+        ins=next(cs.disasm(image[off:off+4],pc,count=1),None)
+        if ins is not None and ins.size==4 and ins.mnemonic=="bl" and ins.op_str=="#0x8018dfa":
+            caller_candidates.append(hex(pc))
+    if len(caller_candidates)>90:
+        raise ValueError("unexpected GPIO registrar BL candidates")
     # Diagnostic ONLY: this region may begin in the middle of a Thumb
     # function or 32-bit instruction. Do not identify r4's origin
     # or a registration entrypoint from linear decoding alone.
@@ -95,6 +122,12 @@ def inspect(image):
     return {
         "upstream_r4_candidate_context_unqualified":upstream,
         "upstream_context_is_confirmed_function_entry":False,
+        "original_GPIO_registrar_prologue":hex(0x08018DFA),
+        "original_second_argument_saved_to_r4":True,
+        "original_r4_preserved_until_write_at_0x08018E1A":True,
+        "original_registrar_direct_BL_candidates":caller_candidates,
+        "original_registrar_direct_BL_candidates_count":len(caller_candidates),
+        "candidate_CALLER_supplies_valid_GPIO_device_pointer_proven":False,
         "actual_r4_device_pointer_source_proven":False,
         "saved_oem_ROM_region":[hex(BEGIN),hex(END)],
         "root_LDR_source":hex(ROOT_LOAD),
