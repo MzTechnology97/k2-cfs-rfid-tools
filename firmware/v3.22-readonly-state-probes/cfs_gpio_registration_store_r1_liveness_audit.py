@@ -109,6 +109,16 @@ def inspect(image):
             caller_candidates.append(hex(pc))
     if len(caller_candidates)>90:
         raise ValueError("unexpected GPIO registrar BL candidates")
+    original_registrar_ROM_pointer_words=[]
+    for off in range(0,len(image)-3,4):
+        v=struct.unpack_from("<I",image,off)[0]
+        if v in (0x08018DFA,0x08018DFB):
+            original_registrar_ROM_pointer_words.append({
+               "original_saved_ROM_slot":hex(LINK_BASE+off),
+               "stored_value":hex(v)
+            })
+    if len(original_registrar_ROM_pointer_words)>90:
+        raise ValueError("unexpected original GPIO registrar table/pointer candidates")
     # Diagnostic ONLY: this region may begin in the middle of a Thumb
     # function or 32-bit instruction. Do not identify r4's origin
     # or a registration entrypoint from linear decoding alone.
@@ -127,6 +137,8 @@ def inspect(image):
         "original_r4_preserved_until_write_at_0x08018E1A":True,
         "original_registrar_direct_BL_candidates":caller_candidates,
         "original_registrar_direct_BL_candidates_count":len(caller_candidates),
+        "original_registrar_aligned_ROM_pointer_candidates":original_registrar_ROM_pointer_words,
+        "original_registrar_aligned_ROM_pointer_candidates_count":len(original_registrar_ROM_pointer_words),
         "candidate_CALLER_supplies_valid_GPIO_device_pointer_proven":False,
         "actual_r4_device_pointer_source_proven":False,
         "saved_oem_ROM_region":[hex(BEGIN),hex(END)],
