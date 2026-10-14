@@ -1711,7 +1711,9 @@ jobs:
           with open("/tmp/cfs-adc-movw-movt-candidates.json") as f:d=json.load(f)
           m=d["saved_v322"]
           assert m["real_saved_APP_origin"]=="0x8003000"
-          assert m["candidate_pair_count"]==len(m["adjacent_ADC_register_MOVW_MOVT_candidates"])
+          assert d["same_original_saved_v313_v322_ADC_MOVW_MOVT_pair_candidates"]
+          assert m["candidate_pair_count"]==0
+          assert m["adjacent_ADC_register_MOVW_MOVT_candidates"]==[]
           for x in m["adjacent_ADC_register_MOVW_MOVT_candidates"]:
               print("ADC_MOVW_MOVT_SOURCE_CANDIDATE",x)
               assert x["candidate_peripheral"] in ("ADC0","ADC1","ADC2")
