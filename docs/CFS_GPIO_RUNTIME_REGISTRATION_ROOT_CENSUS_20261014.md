@@ -52,6 +52,37 @@ use a different base pointer, a generic allocator, an
 indirect function, or multi-basic-block dataflow that
 the scan intentionally does not track.
 
+## CI-confirmed bounded census
+
+[GitHub Actions run 38549228653](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38549228653)
+completed successfully on 14 October 2026. The same pinned
+results were obtained for v3.13 and v3.22:
+
+| Bounded source statistic | Verified count |
+| --- | ---: |
+| Original aligned ROM constants pointing to `0x20004C44` | **1** |
+| Candidate Thumb PC-relative LDRs of that constant | **15** |
+| Candidate short traces reading `[global+0x40]` | **7** |
+| Candidate short traces writing `[global+0x40]` | **0** |
+
+For example, the original `0x08018E32` LDR of
+`0x20004C44` is followed at `0x08018E38` by
+`LDR r0,[r4,#0x40]`, reading physical BSS field
+`0x20004C84`. This helps isolate the ROM code that
+**consumes** the registered device, but still does
+not identify the registration-time writer or
+`[device+4]` callback.
+
+A zero write count applies **only** to the narrow constant-plus-
+straight-line syntax accepted by this script. It is not proof
+that no code initializes the device: generic register
+functions, indirection, multi-block flow, RAM-loaded pointers
+and computed addresses remain possible.
+
+The workflow now pins the exact counts to detect unexpected
+changes in the manufacturer/source evidence. Such counts
+are **not** proof of firmware runtime execution.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
