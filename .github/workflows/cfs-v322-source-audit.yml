@@ -1780,6 +1780,31 @@ jobs:
           assert d["offline_only"] and not d["release_allowed"]
           print("PASS: narrow GPIO BSS field +0x40 neighborhood inspected without claiming a registration writer")
           PY
+      - name: Trace exact original R1 liveness into potential GPIO BSS writer (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_registration_store_r1_liveness_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-BSS-writer-liveness.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-BSS-writer-liveness.json") as f: d=json.load(f)
+          assert d["v313_equal_to_v322_original_ROM"]
+          x=d["source_analysis"]
+          assert x["root_LDR_source"]=="0x8018dfe"
+          assert x["original_root_pointer_value"]=="0x20004c44"
+          assert x["possible_STR_source"]=="0x8018e1a"
+          assert x["possible_STR_target_if_r1_unchanged"]=="0x20004c84"
+          assert x["connected_straight_line_source_bytes"]
+          assert not x["runtime_registration_executed_proven"]
+          assert not x["actual_registered_GPIO_device_pointer_recovered"]
+          assert not x["M1_M2_driver_callback_or_motor_STOPPED_proven"]
+          assert not x["real_CFS_CM5_Kalico_access"]
+          assert not x["v323_MCU_write_or_flash_permitted"]
+          assert d["not_a_live_registration_trace"] and not d["release_allowed"]
+          print("PASS: original Thumb GPIO BSS registration candidate liveness examined without live claims")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
