@@ -1728,6 +1728,34 @@ jobs:
           assert d["no_CFS_CM5_or_Kalico_interaction"]
           print("PASS: strict MOVW/MOVT address census, no ADC motor measurement or firmware release claims")
           PY
+      - name: Locate candidate GPIO device registration BSS field accesses (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_runtime_registration_root_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-runtime-registration-census.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-runtime-registration-census.json") as f: d=json.load(f)
+          assert d["v313_and_v322_original_GPIO_BSS_root_traces_identical"]
+          p=d["v322"]
+          assert p["runtime_global_address"]=="0x20004c44"
+          assert p["runtime_GPIO_device_BSS_field"]=="0x20004c84"
+          assert p["number_of_aligned_exact_ROM_root_constants"]>=1
+          assert p["number_of_root_load_candidate_sites"]>=2
+          traces={t["source_candidate_pc"] for t in p["bounded_candidate_traces"]}
+          assert {"0x8018eee","0x8018f10"}.issubset(traces)
+          assert p["static_BSS_init_value_is_zero_not_runtime_device_pointer"]
+          assert not p["actual_registration_writer_found_on_reachable_path"]
+          assert not p["runtime_GPIO_device_callback_at_device_plus_0x04_recovered"]
+          assert not p["all_motor_pin_write_paths_recovered"]
+          assert not p["physical_motor_STOPPED_proven"]
+          assert not p["safe_to_enable_v323_writes_or_flash"]
+          assert not p["live_CFS_CM5_Kalico_access"]
+          assert d["no_actual_hardware_operation"] and d["no_v323_release"]
+          print("PASS: OEM GPIO BSS global source references, no speculative runtime callback claims")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
