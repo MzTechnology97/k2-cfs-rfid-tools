@@ -1609,6 +1609,28 @@ jobs:
           assert not d["read_or_write_on_actual_CFS_or_CM5_performed"]
           print("PASS: GPIO callback field lies in zero-init BSS; no fictitious ROM callback or motor stop")
           PY
+      - name: Audit bounded straight-line GPIO args without asserting M1 M2 motor ownership (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_bounded_argument_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-bounded-arguments.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-bounded-arguments.json") as f:d=json.load(f)
+          a=d["analysis"]
+          assert d["v313_v322_identical"]
+          assert a["physical_base"]=="0x8003000"
+          assert a["all_existing_BL_candidates"]==122
+          assert a["short_straight_line_argument_candidates"]>=0
+          assert not a["all_callers_reachable_proven"]
+          assert not a["GPIO_driver_runtime_callback_known"]
+          assert not a["actual_M1_M2_owner_and_current_feedback_known"]
+          assert not a["safe_to_flash_or_enable_motor_writes"]
+          assert not d["real_hardware_access"] and not d["flash_release"]
+          print("PASS: bounded GPIO argument census preserves unknown M1/M2 ownership and MCU safety block")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
