@@ -108,6 +108,27 @@ helpers** until a real configuration-to-consumer motor chain is
 demonstrated. A speculative poll of RDATA may clear EOC and
 interfere with the original firmware.
 
+## Complementary immediate address construction test
+
+[GitHub Actions run 38528460315](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38528460315)
+succeeded with the independent
+`cfs_adc_movw_movt_address_census.py` pass.
+It searches the original saved Thumb bytes for **adjacent**
+`MOVW Rx,#low16; MOVT Rx,#high16` pairs whose full 32-bit
+value falls into ADC0/ADC1/ADC2 MMIO address ranges.
+
+**Result: zero candidate adjacent pairs in both pinned versions.**
+The workflow now pins that exact result and the cross-version
+agreement. This does not exclude nonadjacent register construction,
+PC-relative tables, arithmetic with GPIO/ADC base addresses,
+runtime function pointers, or code paths in SRAM.
+
+Together with the nine local ADC0 control/result register
+operations and zero direct BL/pointer references to four
+ADC0 helpers, this favors an **unresolved or generic driver**
+interpretation over any claim that OEM firmware is using
+the four analog current-feedback pins for M1–M4.
+
 ## Safety status
 
 **Not yet proven:** selection or triggering of ADC channels 15/10/1/0,
