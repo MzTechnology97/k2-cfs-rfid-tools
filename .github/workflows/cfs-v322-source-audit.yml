@@ -1877,6 +1877,26 @@ jobs:
           assert d["no_v323_release"]
           print("PASS: OEM GPIOD generic-setup and ADC0 helper paths verified, no motor-idle inference")
           PY
+      - name: Fail closed on ADC_RDATA side effects in motor telemetry plans (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_telemetry_no_side_effect_contract.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-safe-telemetry-contract.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-safe-telemetry-contract.json") as f: d=json.load(f)
+          assert d["original_v313_v322_ADC_reader_verified"]
+          assert d["synthetic_cases_passed"] == 9
+          assert sum(x["synthetic_plan_only"] for x in d["synthetic_cases"]) == 1
+          assert not any(x["permission_for_actual_MCU_read"] for x in d["synthetic_cases"])
+          assert not any(x["physical_motor_stopped_proven"] for x in d["synthetic_cases"])
+          assert not d["actual_MCU_ADC_RDATA_probed"]
+          assert not d["motor_current_feedback_and_calibration_proven"]
+          assert not d["v323_flash_or_MCU_write_permitted"]
+          print("PASS: 9 ADC/RDATA no-side-effect contracts; motor-stop and v3.23 remain blocked")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
