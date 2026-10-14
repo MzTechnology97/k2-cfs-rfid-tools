@@ -1669,6 +1669,36 @@ jobs:
           assert d["no_live_ADC_read_and_no_flash"]
           print("PASS: bounded manufacturer ADC local register roles, no false motor/flash claims")
           PY
+      - name: Cross-check original ADC0 control helper BLs and pointer references (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_helper_reference_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-helper-reference-census.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-helper-reference-census.json") as f:d=json.load(f)
+          a=d["audit"]
+          assert d["original_v313_v322_reference_census_identical"]
+          assert a["physical_link_base"]=="0x8003000"
+          assert len(a["function_entries"])==4
+          assert [x["PC"] for x in a["function_entries"]]==[
+            "0x8022926","0x8022932","0x8022988","0x8022bbc"
+          ]
+          assert a["original_ADC0_RDATA_direct_BL_candidates"]==0
+          assert a["original_ADC0_RDATA_aligned_ROM_pointer_words"]==0
+          assert a["direct_BL_candidate_total"]==sum(len(x["direct_BL_candidates"]) for x in a["function_entries"])
+          assert a["aligned_ROM_word_reference_total"]==sum(len(x["aligned_ROM_word_refs"]) for x in a["function_entries"])
+          for fn in a["function_entries"]:
+              print("OEM_ADC_HELPER_REFERENCE",fn)
+          assert not a["ADC_helper_reachable_from_actual_motor_control_proven"]
+          assert not a["ADC_conversion_rank_and_channel_current_measurement_proven"]
+          assert not a["safe_to_read_ADC_RDATA_on_live_CFS"]
+          assert not a["safe_to_flash_or_SET_RESET_v323"]
+          assert d["ROM_census_does_not_prove_dead_code"]
+          print("PASS: 4 ADC0 original helper reference-census; no invented reachable motor ADC consumer")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
