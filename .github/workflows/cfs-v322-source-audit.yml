@@ -1917,6 +1917,7 @@ jobs:
           assert d["original_v313"]["matched_ADC_candidate_count"] == 0
           assert d["original_v322"]["matched_ADC_candidate_count"] == 0
           assert d["reference_synthetic_fixture"]["synthetic_bounded_pair_validated"]
+          assert d["reference_synthetic_fixture"]["synthetic_clobber_and_two_branch_barriers_validated"]
           assert d["reference_synthetic_fixture"]["synthetic_address"]=="0x4001244c"
           x=d["original_v322"]
           assert x["correct_saved_APP_origin"]=="0x8003000"
