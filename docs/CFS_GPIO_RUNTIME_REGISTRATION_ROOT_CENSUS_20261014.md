@@ -213,6 +213,22 @@ ROM references to `0x08018DFA` and its Thumb entry
 as candidates, not actual calls, until reachability
 and argument provenance are validated.
 
+### No aligned direct pointer evidence either
+
+An additional [successful CI run 38551408127](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38551408127)
+searched original saved ROM aligned full words for
+`0x08018DFA` or its Thumb function address
+`0x08018DFB`: **zero candidates** in both pinned
+firmware generations. Along with zero direct BL
+candidates, this leaves caller reachability unresolved.
+
+The next useful investigation should identify an
+indirect/computed function pointer, RT-Thread registrar
+dispatch, or genuine runtime registration caller,
+not assume this static function necessarily executes
+because its code exists. Keep the original SET/RESET
+safety interlock fail-closed.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
