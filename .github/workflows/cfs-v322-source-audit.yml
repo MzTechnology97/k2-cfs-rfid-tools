@@ -1797,6 +1797,9 @@ jobs:
           assert x["possible_STR_source"]=="0x8018e1a"
           assert x["possible_STR_target_if_r1_unchanged"]=="0x20004c84"
           assert x["connected_straight_line_source_bytes"]
+          assert not x["r1_may_be_clobbered_between_LDR_and_STR"]
+          assert x["branch_or_stack_barriers_between_LDR_and_STR"]==[]
+          assert x["register_root_to_store_source_proven_without_control_flow"]
           assert not x["runtime_registration_executed_proven"]
           assert not x["actual_registered_GPIO_device_pointer_recovered"]
           assert not x["M1_M2_driver_callback_or_motor_STOPPED_proven"]
