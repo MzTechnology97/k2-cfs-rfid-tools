@@ -159,6 +159,35 @@ flow. Only then investigate the operation callback and M1/M2
 ownership. An apparent producer of the device pointer is not
 motor-idle feedback.
 
+## Original GPIO registration routine entry identified
+
+A further examination of the original Thumb bytes immediately preceding
+the global-root LDR (initial [run 38550671450](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38550671450), successful)
+shows a clean manufacturer function prologue:
+
+```asm
+0x08018DFA  PUSH {r4, lr}
+0x08018DFC  MOV  r4, r1           ; capture second call argument
+0x08018DFE  LDR  r1, [pc,#0x36c] ; global 0x20004C44
+   ... original global initialization fields ...
+0x08018E1A  STR  r4, [r1,#0x40]  ; register argument into 0x20004C84
+```
+
+Therefore, along this contiguous manufacturer source sequence,
+the prospective GPIO device pointer written to the BSS field
+**originates in the caller's second argument (`r1`)**.
+The source-accurate `cfs_gpio_registration_store_r1_liveness_audit.py`
+now additionally pins the prologue, verifies `r4` is preserved
+until the store, and enumerates original ROM halfword candidates
+for direct `BL 0x08018DFA` to scope its callers.
+
+The source has not yet established the *argument value* supplied
+by a caller, nor proved which installed RT-Thread GPIO device
+structure appears at runtime. Reading the zero-initialized
+`0x20004C84` offline cannot provide that value; it must be
+deduced from authenticated call arguments/registration logic or a
+separately approved live read-only diagnostic.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
