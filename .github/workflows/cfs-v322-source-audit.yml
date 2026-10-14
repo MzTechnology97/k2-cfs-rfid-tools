@@ -1699,6 +1699,33 @@ jobs:
           assert d["ROM_census_does_not_prove_dead_code"]
           print("PASS: 4 ADC0 original helper reference-census; no invented reachable motor ADC consumer")
           PY
+      - name: Check adjacent MOVW/MOVT ADC address creation beyond ROM literal pools (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_movw_movt_address_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-movw-movt-candidates.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-movw-movt-candidates.json") as f:d=json.load(f)
+          m=d["saved_v322"]
+          assert m["real_saved_APP_origin"]=="0x8003000"
+          assert m["candidate_pair_count"]==len(m["adjacent_ADC_register_MOVW_MOVT_candidates"])
+          for x in m["adjacent_ADC_register_MOVW_MOVT_candidates"]:
+              print("ADC_MOVW_MOVT_SOURCE_CANDIDATE",x)
+              assert x["candidate_peripheral"] in ("ADC0","ADC1","ADC2")
+              assert not x["actual_executable_reachability_proven"]
+              assert not x["ADC_current_source_channel_proven"]
+          assert not m["full_nonadjacent_or_register_arithmetic_coverage_proven"]
+          assert not m["reachable_ADC_channel_selector_or_motor_current_sampler_proven"]
+          assert not m["read_from_actual_CFS_ADC_register"]
+          assert not m["MCU_physical_stop_proven"]
+          assert not m["v323_flash_or_MCU_SET_RESET_authorized"]
+          assert not d["release_gate_passed"]
+          assert d["no_CFS_CM5_or_Kalico_interaction"]
+          print("PASS: strict MOVW/MOVT address census, no ADC motor measurement or firmware release claims")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
