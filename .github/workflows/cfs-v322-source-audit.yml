@@ -1908,7 +1908,14 @@ jobs:
           import json
           from pathlib import Path
           d=json.loads(Path("/tmp/cfs-adc-movw-movt-bounded.json").read_text())
-          assert d["original_v313_v322_bounded_candidates_identical"]
+          # The distinct v3.22 build contains one additional MOVW-shaped
+          # halfword in patched ROM; that is not a discovered ADC consumer.
+          assert not d["original_v313_v322_full_scan_identical"]
+          assert d["matched_ADC_address_candidates_same_across_versions"]
+          assert d["original_v313"]["halfword_scan_MOVW_candidates"] == 363
+          assert d["original_v322"]["halfword_scan_MOVW_candidates"] == 364
+          assert d["original_v313"]["matched_ADC_candidate_count"] == 0
+          assert d["original_v322"]["matched_ADC_candidate_count"] == 0
           assert d["reference_synthetic_fixture"]["synthetic_bounded_pair_validated"]
           assert d["reference_synthetic_fixture"]["synthetic_address"]=="0x4001244c"
           x=d["original_v322"]
