@@ -52,6 +52,35 @@ feedback solution.
 Official GD32F30x manual:
 https://www.gd32mcu.com/data/documents/userManual/GD32F30x_User_Manual_Rev2.9.pdf
 
+## Executed CI finding (14 October 2026)
+
+The first complete GitHub Actions execution
+[run 38527464975](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38527464975)
+**succeeded**. The original SHA-pinned v3.22 image produced
+**nine candidate local ADC0 accesses** in the strictly bounded
+Thumb syntax windows:
+
+| ADC0 register | Local reads | Local writes |
+| --- | ---: | ---: |
+| `CTL0` | 2 | 2 |
+| `CTL1` | 2 | 2 |
+| `RDATA` | 1 | 0 |
+| `RSQ0`, `RSQ1`, `RSQ2` | 0 discovered | 0 discovered |
+| `SAMPT0`, `SAMPT1` | 0 discovered | 0 discovered |
+
+The workflow now **pins these exact results** to detect accidental
+regression. The saved ROM clearly contains generic ADC0 control and
+result-access helpers, but this analysis has not linked them to
+conversion rank configuration, the motor current pads, the running
+motor task, or ADC result RAM consumers.
+
+Importantly, the zero RSQ/SAMPT result is **bounded to this
+literal-plus-short-sequential-Thumb method**, not an exhaustive
+whole-program finding: generic helpers may calculate register
+addresses dynamically, use MOVW/MOVT, indirect calls, DMA or runtime
+function pointers. Calling the ADC unused would therefore
+overstate the evidence.
+
 ## Safety status
 
 **Not yet proven:** selection or triggering of ADC channels 15/10/1/0,
