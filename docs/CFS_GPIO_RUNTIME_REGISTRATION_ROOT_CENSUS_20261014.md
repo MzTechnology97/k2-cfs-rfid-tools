@@ -83,6 +83,34 @@ The workflow now pins the exact counts to detect unexpected
 changes in the manufacturer/source evidence. Such counts
 are **not** proof of firmware runtime execution.
 
+## Focused source neighborhood after the initial census
+
+[CI run 38549755204](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38549755204)
+completed successfully. The source-only window
+`0x08018D80..0x08019000` yielded **one** Thumb halfword
+decoded as a potential `STR [register,#0x40]` writer:
+
+```asm
+0x08018DFE  LDR r1, [PC, #0x36C]  ; ROM literal -> 0x20004C44
+0x08018E1A  STR r4, [r1, #0x40]   ; candidate target 0x20004C84
+```
+
+It also found additional `LDR [register,#0x40]` patterns,
+including independently authenticated original reads of the
+device BSS field. There are 29 halfword candidates for `BL`,
+four `BLX`, three `B` and six `BX` in the bounded region.
+These counts include possibly unrelated or ambiguous code
+decodings and are **not function-level execution counts**.
+
+**Most promising next check:** the sequence between
+the original `0x08018DFE` global root LDR and
+`0x08018E1A` store. The new
+`cfs_gpio_registration_store_r1_liveness_audit.py` pins
+both manufacturer instructions, verifies the global ROM literal
+and conservatively records all intermediate writes to r1 and
+branch/stack barriers. Even if the source has no such barriers,
+a runtime registration trace is **not** yet proven.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
