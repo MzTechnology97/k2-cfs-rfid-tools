@@ -1631,6 +1631,35 @@ jobs:
           assert not d["real_hardware_access"] and not d["flash_release"]
           print("PASS: bounded GPIO argument census preserves unknown M1/M2 ownership and MCU safety block")
           PY
+      - name: Test original ADC register-base immediate dataflow without motor current assertions (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_bounded_register_dataflow.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-bounded-register-dataflow.json > /tmp/cfs-adc-bounded-register-dataflow-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-bounded-register-dataflow.json") as f:d=json.load(f)
+          x=d["v322"]
+          assert d["local_original_Thumb_not_proof_of_reachable_execution"]
+          assert x["ROM_physical_base"]=="0x8003000"
+          assert x["original_ADC0_RDATA_source_instruction_locally_verified"]=="0x8022bc0"
+          assert x["ADC_literal_load_candidates"]>=1
+          assert x["bounded_register_access_candidates"]>=1
+          assert not x["can_prove_actual_channel_15_10_1_0_conversions"]
+          assert not x["can_prove_motor_task_reached_ADC_helpers"]
+          assert not x["can_prove_ADC_result_saved_in_motor_RAM"]
+          assert not x["real_MCU_ADC_EOC_or_DMA_touched"]
+          assert not x["v323_flash_or_SET_RESET_release"]
+          print("OEM_ADC_LOCAL_ACCESS_COUNT",x["bounded_register_access_candidates"])
+          for row in x["candidate_access_counts_by_peripheral_role"]:
+              print("OEM_ADC_REGISTER_ROLE",row)
+          for row in x["adc_channel_selection_register_access_candidates"][:20]:
+              print("UNREACHED_ADC_CHANNEL_SELECTION_CANDIDATE",row)
+          assert d["no_live_ADC_read_and_no_flash"]
+          print("PASS: bounded manufacturer ADC local register roles, no false motor/flash claims")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
