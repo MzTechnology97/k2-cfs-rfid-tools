@@ -153,7 +153,14 @@ def main():
     old=inspect(pinned(args.v313,"intermediate_v313"))
     new=inspect(pinned(args.v322,"running_v322"))
     report={
-        "original_v313_v322_bounded_candidates_identical":old==new,
+        # v3.22 adds one MOVW-shaped halfword candidate in changed
+        # application content. Never require global source-scan totals to
+        # match across intentionally distinct firmware builds.
+        "original_v313_v322_full_scan_identical":old==new,
+        "matched_ADC_address_candidates_same_across_versions":(
+            old["ADC_MOVW_MOVT_bounded_candidates"]==
+            new["ADC_MOVW_MOVT_bounded_candidates"]
+        ),
         "original_v313":old,
         "original_v322":new,
         "reference_synthetic_fixture":synthetic_contract(),
