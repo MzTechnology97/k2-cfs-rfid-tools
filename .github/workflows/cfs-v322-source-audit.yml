@@ -1855,7 +1855,7 @@ jobs:
               d=json.load(f)
           a=d["OEM_GPIO_and_ADC_helper_audit"]
           assert d["v313_v322_original_helper_provenance_equal"]
-          assert a["verified_OEM_Thumb_pins"]==17
+          assert a["verified_OEM_Thumb_pins"]==18
           assert a["gpio_d_hardware_base"]=="0x40011400"
           assert a["gpio_d_generic_setup_only_direct_bl"]=="0x801b53e"
           assert a["adc0_effective_read_addr_if_called"]=="0x4001244c"
