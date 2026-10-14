@@ -188,6 +188,31 @@ structure appears at runtime. Reading the zero-initialized
 deduced from authenticated call arguments/registration logic or a
 separately approved live read-only diagnostic.
 
+## Caller census after r1→r4 source confirmation
+
+The enlarged [CI run 38551095071](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38551095071)
+also passed. The original manufacturer entry is
+`0x08018DFA: PUSH {r4,lr}`, immediately followed by
+`0x08018DFC: MOV r4,r1`. No instruction overwrites
+`r4` on the contiguous sequence before its
+`STR r4,[r1,#0x40]` at `0x08018E1A`.
+
+A bounded halfword scan over the saved v3.13 and v3.22
+images returned **zero direct `BL 0x08018DFA`
+instruction candidates**. This is a negative *direct-call*
+finding, not proof of dead code or absence of real
+registration: original firmware may use an indirect
+function pointer, a registration table, a linker veneer
+or dynamic initialization. Therefore the caller's
+second argument and the runtime GPIO callback remain
+unknown.
+
+The follow-up audit now also looks for aligned full-word
+ROM references to `0x08018DFA` and its Thumb entry
+`0x08018DFB`. Any such references will be treated
+as candidates, not actual calls, until reachability
+and argument provenance are validated.
+
 ## Separation of evidence levels
 
 - **Verified source address:** ROM literal and exact Thumb
