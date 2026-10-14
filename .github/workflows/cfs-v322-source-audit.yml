@@ -1814,6 +1814,34 @@ jobs:
           assert d["not_a_live_registration_trace"] and not d["release_allowed"]
           print("PASS: original Thumb GPIO BSS registration candidate liveness examined without live claims")
           PY
+      - name: Verify OEM PWM duty shadow versus physical STOP state (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_duty_shadow_physical_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-duty-command-shadow.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-duty-command-shadow.json") as f: d=json.load(f)
+          x=d["manufacturer_original_software_command_shadow"]
+          assert d["v313_equals_v322_original_motor_command_shadow"]
+          assert x["original_motor_duty_controller_entry"]=="0x80110cc"
+          assert x["zero_initialized_motor_data_root"]=="0x20004960"
+          assert x["motor_command_structure_base"]=="0x20004a14"
+          assert x["current_requested_duty_field"]=="0x20004a1a"
+          assert x["previous_requested_duty_field"]=="0x20004a1c"
+          assert len(x["source_verified_instructions"])==12
+          assert x["duty_values_are_software_command_history_only"]
+          assert not x["zero_command_means_real_motor_stopped"]
+          assert not x["MCU_set_reset_gate_ready"]
+          assert len(d["synthetic_command_vs_physical_feedback_cases"])==5
+          assert sum(v["synthetic_stop_status_possible"] for v in d["synthetic_command_vs_physical_feedback_cases"])==1
+          assert not d["actual_MCU_motor_STOP_feedback_proven"]
+          assert not d["eligible_v323_motor_guard_release"]
+          assert not d["live_CFS_CM5_accessed"]
+          print("PASS: OEM 0x20004A1A command shadow proven, physical rotor stop still unproven")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
