@@ -82,7 +82,20 @@ def inspect(image):
             "op":ins.mnemonic+" "+ins.op_str,
             "trace_flags":flags,
         })
+    # Diagnostic ONLY: this region may begin in the middle of a Thumb
+    # function or 32-bit instruction. Do not identify r4's origin
+    # or a registration entrypoint from linear decoding alone.
+    upstream_begin=0x08018DC0
+    upstream=[
+        {"at":hex(i.address),"bytes":i.bytes.hex(),
+         "opcode":i.mnemonic+" "+i.op_str}
+        for i in cs.disasm(image[upstream_begin-LINK_BASE:ROOT_LOAD-LINK_BASE],
+                           upstream_begin)
+    ]
     return {
+        "upstream_r4_candidate_context_unqualified":upstream,
+        "upstream_context_is_confirmed_function_entry":False,
+        "actual_r4_device_pointer_source_proven":False,
         "saved_oem_ROM_region":[hex(BEGIN),hex(END)],
         "root_LDR_source":hex(ROOT_LOAD),
         "original_root_pointer_ROM_slot":hex(lit),
