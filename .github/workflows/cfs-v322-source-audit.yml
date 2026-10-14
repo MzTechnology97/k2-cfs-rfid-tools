@@ -1742,8 +1742,9 @@ jobs:
           p=d["v322"]
           assert p["runtime_global_address"]=="0x20004c44"
           assert p["runtime_GPIO_device_BSS_field"]=="0x20004c84"
-          assert p["number_of_aligned_exact_ROM_root_constants"]>=1
-          assert p["number_of_root_load_candidate_sites"]>=2
+          assert p["number_of_aligned_exact_ROM_root_constants"]==1
+          assert p["number_of_root_load_candidate_sites"]==15
+          assert p["local_direct_field_access_counts"]=={"read":7}
           traces={t["source_candidate_pc"] for t in p["bounded_candidate_traces"]}
           assert {"0x8018eee","0x8018f10"}.issubset(traces)
           assert p["static_BSS_init_value_is_zero_not_runtime_device_pointer"]
