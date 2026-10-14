@@ -1842,6 +1842,37 @@ jobs:
           assert not d["live_CFS_CM5_accessed"]
           print("PASS: OEM 0x20004A1A command shadow proven, physical rotor stop still unproven")
           PY
+      - name: Verify OEM GPIO-D and ADC0 helpers are not motor feedback evidence (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_d_adc0_helper_reachability_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpiod-adc0-helper-evidence.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpiod-adc0-helper-evidence.json") as f:
+              d=json.load(f)
+          a=d["OEM_GPIO_and_ADC_helper_audit"]
+          assert d["v313_v322_original_helper_provenance_equal"]
+          assert a["verified_OEM_Thumb_pins"]==17
+          assert a["gpio_d_hardware_base"]=="0x40011400"
+          assert a["gpio_d_generic_setup_only_direct_bl"]=="0x801b53e"
+          assert a["adc0_effective_read_addr_if_called"]=="0x4001244c"
+          assert a["direct_BL_candidate_sites"]["0x801b684"]==["0x801b53e"]
+          for key in ("0x8022926","0x8022932","0x8022bbc","0x80236f4"):
+              assert a["direct_BL_candidate_sites"][key]==[]
+          assert a["zero_direct_BL_does_NOT_prove_zero_indirect_calls"]
+          for key in ("ADC0_motor_current_channels_configured_and_sampled_proven",
+                      "M1_M2_active_drive_state_proven",
+                      "independent_stop_status_for_all_motors_proven",
+                      "safe_MCU_write_interlock_implemented",
+                      "v323_flash_or_motor_write_permitted",
+                      "live_CFS_read_or_write"):
+              assert not a[key]
+          assert d["no_v323_release"]
+          print("PASS: OEM GPIOD generic-setup and ADC0 helper paths verified, no motor-idle inference")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
