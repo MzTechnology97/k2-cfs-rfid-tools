@@ -1646,7 +1646,16 @@ jobs:
           assert x["ROM_physical_base"]=="0x8003000"
           assert x["original_ADC0_RDATA_source_instruction_locally_verified"]=="0x8022bc0"
           assert x["ADC_literal_load_candidates"]>=1
-          assert x["bounded_register_access_candidates"]>=1
+          assert x["bounded_register_access_candidates"]==9
+          assert x["adc_channel_selection_register_access_candidates"]==[]
+          assert x["adc_sampling_register_access_candidates"]==[]
+          assert x["candidate_access_counts_by_peripheral_role"] == [
+              {"peripheral":"ADC0","register":"CTL0","direction":"read","count":2},
+              {"peripheral":"ADC0","register":"CTL0","direction":"write","count":2},
+              {"peripheral":"ADC0","register":"CTL1","direction":"read","count":2},
+              {"peripheral":"ADC0","register":"CTL1","direction":"write","count":2},
+              {"peripheral":"ADC0","register":"RDATA","direction":"read","count":1},
+          ]
           assert not x["can_prove_actual_channel_15_10_1_0_conversions"]
           assert not x["can_prove_motor_task_reached_ADC_helpers"]
           assert not x["can_prove_ADC_result_saved_in_motor_RAM"]
