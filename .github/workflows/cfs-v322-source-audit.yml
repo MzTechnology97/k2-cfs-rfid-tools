@@ -2157,6 +2157,34 @@ jobs:
           assert not r['v323_release_allowed']
           print('PASS: 5 two-pass + 9 direct upstream calls; 2 internal BL; 9 negative tests')
           PYTEST
+      - name: Audit OEM 18 GPIO and 2 motor tail branch PCs plus RT-Thread BX callback (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_gpio_motor_tail_and_callback_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-tail-callback-offline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-tail-callback-offline.json') as f: d=json.load(f)
+          a=d['OEM_tail_and_callback_evidence']
+          assert d['source_only_original_app_agrees_between_generations']
+          assert a['source_emitted_GPIO_tail_call_sites']==18
+          assert a['source_emitted_motor_tail_call_sites']==2
+          assert a['known_static_GPIO_pin_tail_sites']==9
+          assert a['other_gpio_tail_sites_with_table_or_runtime_pin_source']==9
+          assert a['unbounded_parameter_parser_gpio_tail']=='0x8019156'
+          assert a['pin_ops_ROM_Thumb_write_callback']=='0x801ab91'
+          assert a['existing_source_classified_direct_GPIO_BL']==118
+          assert len(d['negative_fixtures_rejected'])==14
+          assert a['indirect_RT_Thread_registered_pin_ops_dispatch_proven_in_ROM']
+          assert not a['all_indirect_BLX_callbacks_source_enumerated']
+          assert not a['parameter_parser_is_nonmotor_and_safe']
+          assert not a['motor_STOP_or_idle_is_physically_confirmed']
+          assert not a['MCU_SET_RESET_or_v323_flash_allowed']
+          assert not d['v323_release_approved']
+          print('PASS: OEM 18 GPIO B/B.W, 2 motor B/B.W, callback BX, 14 corruption rejects')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
