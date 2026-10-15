@@ -56,6 +56,12 @@ PARSER_GPIO={
     0x08019152:("pop.w","{r4, r5, r6, lr}"),
     0x08019156:("b",f"#{GPIO_DISPATCH:#x}"),
 }
+PARSER_COMMAND_WORDS={
+    0x0801910A:(0x08019388,b"high",0x27C),
+    0x08019114:(0x08019390,b"on",0x278),
+    0x0801911E:(0x08019394,b"low",0x274),
+    0x08019128:(0x08019398,b"off",0x26C),
+}
 MOTOR_TAIL_SOURCE={
     0x0800D226:("push","{r4, r5, r6, lr}"),
     0x0800D228:("mov","r4, r0"),
@@ -132,6 +138,13 @@ def spot_checks(raw:bytes)->dict:
             raise ValueError("GPIO static source immediate position drift")
     for table in (PARSER_GPIO,MOTOR_TAIL_SOURCE,DYNAMIC_TAIL_SOURCE):
         for pc,op in table.items():must(raw,pc,op)
+    for pc,(address,name,imm) in PARSER_COMMAND_WORDS.items():
+        must(raw,pc,("adr",f"r0, #{imm:#x}"))
+        if (((pc+4)&~3)+imm)!=address:
+            raise ValueError("parameter command ADR ROM geometry changed")
+        idx=address-LINK_BASE
+        if raw[idx:idx+len(name)+1]!=name+b"\0":
+            raise ValueError("manufacturer GPIO command choice string changed")
     if word(raw,PIN_OPS_SLOT)!=(PIN_WRITE|1):
         raise ValueError("RT-Thread pin write callback Thumb pointer changed")
     must(raw,GPIO_DISPATCH_LOAD,("ldr","r3, [r0, #4]"))
@@ -159,6 +172,8 @@ def spot_checks(raw:bytes)->dict:
             "other_gpio_tail_sites_with_table_or_runtime_pin_source":
                 len(GPIO_BRANCHES)-len(GPIO_IMMEDIATE),
             "unbounded_parameter_parser_gpio_tail":hex(0x08019156),
+            "OEM_parser_software_value_words": [name.decode("ascii") for _,name,_ in PARSER_COMMAND_WORDS.values()],
+            "OEM_parser_access_from_external_connection_proven":False,
             "motor_control_tail_targets":[hex(p) for p in MOTOR_BRANCHES],
             "pin_ops_ROM_Thumb_write_callback":hex(word(raw,PIN_OPS_SLOT)),
             "manufacturer_initial_ROM_and_RAM_function_pointer_hits":ptrs,
@@ -206,6 +221,10 @@ def negatives(raw:bytes)->list[str]:
         ("registered_pin_write_ROM_pointer",PIN_OPS_SLOT),
         ("RT_Thread_dynamic_dispatch_load",GPIO_DISPATCH_LOAD),
         ("RT_Thread_dynamic_dispatch_BX",GPIO_DISPATCH_BX),
+        ("OEM_GPIO_choice_high_string",0x08019388),
+        ("OEM_GPIO_choice_on_string",0x08019390),
+        ("OEM_GPIO_choice_low_string",0x08019394),
+        ("OEM_GPIO_choice_off_string",0x08019398),
     )
     rejected=[]
     for label,pc in cases:
@@ -213,7 +232,7 @@ def negatives(raw:bytes)->list[str]:
         try:spot_checks(bytes(corrupted))
         except ValueError:rejected.append(label)
         else:raise AssertionError("source mutation was accepted: "+label)
-    if len(rejected)!=14:raise ValueError("not all expected GPIO negative cases rejected")
+    if len(rejected)!=18:raise ValueError("not all expected GPIO negative cases rejected")
     return rejected
 
 def main()->None:
