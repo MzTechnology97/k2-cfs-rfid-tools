@@ -2304,6 +2304,48 @@ jobs:
           assert not j['MCU_or_production_Kalico_access']
           print('PASS exact full-APP parity: 178140 bytes, 14 BL hooks, CRC16 C36F, 5 rejects')
           PYTEST
+      - name: Emulate first v3.23 read-only 0x15 diagnostic without saving firmware (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_readonly_snapshot_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --self-test --json-out /tmp/cfs-v323-readonly-candidate-offline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-readonly-candidate-offline.json') as f: r=json.load(f)
+          c=r['candidate']
+          assert c['APP_base']=='0x8003000'
+          assert c['handler_entry']=='0x802de38'
+          assert c['saved_v322_sha']=='40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7'
+          assert c['known_v322_handler_bytes']==2468
+          assert c['candidate_v323_handler_bytes']==2504
+          assert c['handler_added_bytes']==36
+          assert c['in_memory_candidate_APP_bytes']==178176
+          assert c['source_13_OEM_equ_pointers']==13
+          assert c['15_outgoing_OEM_Thumb_branches']==15
+          assert c['14_incoming_OEM_Thumb_hooks']==14
+          assert c['original_prefix_changes_confined_to_old_hooks_and_metadata']
+          assert c['historical_unverified_flash_end']=='0x802e800'
+          assert c['flash_end_headroom_bytes']==0
+          assert c['new_op']=='0x15'
+          assert c['new_read_only_response_layout']=='[0x23,raw_box_oper_state]'
+          assert c['no_new_peripheral_reads']
+          assert c['no_new_nonstack_SRAM_writes']
+          assert len(r['emulated_offline_cases'])==10
+          assert [x['response'] for x in r['emulated_offline_cases'][:7]]==['2300','2301','2302','2303','2304','2305','23ff']
+          assert all(x['RAM_writes_all_stack_local'] for x in r['emulated_offline_cases'])
+          assert all(x['status']==1 and x['response']=='' for x in r['emulated_offline_cases'][7:])
+          assert len(r['fail_closed_source_mutations'])==4
+          assert not c['motor_state_independent_STOP_evidence']
+          assert not c['real_bootloader_flash_limit_verified']
+          assert not c['MCU_flash_permitted']
+          assert not c['production_Kalico_or_CFS_touched']
+          assert not r['v323_firmware_flashable']
+          assert r['no_persistent_BIN_or_ELF_output']
+          print('PASS: read-only v3.23 trial, 10 Unicorn cases, 29 old ABI edges, no image exported')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
