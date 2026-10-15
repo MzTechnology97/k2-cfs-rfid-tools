@@ -2032,13 +2032,16 @@ jobs:
           assert len(a['all_six_pin_ops_function_pointers'])==6
           assert len(a['original_PD0_PD3_GPIO_records'])==4
           assert a['GPIO_write_nonzero_sets_BOP_zero_clears_BC']
-          assert len(r['negative_fixtures_rejected'])==6
+          assert a['pin_initializer_present_and_reachable_in_OEM_ROM_loop']
+          assert a['ROM_pin_initializer_early_init_vector_slot']=='0x802d764'
+          assert a['OEM_early_init_indirect_BLX_loop']=='0x801d584'
+          assert len(r['negative_fixtures_rejected'])==9
           assert not a['board_initializer_executed_on_live_CFS_proven']
           assert not a['all_M1_M2_motor_start_stop_callers_recovered']
           assert not a['motor_current_and_physical_stop_verified']
           assert not a['MCU_SET_RESET_or_flash_authorized']
           assert not r['v323_release_permitted']
-          print('PASS: OEM pin registration, 6 callback ops, M1/M2 GPIO drive and 6 negative cases')
+          print('PASS: OEM pin registration, 6 callback ops, M1/M2 GPIO drive and 9 negative cases')
           PYTEST
       - name: Remove disposable compiled image
         if: always()
