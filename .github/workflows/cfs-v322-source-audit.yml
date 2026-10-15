@@ -736,7 +736,11 @@ jobs:
           assert m['v323_readonly_candidate_end_exclusive']=='0x802e800'
           assert m['v323_readonly_candidate_last_occupied_2KiB_page']==92
           assert m['arithmetic_headroom_to_arbitrary_historical_POLICY_NOT_loader_guarantee']==53248
-          assert len(a['mutations_rejected'])==13
+          assert b['historical_receive_dispatch_slot6_Thumb']=='0x8001d5d'
+          assert b['original_loader_slot6_passes_final_Flash_page_to_FMC_erase']
+          assert b['loader_FMC_erase_target_last_page']=='0x807f800'
+          assert not b['historic_loader_all_APP_erase_paths_authenticated']
+          assert len(a['mutations_rejected'])==18
           assert not m['installed_loader_matches_archived_2025_bytes']
           assert not m['loader_maximum_APP_length_authenticated']
           assert not m['loader_actual_ERASE_pages_authenticated']
