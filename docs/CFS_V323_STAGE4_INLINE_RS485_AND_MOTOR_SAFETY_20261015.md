@@ -25,7 +25,7 @@ The precise original Thumb execution chain, in physical addresses:
 | **`0x0800F3A0`** | our patched normal dispatcher route into the v3.22/v3.23 `0x57` handler; **not used by this stage-4 reader** |
 
 These are **real** original APP PCs; they are not the old nominal
-`0x08010000`-based addresses. The same 30 pinned instruction
+`0x08010000`-based addresses. The same 47 pinned instruction
 sites agree in exact saved v3.13 and v3.22 binaries.
 
 ## Bounded original ARM emulation
@@ -66,8 +66,29 @@ read path, therefore, a branch in the feed loop expecting
 `F7`; the enclosing UART reader does. The wrong-sync direct
 validator and enclosing-reader behavior were tested separately.
 
-Eleven synthetic scenarios were tested twice, plus **13 fail-closed
+Eleven synthetic scenarios were tested twice, plus **18 fail-closed
 single-byte source mutations** in the original instruction census.
+
+## Source-verified hub run/brake path
+
+The private stage-4 receive loop is demonstrably inside a motor
+operation: it invokes the original hub start routine
+**`0x08011164`** at `0x08025C60`, before entering its UART
+polling loop. The original hub start function writes **0** to
+RT-Thread GPIO pin ID `0x44` (deassert brake), then calls the
+hub control functions `0x080110B2` and `0x080110CC`.
+Four separate stage-4 exit paths call the hub stop routine
+**`0x08011198`** at `0x08025CD0`, `0x08025D04`,
+`0x08025D2E`, and `0x08025D52`. The original stop function
+writes **1** to the same pin ID `0x44` (assert brake) and
+commands zero to the hub speed-control helper.
+
+These **17 additional original Thumb PCs** are statically verified
+in BOTH v3.13/v3.22 alongside the 30 RS485 instructions; five more
+synthetic source mutations fail closed. The test does **not**
+emulate electrical hub braking, read tachometer/FG feedback, or
+prove those stop sites cover every ISR/task exit. The local Ghidra
+source labels these wrappers as `hub_forward` and `hub_stop`.
 
 ## What this DOES NOT establish
 
