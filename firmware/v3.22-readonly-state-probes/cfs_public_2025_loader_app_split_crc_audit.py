@@ -44,6 +44,7 @@ LITERALS={
     0x08001360:APP_BASE,
     0x08001A88:APP_BASE,
     0x08000AA0:0x0800320C,
+    0x08001DD8:0x0807F800,
 }
 OPCODES={
     0x080005B8:("cpsid","i"),
@@ -69,6 +70,16 @@ OPCODES={
     0x08001350:("ldr","r2, [sp, #4]"),
     0x08001352:("ldr","r2, [r2]"),
     0x0800135E:("bx","r3"),
+    0x08001A32:("cmp","r3, #7"),
+    0x08001A38:("ldr.w","pc, [r2, r3, lsl #2]"),
+    0x08001D60:("cpsid","i"),
+    0x08001D62:("bl","#0x8000364"),
+    0x08001D66:("ldr","r0, [pc, #0x70]"),
+    0x08001D68:("bl","#0x80002b8"),
+    0x08001D6C:("bl","#0x800033c"),
+    0x08001D70:("cpsie","i"),
+    0x080002B8:("push","{r3, r4, r5, lr}"),
+    0x080002DE:("str","r5, [r3]"),
     0x08001A0A:("ldr","r7, [pc, #0x7c]"),
 }
 THUMB_MSR_MSP_R2=bytes.fromhex("82f30888")
@@ -107,12 +118,18 @@ def loader_layout(flash:bytes)->dict:
         found=disasm_at(flash,at)
         if found!=want:
             raise ValueError(f"historical loader Thumb changed at {at:#x}: {found} expected {want}")
+    # The historical 8-way receive handler has slot 6 entering a
+    # caller which passes 0x0807F800 to the FMC erase-page helper.
+    # This is a positive *historical* page-erase path, not all app pages.
+    if rom_word(flash,0x08001A54)!=0x08001D5D:
+        raise ValueError("historical receive dispatch slot6 changed")
     msr_pc=0x08001354
     if flash[msr_pc-FLASH_BASE:msr_pc-FLASH_BASE+4]!=THUMB_MSR_MSP_R2:
         raise ValueError("historical loader does not load application MSP before handoff")
     for at,ptr in ((0x080005BA,0x080005C4),(0x080005BC,0x080005C8),
                    (0x08000A3C,0x08000AA0),(0x08000A74,0x08000AA4),
-                   (0x08001306,0x08001360),(0x08001A0A,0x08001A88)):
+                   (0x08001306,0x08001360),(0x08001A0A,0x08001A88),
+                   (0x08001D66,0x08001DD8)):
         mnemonic,operands=disasm_at(flash,at)
         if mnemonic not in ("ldr","ldr.w"):
             raise ValueError("pinned historic literal load no longer present")
@@ -156,6 +173,10 @@ def loader_layout(flash:bytes)->dict:
         "CRC16_saved_header_matches_implemented_algorithm":True,
         "historical_raw_dump_contains_both_loader_and_APP":True,
         "historical_flash_has_loader_0x08000000_and_APP_0x08003000":True,
+        "historical_receive_dispatch_slot6_Thumb":hex(0x08001D5D),
+        "original_loader_slot6_passes_final_Flash_page_to_FMC_erase":True,
+        "loader_FMC_erase_target_last_page":hex(0x0807F800),
+        "historic_loader_all_APP_erase_paths_authenticated":False,
     }
 
 def modern_headers(v313:bytes,v322:bytes)->dict:
@@ -211,6 +232,11 @@ def synthetic_negative_cases(flash:bytes)->list[str]:
         ("loader_handoff_MSR_MSP",0x08001354),
         ("loader_handoff_BX_reset",0x0800135F),
         ("archived_APP_metadata_crc",APP_BASE+CRC_OFF),
+        ("historical_dispatch_slot6",0x08001A54),
+        ("historical_last_Flash_page_literal",0x08001DD8),
+        ("historical_FMC_page_erase_call",0x08001D68),
+        ("historical_FMC_erase_dest_register",0x080002DE),
+        ("historical_interrupt_reenable_after_erase",0x08001D70),
         ("archived_APP_metadata_length",APP_BASE+0x20E),
     )
     refused=[]
