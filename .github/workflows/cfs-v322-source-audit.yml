@@ -2131,6 +2131,32 @@ jobs:
           assert not r['firmware_release_authorized']
           print('PASS: 118/122 OEM direct GPIO BL source patterns, 4 unknown, 20 negative tests')
           PYTEST
+      - name: Audit all 14 direct upstream parameter-fed GPIO helper callers (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_gpio_parameter_direct_callers_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-parameter-gpio-callers.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-parameter-gpio-callers.json') as f: r=json.load(f)
+          d=r['direct_source_only']
+          assert r['both_SHA_pinned_generations_identical']
+          assert d['upstream_source_only_BL_into_two_pass']==5
+          assert d['upstream_source_only_BL_into_GPIO_helper_2']==9
+          assert d['internal_two_pass_BL_into_GPIO_helper_1']==2
+          assert len(d['all_14_reviewed_external_direct_callers'])==14
+          assert d['all_upstream_direct_arg_pairs_outside_brushed_motor_pins']
+          assert len(r['rejected_mutation_cases'])==9
+          assert not d['these_14_source_proven_direct_calls_exhaust_ALL_indirect_entries']
+          assert not d['direct_or_indirect_external_task_callers_fully_proven']
+          assert not d['runtime_dynamic_argument_is_necessarily_nonmotor']
+          assert not d['physical_motor_idle_or_driver_deenergized']
+          assert not d['v323_flash_or_motor_active_MCU_writes_permitted']
+          assert not r['v323_release_allowed']
+          print('PASS: 5 two-pass + 9 direct upstream calls; 2 internal BL; 9 negative tests')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
