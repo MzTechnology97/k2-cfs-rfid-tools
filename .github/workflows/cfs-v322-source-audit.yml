@@ -2389,6 +2389,53 @@ jobs:
           assert r['no_persistent_BIN_or_ELF_output']
           print('PASS: read-only v3.23 trial, 10 Unicorn cases, 29 old ABI edges, no image exported')
           PYTEST
+      - name: Reproduce OEM stage4 embedded RS485 reader under Unicorn (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_stage4_inline_rs485_reader_unicorn_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-stage4-inline-RS485-OEM-proof.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-stage4-inline-RS485-OEM-proof.json') as f: a=json.load(f)
+          assert a['original_APP_physical_base']=='0x8003000'
+          assert a['original_stage4_load_function']=='0x80045c6'
+          assert a['original_stage4_motor_loop']=='0x8025c4e'
+          assert a['original_stage4_UART_reader']=='0x8025eb2'
+          assert a['original_stage4_frame_validator']=='0x8025c18'
+          assert a['original_main_RS485_dispatcher_distinct']=='0x800f27c'
+          assert a['OEM_instruction_sites_verified_across_two_pinned_APPs']==47
+          assert a['v313_v322_embedded_receive_behavior_identical']
+          assert a['embedded_reader_requires_one_plus_eight_serial_bytes_for_sync']
+          assert a['embedded_reader_returns_stages_5_6_or_0_and_drops_CRC_failure']
+          assert a['OEM_validator_raw_crc_error_is_0xFF_but_reader_returns_0']
+          assert a['OEM_validator_checks_no_sync_byte_but_reader_does']
+          assert a['OEM_validator_accepts_noncanonical_declared_length_if_crc_matches']
+          assert a['OEM_validator_accepts_noncanonical_qualifier_if_crc_matches']
+          assert a['OEM_stage4_does_not_dispatch_0x57']
+          assert a['OEM_stage4_calls_hub_start_before_receive']
+          assert a['OEM_stage4_has_four_source_verified_hub_stop_calls']
+          assert a['OEM_hub_brake_pin_original_0x44']
+          assert not a['physical_motor_energized_status_from_brake_signal_verified']
+          assert not a['external_full_UART_receiver_acceptance_proven']
+          assert not a['physical_motor_quiescence_verified']
+          assert not a['installed_firmware_flashing_authorized']
+          assert len(a['emulated_synthetic_cases'])==11
+          assert len(a['OEM_source_mutations_rejected'])==18
+          assert [a['emulated_synthetic_cases'][k]['returned_stage_or_error'] for k in (
+            'valid_stage5','valid_stage6','length_7_with_matching_crc',
+            'length_2_with_matching_crc','header_00_with_matching_crc',
+            'header_99_with_matching_crc','bad_address','bad_command_57',
+            'bad_stage','bad_crc','bad_sync')] == [5,6,5,5,5,5,0,0,0,0,0]
+          assert a['emulated_synthetic_cases']['bad_crc']['direct_OEM_validator_return']==255
+          assert a['emulated_synthetic_cases']['bad_crc']['returned_stage_or_error']==0
+          assert a['emulated_synthetic_cases']['bad_sync']['direct_OEM_validator_return']==5
+          assert a['emulated_synthetic_cases']['bad_sync']['returned_stage_or_error']==0
+          assert all(not c['main_dispatch_invoked'] for c in a['emulated_synthetic_cases'].values())
+          assert not a['hardware_access']
+          print('PASS 47 original Thumb PCs, 11 dual-generation emulator cases, 18 negative mutations, no motor/serial IO')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
