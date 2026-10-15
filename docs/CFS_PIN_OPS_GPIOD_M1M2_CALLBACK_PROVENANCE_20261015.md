@@ -24,6 +24,27 @@ This provides a concrete *candidate value* for the formerly unknown BSS
 registration pointer, based on original ROM **caller argument provenance**
 rather than assuming zeroed SRAM contained a runtime snapshot.
 
+### Original startup init table makes the source chain traceable
+
+The initializer is **not an orphan function**. ROM slot
+`0x0802D764` holds Thumb function pointer `0x0801AE2B`,
+which is the original `pin` registrar initializer at `0x0801AE2A`.
+The manufacturer's early initialization loop
+`0x0801D584` loads the start `0x0802D758` from literal
+`0x0801D620`, loads the exclusive end `0x0802D774`
+from `0x0801D624`, then executes `LDR r0,[r4]; BLX r0;
+ADDS r4,#4; CMP r4,r5; BLO ...` to invoke each of the
+seven ROM function pointers in that range. The initializer
+pointer `0x0802D764` is **inside** this exact range. Original
+`0x0801A8E0 BL 0x0801D584` calls the loop.
+
+This materially strengthens the GPIO registration evidence:
+we can now identify a source-level OEM startup caller and its
+indirect callback table rather than merely an isolated helper
+plus speculative BSS initialization. It is **not** a successful
+physical boot trace, a proof that this loop always executes,
+or evidence of active motor status.
+
 ### Exact six-entry GPIO device operations table
 
 Each entry contains the real Thumb function pointer (low bit set):
@@ -79,11 +100,11 @@ pins source opcodes, literal/ADR arithmetic, six actual function
 pointers, the BSS registrar argument chain, callback dispatch, GPIO
 write implementation, and four M1/M2 physical pin table records
 against **both** saved SHA-pinned firmware generations. The audit
-includes **six corruption fixtures** (table pointer, registrar
+includes **nine corruption fixtures** (table pointer, registrar
 branch, write branch, GPIOD BOP write opcode, PD0 pin record,
-and device string); all are rejected by code-specific assertions.
+device string, startup vector pointer, startup loop start bound and BLX opcode); all are rejected by code-specific assertions.
 
-**Local CM5 result: 6/6 pin ops, 4/4 PD0–PD3 records, 6/6 fail-closed
+**Local CM5 result: 6/6 pin ops, 4/4 PD0–PD3 records, 9/9 fail-closed
 mutation scenarios.** The CI independently reproduces the source-only
 audit against the exact rebuilt v3.22.
 
