@@ -2475,6 +2475,51 @@ jobs:
           assert not a['hardware_access']
           print('PASS 47 original Thumb PCs, 11 dual-generation emulator cases, 18 negative mutations, no motor/serial IO')
           PYTEST
+      - name: Rebuild experimental v3.23 legacy RFID type4 live guard and both Creality wrappers (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_legacy_type4_live_usage_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --self-test --json-out /tmp/cfs-v323-experimental-legacy-type4-offline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-experimental-legacy-type4-offline.json') as f: a=json.load(f)
+          c=a['candidate']
+          assert c['physical_APP_base']=='0x8003000'
+          assert c['snapshot_v323_parent_bytes']==178176
+          assert c['legacy_type4_candidate_APP_bytes']==178320
+          assert c['snapshot_parent_gate_added_bytes']==144
+          assert c['legacy_new_OEM_callsite']=='0x8006684'
+          assert c['old_14_incoming_OEM_hardware_hooks_preserved']
+          assert c['new_total_incoming_OEM_hook_count']==15
+          assert c['15_original_outgoing_OEM_calls_plus_one_stock_gate']==16
+          assert c['new_live_type4_gate_pc']=='0x802e7a8'
+          assert c['bootloader_page_last_occupied']==93
+          assert c['image_end_exclusive']=='0x802e890'
+          assert c['reserved_last_512KiB_parameter_page']=='0x807f800'
+          assert c['original_OEM_precise_instruction_sites']==13
+          assert c['two_saved_estimation_hook_targets_pinned']
+          assert c['sha256_for_OFFLINE_DO_NOT_FLASH']=='affe69e3bafce9c96099c5263bb24fdccd23c909f193943ad6caa46ca7ff1854'
+          assert c['crc16_for_OFFLINE_DO_NOT_FLASH']=='0xb145'
+          assert c['no_new_secure_element_or_tag_writer_calls']
+          assert c['no_new_nonstack_SRAM_allocation']
+          assert c['preserves_original_secure_board_logic']
+          assert c['only_legacy_Creality_stock_runtime_converted_to_type4']
+          assert c['secure_board_type7_runtime_retained']
+          assert c['no_flash_authorization']
+          assert len(a['offline_type4_usage_gate_emulator_cases'])==17
+          assert len(a['existing_estimation_wrapper_emulator_cases'])==17
+          assert len(a['corrupt_source_mutations_rejected'])==4
+          assert a['existing_estimation_wrapper_emulator_cases'][7]['runtime_type']==4
+          assert a['existing_estimation_wrapper_emulator_cases'][-1]['runtime_type']==7
+          assert not a['hardware_release_gates_passed']
+          assert not a['firmware_IMAGE_exported']
+          assert not a['RS485_physical_update_performed']
+          assert not a['production_Kalico_changed']
+          print('PASS 17 guarded legacy type4 / 17 old Creality wrapper Unicorn cases + 4 mutation fixtures, no BIN, never flash')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
