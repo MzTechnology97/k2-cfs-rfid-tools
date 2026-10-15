@@ -1988,6 +1988,30 @@ jobs:
           assert not d['MCU_motor_safe_or_flash_release_approved']
           print('PASS: all 11 existing OEM STOCK branches relocate; four negative mutations rejected')
           PYTEST
+      - name: Verify ALL 15 outgoing OEM relocations and 14 patched hook branches (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v322_full_branch_edge_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --self-test --json-out /tmp/cfs-v322-all-branch-edges.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-all-branch-edges.json') as f: d=json.load(f)
+          assert d['real_saved_APP_base']=='0x8003000'
+          assert d['saved_handler_origin']=='0x802de38'
+          assert d['compiled_handler_identical_to_SHA_locked_v322']
+          assert d['external_Thumb_branch_relocations_verified']==15
+          assert d['modified_original_APP_branch_sites_verified']==14
+          assert not d['absolute_Flash_word_literals_in_handler_source']
+          assert d['regression']['negative_scenarios_rejected']==5
+          assert not d['regression']['MCU_release_allowed']
+          assert not d['all_absolute_ROM_loads_across_whole_original_APP_proven']
+          assert not d['whole_device_control_flow_and_interrupt_safety_proven']
+          assert not d['MCU_SET_RESET_or_flash_authorized']
+          print('PASS: 15 outgoing OEM branch targets, 14 incoming hook BLs, 5 fail-closed tests')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
