@@ -2187,6 +2187,35 @@ jobs:
           assert not d['v323_release_approved']
           print('PASS: OEM 18 GPIO B/B.W, 2 motor B/B.W, callback BX, 18 corruption rejects')
           PYTEST
+      - name: Verify OEM MSH pin descriptor layout, GPIO write command and 18 corruption fixtures (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_msh_pin_gpio_command_registration_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-oem-msh-pin-rom.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-oem-msh-pin-rom.json') as f: r=json.load(f)
+          s=r['original_source_justification']
+          assert r['SHA_pinned_v313_v322_OEM_MSH_source_identical']
+          assert s['registered_MSH_compatible_ROM_descriptor_count_checked']==6
+          assert s['original_descriptor_word_layout']==['name_ptr','desc_ptr','zero','Thumb_handler']
+          assert s['pin_source_registered_ROM_name']=='pin'
+          assert s['pin_ROM_handler_Thumb_pointer']=='0x8019029'
+          assert s['pwm_is_a_different_shell_command_and_handler']
+          assert s['pin_command_suboptions']==['num','mode','read','write']
+          assert s['pin_write_values']==['high','on','low','off']
+          assert s['pin_write_param_handler_reached_from_PIN_entry_by_direct_BW']
+          assert s['pin_write_software_parameter_B_to_GPIO_dispatch']=='0x8019156'
+          assert len(r['negative_mutations_rejected'])==18
+          assert not s['shell_dispatcher_runtime_registration_invoked']
+          assert not s['MSH_available_over_any_external_interface_proven']
+          assert not s['hardware_RFID_write_interlock_proven']
+          assert not s['v323_flash_or_MCU_SET_RESET_approved']
+          assert not r['MCU_flash_release_authorized']
+          print('PASS: OEM MSH ROM pin->GPIO write source chain, PWM separate, 18 rejection fixtures')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
