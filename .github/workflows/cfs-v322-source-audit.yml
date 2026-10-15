@@ -2244,6 +2244,36 @@ jobs:
           assert not r['flash_authorization']
           print('PASS OEM MCU RS485 F7, +3 length, CRC poly07, RX checks, 12 rejected mutations')
           PYTEST
+      - name: Prove physical v3.23 compiler baseline reproduces exact v3.22 handler (OFFLINE, NO BIN)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_physical_relink_baseline.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S \
+            --linker link.ld \
+            --builder build-v3_22.py \
+            --self-test --json-out /tmp/cfs-v323-physical-relink-baseline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-physical-relink-baseline.json') as f: r=json.load(f)
+          assert r['verified_saved_original_32_APP_SHA256']=='40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7'
+          assert r['actual_APP_base']=='0x8003000'
+          assert r['physical_handler_start']=='0x802de38'
+          assert r['physical_handler_bytes']==2468
+          assert r['physically_relinked_handler_byte_identical_to_hw_validated_v322']
+          assert r['rewritten_source_flash_branch_symbols']==13
+          assert r['all_13_source_flash_symbols_shifted_by_minus_D000']
+          assert r['complete_external_Thumb_branch_target_checks']==15
+          assert r['original_patched_OEM_BL_callsite_checks']==14
+          assert len(r['negative_fixtures_rejected'])==7
+          assert not r['fresh_v323_firmware_created']
+          assert not r['bootloader_partition_and_erase_page_owner_authenticated']
+          assert not r['motor_busy_interlock_physically_verified']
+          assert not r['firmware_flash_authorized']
+          assert not r['MCU_hardware_io_performed']
+          print('PASS v3.23 compiler baseline: 2468 identical bytes, 13 symbols, 29 edges, 7 rejects')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
