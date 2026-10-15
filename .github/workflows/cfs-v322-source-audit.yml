@@ -2216,6 +2216,34 @@ jobs:
           assert not r['MCU_flash_release_authorized']
           print('PASS: OEM MSH ROM pin->GPIO write source chain, PWM separate, 18 rejection fixtures')
           PYTEST
+      - name: Audit original MCU RS485 F7 framing and CRC8 poly07 source (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_rs485_crc8_frame_provenance_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-rs485-rom-evidence.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-rs485-rom-evidence.json') as f: r=json.load(f)
+          s=r['OEM_RS485_Thumb_source_only']
+          assert r['saved_v313_and_v322_source_identical']
+          assert s['CRC8_function_PC']=='0x800e9ec'
+          assert s['CRC8_initial_value']==0
+          assert s['CRC8_polynomial']=='0x7'
+          assert not s['CRC8_reflected']
+          assert s['manufacturer_TX_sync']=='0xf7'
+          assert s['OEM_transmit_declared_length_equals_payload_plus_three']
+          assert s['OEM_receive_minimum_declared_length_three_check_PC']=='0x800f926'
+          assert s['OEM_validator_max_payload_on_that_path']==97
+          assert len(r['negative_fixtures_rejected'])==12
+          assert not s['all_application_and_loader_receive_paths_have_same_limit']
+          assert not s['complete_runtime_command_protocol_recovered']
+          assert not s['hardware_motor_STOP_verified']
+          assert not s['firmware_flashable']
+          assert not r['flash_authorization']
+          print('PASS OEM MCU RS485 F7, +3 length, CRC poly07, RX checks, 12 rejected mutations')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
