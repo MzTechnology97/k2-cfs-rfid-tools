@@ -1929,6 +1929,34 @@ jobs:
           assert not d["no_ADC_EOC_side_effect_and_no_firmware_flash"] is False
           print("PASS: bounded nonadjacent ADC MOVW/MOVT search; no physical motor-idle or live ADC authorization")
           PY
+      - name: Confirm ADC helper is NOT qualified as motor current feedback (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_motor_current_evidence_gate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-motor-current-gate.json >/dev/null
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-motor-current-gate.json") as f: d=json.load(f)
+          assert d["same_motor_channel_evidence_across_versions"]
+          assert d["same_bounded_MOVW_MOVT_ADC_matches_across_versions"]
+          assert len(d["synthetic_negative_cases"]) == 10
+          assert not any(s["MCU_SET_RESET_allowed"] for s in d["synthetic_negative_cases"])
+          assert not any(s["flash_extended_v323_allowed"] for s in d["synthetic_negative_cases"])
+          for version in ("saved_v313","saved_v322"):
+              s=d[version]
+              assert s["ADC_register_dataflow_candidates"]["original_ADC0_RDATA_source_instruction_locally_verified"] == "0x8022bc0"
+              assert not s["original_ADC_current_channel_sequence_for_M1_M4_proven"]
+              assert not s["original_motor_task_consumes_ADC_sample_proven"]
+              assert not s["EOC_safe_nonintrusive_live_observation_proven"]
+              assert not s["current_zero_permits_firmware_write"]
+          assert not d["safe_to_read_live_ADC_RDATA"]
+          assert not d["physical_motor_feedback_authenticated"]
+          assert not d["v323_release_gate_passed"]
+          assert not d["installed_CFS_or_CM5_access"]
+          print("PASS: ADC0 source helper not motor current proof; 10 motor-current negative cases fail closed")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
