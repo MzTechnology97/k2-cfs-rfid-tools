@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse,json
 from pathlib import Path
 from flash_ram_phase2_audit import pinned
-from cfs_adc_bounded_register_dataflow import inspect as dataflow
+from cfs_adc_bounded_register_dataflow import analyze as dataflow
 from cfs_adc_movw_movt_bounded_reachability import inspect as movable
 from cfs_app_real_link_base_audit import audited
 
