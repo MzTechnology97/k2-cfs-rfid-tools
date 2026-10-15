@@ -38,9 +38,11 @@ from cfs_v323_physical_full_image_parity import (
     EXPECTED_AFTER_HEAP,
 )
 
-# An explicitly conservative historical build POLICY end, not an
-# authenticated bootloader / erase-page / main-Flash ownership limit.
-UNVERIFIED_PHYSICAL_BUILD_END=0x0802E800
+# Historical source-level size policy (physical absolute address), NOT a
+# certified loader-boundary. The v3.23 experiment ends at 0x0802E800
+# only because this is its actual compiled length / a 2KiB page boundary.
+HISTORICAL_UNVERIFIED_POLICY_END=0x0803B800
+EXPECTED_CANDIDATE_END=0x0802E800
 MARKER=0x23
 COMMAND=0x15
 BOX_STATE=0x200037D2
@@ -96,7 +98,7 @@ def compile_candidate(v313:bytes,v322:bytes,asm:str,ld:str,builder:str,
     if len(new_handler)!=2504 or len(known_refs)!=13:
         raise ValueError("read-only feature changed handler byte count or external symbols")
     end=PHYSICAL_HANDLER+len(new_handler)
-    if end>UNVERIFIED_PHYSICAL_BUILD_END:
+    if end>HISTORICAL_UNVERIFIED_POLICY_END:
         raise ValueError("candidate exceeded conservative, unqualified Flash budget")
     syms=symbol_dict(nm)
     if "op_v323_readonly_snapshot" not in syms:
@@ -152,7 +154,7 @@ def compile_candidate(v313:bytes,v322:bytes,asm:str,ld:str,builder:str,
     changed_oem_bytes=sum(a!=b for a,b in zip(image[:APP_PREFIX],v322[:APP_PREFIX]))
     if struct.unpack_from("<I",image,heapoff)[0]!=EXPECTED_AFTER_HEAP:
         raise ValueError("v3.22 heap patch no longer identical")
-    if len(image)!=178176 or end!=UNVERIFIED_PHYSICAL_BUILD_END:
+    if len(image)!=178176 or end!=EXPECTED_CANDIDATE_END:
         raise ValueError("total length / unqualified conservative flash end drift")
     metadata={
         "APP_base":hex(LINK_BASE),
@@ -168,8 +170,10 @@ def compile_candidate(v313:bytes,v322:bytes,asm:str,ld:str,builder:str,
         "14_incoming_OEM_Thumb_hooks":len(hooks),
         "original_OEM_prefix_changed_bytes":changed_oem_bytes,
         "original_prefix_changes_confined_to_old_hooks_and_metadata":True,
-        "historical_unverified_flash_end":hex(UNVERIFIED_PHYSICAL_BUILD_END),
-        "flash_end_headroom_bytes":UNVERIFIED_PHYSICAL_BUILD_END-end,
+        "historical_arbitrary_policy_end_NOT_LOADER_PROVEN":hex(HISTORICAL_UNVERIFIED_POLICY_END),
+        "candidate_end_exclusive":hex(end),
+        "last_occupied_2KiB_flash_page":(end-1-0x08000000)//2048,
+        "arithmetic_headroom_to_unverified_policy_NOT_CERTIFIED_FREE":HISTORICAL_UNVERIFIED_POLICY_END-end,
         "candidate_crc16":hex(crc),
         "new_op":hex(COMMAND),
         "new_read_only_response_layout":"[0x23,raw_box_oper_state]",
