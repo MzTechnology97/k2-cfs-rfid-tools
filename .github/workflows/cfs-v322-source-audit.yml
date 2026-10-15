@@ -2520,6 +2520,47 @@ jobs:
           assert not a['production_Kalico_changed']
           print('PASS 17 guarded legacy type4 / 17 old Creality wrapper Unicorn cases + 4 mutation fixtures, no BIN, never flash')
           PYTEST
+      - name: Validate secondary type4 secure-element callsite guards (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_type4_secure_sink_guards_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-second-secure-sinks-proof.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-second-secure-sinks-proof.json') as f: a=json.load(f)
+          c=a['candidate']
+          assert c['old_in_memory_type4_APP_bytes']==178320
+          assert c['new_in_memory_type4_guarded_APP_bytes']==178352
+          assert c['added_guard_bytes']==32
+          assert c['new_code_end_exclusive']=='0x802e8b0'
+          assert c['last_Flash_page_index']==93
+          assert c['first_guard_site']=='0x800de68'
+          assert c['second_guard_site']=='0x800dec2'
+          assert c['OEM_manager_reread_callsite_unmodified']=='0x800dfda'
+          assert c['source_proven_legacy_no_chip_paths_return_nonzero_failure']
+          assert c['secure_board_tail_calls_original_OEM_addresses']
+          assert c['old_15_OEM_hooks_preserved']
+          assert c['total_OEM_inbound_hooks']==17
+          assert c['outgoing_external_OEM_targets']==18
+          assert c['candidate_only_crc16']=='0x4bae'
+          assert c['candidate_only_sha256']=='0457448fdfe2da2989fab886c988ab1997fc0b5ba93a69aa2725a2a61e74adc1'
+          assert not c['hardware_chip_gate_dynamic_race_qualified']
+          assert not c['installed_CFS_bootloader_authenticated']
+          assert not c['release_approved']
+          assert c['no_tag_or_Flash_writes_executed']
+          assert c['no_output_firmware_file']
+          assert len(a['offline_secure_sink_emulator_cases'])==6
+          for test in a['offline_secure_sink_emulator_cases']:
+            assert test['returned']==(0xab if test['FM15L013_hw_flag']==1 else 2)
+            assert test['original_OEM_secure_sink_called']==(test['FM15L013_hw_flag']==1)
+            assert not test['global_or_peripheral_writes']
+          assert not a['hardware_write_test_performed']
+          assert not a['CI_releasing_flash_image']
+          print('PASS 2 source-pinned secure sink guards × 3 chip states, no flash, no hardware IO')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
