@@ -747,8 +747,47 @@ jobs:
           assert not m['interrupted_flash_update_recovery_verified']
           assert not m['v323_flash_authorized']
           assert not a['active_hardware_access']
-          print('PASS complete historical 2025 CFS Flash loader+APP vectors/CRC/13 mutants; no flash permission')
+          print('PASS complete historical 2025 CFS Flash loader+APP vectors/CRC/18 mutants; no flash permission')
           PY
+          python cfs_public_2025_loader_update_page_geometry_audit.py \
+            --historic-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-2025-update-FMC-boundary-proof.json >/dev/null
+          python - <<'PYUPDATE'
+          import json
+          with open('/tmp/cfs-2025-update-FMC-boundary-proof.json') as f: a=json.load(f)
+          b=a['archive']
+          assert b['public_historic_full_flash_sha256']=='58b8b90890c08aae81235dd4625fc75ff955e09e82f6c47ee2d74276498bc125'
+          assert b['original_Thumb_update_and_FMC_instructions_checked']==33
+          assert b['original_F0_dispatch_slots_checked']==8
+          assert b['original_Flash_and_SRAM_literals_checked']==8
+          assert b['F0_01_update_entry']=='0x8001e0c'
+          assert b['F0_06_parameter_erase_entry']=='0x8001d5c'
+          assert b['original_update_start_address']=='0x8003000'
+          assert b['original_serial_chunk_size_bytes']==128
+          assert b['original_buffered_FMC_program_bytes']==256
+          assert b['historical_FMC_page_erase_modulus_bytes']==2048
+          assert b['original_other_command_parameter_page_erase_target']=='0x807f800'
+          assert b['original_FMC_density_specific_end_comparison']=='0x807ffff'
+          assert b['historical_update_writer_is_separate_from_parameter_erase_command']
+          assert not b['original_update_writer_has_pinned_parameter_page_protection']
+          assert not b['loaded_CFS_loader_identical_to_archived']
+          assert not b['safe_to_flash_modified_v323']
+          q=a['offline_address_boundary_scenarios']
+          assert q['known_v322']['last_byte_exclusive']=='0x802e7dc'
+          assert q['experimental_v323_snapshot']['last_byte_exclusive']=='0x802e800'
+          assert q['experimental_v323_snapshot']['last_touched_page_index']==92
+          assert not q['experimental_v323_snapshot']['overlaps_reserved_parameter_page']
+          assert not q['exactly_ends_at_param']['overlaps_reserved_parameter_page']
+          assert q['one_byte_of_param']['overlaps_reserved_parameter_page']
+          assert q['one_byte_beyond_flash']['overflows_512KiB_physical_flash']
+          assert len(a['altered_OEM_code_sites_rejected'])==14
+          assert not a['real_bootloader_flash_authorization']
+          assert not a['real_CFS_UART_or_FMC_I_O']
+          assert not a['firmware_or_loader_image_emitted']
+          print('PASS historical loader F0 update flow, FMC page/address protection boundary, 14 offline mutants; NOT flash approved')
+          PYUPDATE
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
