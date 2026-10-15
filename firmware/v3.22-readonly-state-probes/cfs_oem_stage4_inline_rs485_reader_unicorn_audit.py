@@ -75,6 +75,25 @@ OEM_EXPECTED={
     0x08025C40:("ldrb","r0, [r4, #6]"),
     0x08025C42:("cmp","r0, #5"),
     0x08025C46:("cmp","r0, #6"),
+    # Manufacturer stage-4 feed physically drives the hub and has
+    # several explicit stop sites; these are source-level pins only.
+    0x08025C60:("bl","#0x8011164"),
+    0x08025CD0:("bl","#0x8011198"),
+    0x08025D04:("bl","#0x8011198"),
+    0x08025D2E:("bl","#0x8011198"),
+    0x08025D52:("bl","#0x8011198"),
+    0x08011164:("push","{r4, lr}"),
+    0x08011168:("movs","r1, #0"),
+    0x0801116A:("movs","r0, #0x44"),
+    0x0801116C:("bl","#0x8018eec"),
+    0x08011172:("bl","#0x80110b2"),
+    0x0801117C:("b","#0x80110cc"),
+    0x08011198:("push","{r4, lr}"),
+    0x0801119A:("movs","r1, #1"),
+    0x0801119C:("movs","r0, #0x44"),
+    0x0801119E:("bl","#0x8018eec"),
+    0x080111A6:("movs","r0, #0"),
+    0x080111A8:("b","#0x80110cc"),
 }
 
 def instruction_at(app:bytes,pc:int)->tuple[str,str]:
@@ -259,6 +278,11 @@ def negative_source_tests(app:bytes)->list[str]:
         "modified_stage5_compare":0x08025C42,
         "modified_stage6_compare":0x08025C46,
         "modified_stage4_response_route":0x08025CBA,
+        "changed_motor_hub_start_call":0x08025C60,
+        "changed_motor_hub_stop_on_timeout":0x08025CD0,
+        "changed_motor_hub_stop_on_loop_failure":0x08025D04,
+        "changed_motor_brake_deassertion":0x08011168,
+        "changed_motor_brake_assertion":0x0801119A,
     }
     failures=[]
     for name,pc in names.items():
@@ -267,7 +291,7 @@ def negative_source_tests(app:bytes)->list[str]:
         try:verify_instruction_sites(bytes(modified))
         except ValueError:failures.append(name)
         else:raise AssertionError("modified original motor-stage source accepted: "+name)
-    if len(failures)!=13:
+    if len(failures)!=18:
         raise AssertionError("exact source mutations not rejected")
     return failures
 
@@ -294,6 +318,10 @@ def main()->None:
         "original_main_RS485_dispatcher_distinct":hex(OEM_MAIN_RS485_DISPATCH),
         "original_0x57_hooked_main_router":hex(V322_PATCHED_ROUTER),
         "OEM_instruction_sites_verified_across_two_pinned_APPs":len(OEM_EXPECTED),
+        "OEM_stage4_calls_hub_start_before_receive":True,
+        "OEM_stage4_has_four_source_verified_hub_stop_calls":True,
+        "OEM_hub_brake_pin_original_0x44":True,
+        "physical_motor_energized_status_from_brake_signal_verified":False,
         "v313_v322_embedded_receive_behavior_identical":True,
         "embedded_reader_requires_one_plus_eight_serial_bytes_for_sync":True,
         "embedded_reader_returns_stages_5_6_or_0_and_drops_CRC_failure":True,
