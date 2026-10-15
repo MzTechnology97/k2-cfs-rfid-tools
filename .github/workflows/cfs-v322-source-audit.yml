@@ -2100,6 +2100,37 @@ jobs:
           assert not r['firmware_flash_permitted']
           print('PASS 4 motor records, 8 pin map entries, 3 motor direct BL, 94/122 classified, 14 rejects')
           PYTEST
+      - name: Classify 118/122 OEM GPIO BL source patterns, preserve four dynamic pin entries (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_gpio_deeper_indirect_tables_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-gpio-118-direct-call-provenance.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-gpio-118-direct-call-provenance.json') as f: r=json.load(f)
+          s=r['source']
+          assert r['two_OEM_saved_generations_identical']
+          assert s['OEM_direct_GPIO_BL_count']==122
+          assert s['previously_source_classified']==94
+          assert s['new_direct_GPIO_source_classified']==24
+          assert s['total_static_source_classified']==118
+          assert s['remaining_direct_GPIO_BLs_unclassified']==4
+          assert s['still_dynamic_parameter_pin_direct_GPIO_BLs']==[
+              '0x800727c','0x8007298','0x80072e8','0x8007302']
+          assert s['conditional_pin_is_source_value_0x10']
+          assert s['halfword_initial_pin_pairs']==[['0x18','0x19'],['0x1a','0x1b']]
+          assert len(s['ten_pin_initial_values'])==10
+          assert len(s['four_pair_initial_values'])==4
+          assert len(r['negative_scenarios_rejected'])==20
+          assert not s['all_external_dynamic_pin_arguments_are_nonmotor']
+          assert not s['runtime_RAM_equals_initial_values']
+          assert not s['physical_motor_idle_signal_verified']
+          assert not s['MCU_SET_RESET_or_v323_flash_authorized']
+          assert not r['firmware_release_authorized']
+          print('PASS: 118/122 OEM direct GPIO BL source patterns, 4 unknown, 20 negative tests')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
