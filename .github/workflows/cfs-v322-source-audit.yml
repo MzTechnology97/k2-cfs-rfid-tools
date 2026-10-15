@@ -2327,8 +2327,10 @@ jobs:
           assert c['15_outgoing_OEM_Thumb_branches']==15
           assert c['14_incoming_OEM_Thumb_hooks']==14
           assert c['original_prefix_changes_confined_to_old_hooks_and_metadata']
-          assert c['historical_unverified_flash_end']=='0x802e800'
-          assert c['flash_end_headroom_bytes']==0
+          assert c['historical_arbitrary_policy_end_NOT_LOADER_PROVEN']=='0x803b800'
+          assert c['candidate_end_exclusive']=='0x802e800'
+          assert c['last_occupied_2KiB_flash_page']==92
+          assert c['arithmetic_headroom_to_unverified_policy_NOT_CERTIFIED_FREE']==53248
           assert c['new_op']=='0x15'
           assert c['new_read_only_response_layout']=='[0x23,raw_box_oper_state]'
           assert c['no_new_peripheral_reads']
