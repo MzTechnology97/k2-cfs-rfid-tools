@@ -14,6 +14,12 @@ import re
 import struct
 from pathlib import Path
 
+# WARNING 2026-10-12: APP_BASE is a LEGACY ARTIFICIAL ANALYSIS ORIGIN.
+# The SAVED CFS APP is truly linked at 0x08003000. This module's old
+# address/end/page report numbers are not physical measurements and must
+# never be used to justify firmware placement or flashing. Retained only
+# to reproduce old SHA-pinned studies; migrate dependents separately.
+# See cfs_app_real_link_base_audit.py and cfs_v323_corrected_release_gate.py.
 APP_BASE = 0x08010000
 FLASH_START = 0x08000000
 # GD32F303VE: first 256KiB has fast instruction fetch; remaining 256KiB

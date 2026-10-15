@@ -1,3 +1,5 @@
+> **Important correction (2026-10-12):** The saved CFS application binaries are physically linked at **0x08003000**, not **0x08010000**. Consequently this older report's Flash end, occupied page numbers, 36-byte headroom, and claims that the full lower 64 KiB is an unknown loader region are **superseded**. Actual v3.22 end is **0x0802E7DC**, last occupied 2 KiB page **92**, and there are **53,284 arithmetic bytes** below the **unverified** 0x0803B800 policy boundary; they are not certified free. SRAM and motor-safety issues remain open. See [validated corrected release-readiness](CFS_V323_RELEASE_READINESS_20261012.md). Historical raw test outputs below are retained for audit only.
+
 # CFS G32 / application 153 — Phase 2: Flash and RAM map audit
 
 **2026-10-11 — OFFLINE ONLY, no firmware upgrade authorised.**

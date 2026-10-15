@@ -459,6 +459,1512 @@ jobs:
           assert d["static_ROM_does_not_prove_initialized_RAM_content"]
           print("PASS: exact reset scatter descriptors, 5 PWM name fields")
           PY
+      - name: Inspect full manufacturer Thumb scatter opcode stream (diagnostic only)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from capstone import Cs,CS_ARCH_ARM,CS_MODE_THUMB,CS_MODE_LITTLE_ENDIAN
+          from flash_ram_phase2_audit import pinned,APP_BASE
+          b=pinned(Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin"),"running_v322")
+          lo,hi=0x0801016c,0x080101c6
+          c=Cs(CS_ARCH_ARM,CS_MODE_THUMB|CS_MODE_LITTLE_ENDIAN)
+          for i in c.disasm(b[lo-APP_BASE:hi-APP_BASE],lo):
+              print(f"CFS_SCATTER_ARM {i.address:#010x} {i.bytes.hex()} {i.mnemonic} {i.op_str}")
+          PY
+      - name: Verify full APP Thumb decoder control flow and synthetic contract (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_scatter_decoder_contract.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-scatter-contract.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-scatter-contract.json") as f:
+              d=json.load(f)
+          assert d["manufacturer_Thumb"]["full_instruction_count"] == 33
+          assert d["manufacturer_Thumb"]["all_IT_and_branch_instructions_verified"]
+          tests=d["controlled_synthetic_codec_tests"]
+          assert tests["synthetic_tests_total"] == 9
+          assert len(tests["valid"]) == 7
+          assert len(tests["invalid_rejected"]) == 2
+          assert d["actual_saved_stream"]["candidate_decode_rejected"]
+          assert d["actual_saved_stream"]["backref_offset"] == 160
+          assert not d["actual_vendor_bootloader_0x0800316C_authenticated"]
+          assert not d["CFS_PWM_names_recovered"]
+          assert not d["independent_motor_idle_proven"]
+          assert not d["firmware_release_allowed"]
+          print("PASS: all APP Thumb IT/branch instructions and 9 synthetic codec fixtures, real CFS stream rejected")
+          PY
+      - name: Validate bounded APP scatter reference decoder against SHA-pinned v3.22
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_scatter_reference_decoder.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-scatter-candidate.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from flash_ram_phase2_audit import pinned
+          from cfs_scatter_candidate_decompress_audit import mutation_checks
+          with open("/tmp/cfs-scatter-candidate.json") as f:
+              d = json.load(f)
+          image = pinned(Path("CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin"),"running_v322")
+          assert mutation_checks(image)["count"] == 7
+          original = d["source"]
+          assert original["undumped_actual_handler"] == "0x800316c"
+          assert original["candidate_ROM_routine"] == "0x801016c"
+          assert original["candidate_minus_handler"] == "0xd000"
+          info = d["counterfactual_reference_decoder"]
+          assert not info["candidate_algorithm_matches_source"]
+          assert info["rejection_reason"] == (
+              "invalid backwards reference to uninitialized output"
+          )
+          bad = info["deterministic_failure"]
+          assert (bad["token"], bad["src_bytes"], bad["decoded_len"],
+                  bad["offset"]) == (2, 14, 10, 160)
+          assert not info["five_candidate_objects"]
+          assert info["no_real_device_name_recovered"]
+          assert not info["counterfactual_decompression_succeeded"]
+          assert not info["real_bootloader_decompressor_executed"]
+          assert not d["physical_CFS_accessed"]
+          assert not d["actual_runtime_pwm1_name_pointer_proven"]
+          assert not d["independent_motor_stop_proven"]
+          assert not d["expanded_v323_firmware_safe_to_flash"]
+          print("PASS: reject incompatible APP decoder / 7 CRC-valid mutants, no fabricated names")
+          PY
+      - name: Compare archived original CFS GD32 bootloader and RAM forensic snapshot (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          set -eu
+          # Public read-only 2025 data, from independent earlier CFS firmware.
+          curl -fsSL --retry 3 --max-time 45 \
+            -o /tmp/cfs-2025-original-flash.bin \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/main/reversing/live_dumps/0x0800_0000.bin
+          curl -fsSL --retry 3 --max-time 30 \
+            -o /tmp/cfs-2025-original-ram.bin \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/main/reversing/live_dumps/0x2000_0000_trunc.bin
+          python cfs_historical_bootloader_compare.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-public-bootloader-v322-compare.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-public-bootloader-v322-compare.json") as f:
+              d=json.load(f)
+          assert d["public_flash_integrity"]["git_blob_sha1"] == \
+              "44e2d48a144356c1ae2b3fe0b4e23175c050e28e"
+          assert d["public_RAM_integrity"]["git_blob_sha1"] == \
+              "80e1103c16dd5e17ddf5c84af6e976ad14bd0d38"
+          a=d["analysis"]
+          assert a["decompressor_total_bytes_compared"] == 92
+          assert a["zeroinit_total_bytes_compared"] == 32
+          assert len(a["historical_dump_five_fields_at_v322_offsets_UNVERIFIED"]) == 5
+          assert not a["deployed_CFS_bootloader_identity_verified"]
+          assert not a["actual_pwm1_runtime_callback_proven"]
+          assert not a["independent_motor_feedback_proven"]
+          assert not a["firmware_flash_safe"]
+          assert not d["any_firmware_flashing"]
+          print("PASS: historical CFS G32 bootloader diff and private name-field bounds checked; hardware remains unchanged")
+          PY
+          python cfs_scatter_two_generation_input_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-two-generation-scatters.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-two-generation-scatters.json") as f:
+              d=json.load(f)
+          assert d["old_scatter_source_bytes"] == 600
+          assert d["old_scatter_output_bytes"] == 2844
+          assert d["new_scatter_source_bytes"] == 716
+          assert d["new_scatter_output_bytes"] == 3012
+          assert d["same_bytes_at_historical_bootloader_vs_APP_candidate"]
+          assert not d["public_original_2025"]["any_device_names_authenticated"]
+          assert not d["current_saved_APP_v322"]["any_device_names_authenticated"]
+          assert not d["actual_deployed_bootloader_verified"]
+          assert not d["physical_CFS_access"]
+          assert not d["motor_safety_release_authorized"]
+          print("PASS: pinned old vs new CFS stream under same 92-byte decoder, no live claims")
+          PY
+          python cfs_historical_pwm_name_xrefs.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --public-ram /tmp/cfs-2025-original-ram.bin \
+            --json-out /tmp/cfs-original-2025-pwm-names.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-original-2025-pwm-names.json") as f:
+              d=json.load(f)
+          assert d["historic_compressed_stream_decoded"]
+          assert d["legacy_source_consumed"] == 599
+          assert d["legacy_synthetic_data_size"] == 2844
+          assert {x["name"] for x in d["five_ROM_names"]} == {
+              "pwm1", "pwm3", "pwm4", "pwm5", "pwm8"
+          }
+          assert not d["layout_safely_transferable_to_v322"]
+          assert not d["real_v322_PWM1_callback_known"]
+          assert not d["live_CFS_hardware_access"]
+          assert not d["motor_stop_feedback_proven"]
+          print("PASS: original older CFS PWM ROM-name xref scan against independently decoded SRAM, never confuse with v3.22")
+          PY
+          python cfs_pwm_callback_crossgen_static_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-callback-2025-v322.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-callback-2025-v322.json") as f:
+              d=json.load(f)
+          assert d["historical_authenticated_runtime_pointer"] == "0x8014555"
+          assert d["v322_original_constructor_callback_pointer"] == "0x801939d"
+          assert d["historical"]["instruction_count"] >= 12
+          assert d["v322"]["instruction_count"] >= 12
+          assert not d["callback_equivalence_proven"]
+          assert not d["actual_v322_pwm1_name_association_proven"]
+          assert not d["physical_motor_stop_proven"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: historical vs current PWM callback Thumb disassembly for review only")
+          PY
+          python cfs_startup_reachability_audit.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-reset-path-analysis.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-reset-path-analysis.json") as f: d=json.load(f)
+          assert d["v313"]["vector_points_into_saved_image"]
+          assert d["v322"]["vector_points_into_saved_image"]
+          assert d["historical_raw_flash"]["vector_points_into_saved_image"]
+          assert d["v313"]["vector_reset_thumb"] == "0x801a969"
+          assert d["v322"]["vector_reset_thumb"] == "0x801a969"
+          assert d["v322"]["startup_code"][0]["op"] == "add.w"
+          assert d["v322"]["startup_code"][0]["args"] == "r0, r5, r5, lsl #3"
+          assert not d["current_APP_entry_has_normal_reset_handler_prologue_VERIFIED"]
+          assert not d["current_APP_source_is_known_to_execute_scatter_descriptors"]
+          assert d["exact_early_application_vector_pair_same_v313_v322"]
+          assert not d["data_scatter_table_proves_executed_startup_path"]
+          assert not d["actual_CFS_reset_observed"]
+          assert not d["release_approved"]
+          print("PASS: v3.13/v3.22 verified reset vectors, historic reset entry inspected offline")
+          PY
+          python cfs_pwm_historical_callback_shim_identity.py \
+            --public-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-historical-callback-shim-diff.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-historical-callback-shim-diff.json") as f:
+              d=json.load(f)
+          assert d["history_common_callback_ptr"]=="0x8014555"
+          assert d["v322_extended_shim_entry"]=="0x802639d"
+          assert d["v322_unrelated_constructor_callback_literal"]=="0x801939d"
+          assert d["historical_function"]["full_function_bytes"] == 40
+          assert d["v322_function"]["full_function_bytes"] == 40
+          assert d["historical_function"]["opcode_count"] == 19
+          assert d["v322_function"]["opcode_count"] == 19
+          assert d["exact_40_original_Thumb_bytes_identical"]
+          assert d["original_byte_difference_count"] == 0
+          assert d["v313_exact_extended_shim_matches_v322"]
+          assert d["v313_extended_shim_matches_old_historical_callback"]
+          assert d["historical_static_ROM_Thumb_ptr_literals"] == ["0x8014a20"]
+          assert not d["v322_static_ROM_Thumb_ptr_literals"]
+          assert d["v322_other_constructor_Thumb_ptr_literals"] == ["0x8026868"]
+          assert not d["v322_registered_pwm1_callback_proven"]
+          assert not d["actual_physical_motor_stop_feedback_proven"]
+          assert not d["safe_for_v323_firmware_release"]
+          assert not d["live_CFS_queried"]
+          print("PASS: old authenticated PWM callback and v3.22 extended shim compared without equating to live driver")
+          PY
+          python cfs_pwm_callback_literal_provenance.py \
+            --historical-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-callback-registration-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-callback-registration-provenance.json") as f:
+              d=json.load(f)
+          assert d["old_original_ROM_callback_thumb_ptr"] == "0x8014555"
+          assert d["modern_constructor_callback_thumb_ptr"] == "0x801939d"
+          assert d["original_constructor_32_byte_window_old_vs_v322_identical"]
+          assert d["original_constructor_v313_v322_32_byte_window_identical"]
+          assert d["old_v322_constructor_byte_differences"] == 0
+          assert d["constructor_old_sha256"] == d["constructor_v322_sha256"]
+          assert d["constructor_old_sha256"] == (
+              "dc05fd17e099777114f4fd59d56f8db95c291ecbc95ec514d8666f748c4edb86"
+          )
+          assert d["modern_constructor_writes_plus_0x38_at"] == "0x8026470"
+          assert d["v313_and_v322_PC_relative_load_sites_equal"]
+          assert d["older_original_PC_relative_load_candidates"]
+          assert d["modern_original_PC_relative_load_candidates"]
+          assert not d["modern_name_to_object_binding_proven"]
+          assert not d["modern_callback_0x0801939D_standard_entry_proven"]
+          assert not d["safe_motor_active_hook_proven"]
+          assert not d["independent_rotor_idle_proven"]
+          assert not d["v323_release_authorized"]
+          print("PASS: original callback literal callsite provenance, runtime PWM1 identity unresolved")
+          PY
+          rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
+      - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_scatter_v313_v322_source_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-v313-v322-scatter-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-v313-v322-scatter-provenance.json") as f: d=json.load(f)
+          assert d["same_original_first_scatter_descriptor"]
+          assert d["input_length"] == 716
+          assert d["searched_relative_offset_range"] == [-2048,2048]
+          assert d["input_changed_byte_count"] == 0
+          assert d["v313_input_SHA256"] == d["v322_input_SHA256"] == (
+              "6c798b603b4139169f60d03cc7d1be58444f6514d2a7f077230ebd5269e27a66"
+          )
+          assert not d["candidate_full_decodes"]
+          for version in ("v313","v322"):
+              check=d[version+"_candidate_decode"]
+              assert not check["valid"]
+              assert check["reason"] == "uninitialized_backreference"
+              assert (check["state"]["tokens"],check["state"]["source_consumed"],
+                      check["state"]["output_written"],check["state"]["distance"]) == (
+                  2,14,10,160
+              )
+          assert not d["no_assumed_runtime_name_mapping"] is False
+          assert not d["safe_to_write_while_motor_active"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: source provenance and bounded alignment hypotheses, no operational implications")
+          PY
+      - name: Verify manufacturer callback entry provenance v3.13 vs v3.22 (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_callback_entry_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-callback-entry.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-callback-entry.json") as f: d=json.load(f)
+          assert d["original_callback_pointer_unchanged"]
+          assert d["near_callback_code_window_bytes_unchanged"]
+          assert d["version_313"]["callback_pointer_literal"] == "0x801939d"
+          assert d["version_322"]["callback_pointer_literal"] == "0x801939d"
+          assert not d["valid_independent_callback_entry_behavior_PROVEN"]
+          assert not d["historical_callback_equivalence_PROVEN"]
+          assert not d["actual_motor_stop_feedback_proven"]
+          assert not d["safe_to_flash_v323"]
+          assert not d["live_hardware_touched"]
+          print("PASS: callback code entry provenance, no production assumptions")
+          PY
+      - name: Verify five-device +0x38 callback entry stack ABI risk (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_callback_entry_abi_sanity.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-callback-frame.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-callback-frame.json") as f: d=json.load(f)
+          assert d["code_byte_identical_across_two_versions"]
+          v=d["v322"]
+          assert v["constructor_literal"] == "0x801939d"
+          assert v["thumb_entry"] == "0x801939c"
+          assert v["instruction_count"] == 12
+          assert not v["has_local_entry_push"]
+          assert v["returns_with_callee_stack_POP"]
+          assert not v["independent_AAPCS_entry_safety_proven"]
+          assert not v["normal_BX_dispatch_to_this_exact_object_proven"]
+          assert not v["actual_motor_idle_sensing_proven"]
+          assert not d["callback_ABI_compatibility_verified"]
+          assert d["do_not_install_motor_guard_on_this_unverified_address"]
+          print("PASS: 12 actual Thumb instructions indicate nonstandalone callback ABI, no firmware hook")
+          PY
+      - name: Emulate questionable +0x38 PWM callback under synthetic AAPCS entry (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_callback_synthetic_abi_probe.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-callback-synthetic-abi.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-callback-synthetic-abi.json") as f:
+              d=json.load(f)
+          assert d["original_v313_and_v322_results_match"]
+          assert len(d["cases"]) == 2
+          assert [x["synthetic_case"] for x in d["cases"]] == [
+              "matching_checksum","mismatching_checksum"
+          ]
+          assert [x["return_value"] for x in d["cases"]] == ["0x0","0xf4"]
+          assert all(x["stack_return_address_used"] for x in d["cases"])
+          assert all(not x["independent_LR_return_address_used"] for x in d["cases"])
+          assert all(x["caller_stack_bytes_consumed"] == 16 for x in d["cases"])
+          assert not d["normal_direct_AAPCS_callback_contract_proven"]
+          assert not d["actual_RTThread_calling_context_proven"]
+          assert not d["real_PWM1_device_callback_binding_proven"]
+          assert not d["physical_motor_idle_signal_proven"]
+          assert not d["safe_to_hook_or_flash_v323"]
+          assert not d["real_device_or_serial_accessed"]
+          print("PASS: synthetic call entered 0x0801939D, original POP returned via caller-stack PC not LR")
+          PY
+      - name: Assert original three-operation-pointer constructor and checksum fallthrough (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_constructor_three_pointer_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-three-constructor-ops.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-three-constructor-ops.json") as f: d=json.load(f)
+          x=d["original_provenance"]
+          sites=x["original_constructor_three_literal_writes"]
+          assert [s["object_field"] for s in sites]==["0x30","0x34","0x38"]
+          assert [s["stored_thumb_pointer"] for s in sites]==[
+              "0x80193c5","0x8019401","0x801939d"
+          ]
+          assert x["plus38_entered_after_two_preregister_loads_by_sequential_flow"]
+          assert x["all_three_original_constructor_pointers_reach_sequential_code_interiors"]
+          assert x["plus30_predecessor"].startswith("0x080193C2")
+          assert x["plus34_predecessor"].startswith("0x080193FC")
+          assert x["plus38_returns_by_pop_from_an_earlier_stack_frame"]
+          assert d["same_v313_and_v322"]
+          assert not x["constructor_code_proves_which_named_pwm_instance"]
+          assert not x["normal_AAPCS_direct_entry_proven"]
+          assert not x["caller_stack_preparation_proven"]
+          assert not x["actual_motor_idle_feedback_proven"]
+          assert x["do_not_patch_ROM_or_hook_callback"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: three original constructor pointers and unsafe standalone +0x38 fallthrough invariant")
+          PY
+      - name: Prove physical APP link base and decode original PWM SRAM correctly (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_app_real_link_base_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-app-link-base.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-app-link-base.json") as f: d=json.load(f)
+          assert d["same_ROM_names_and_three_callbacks_both_versions"]
+          for key in ["v313","v322"]:
+              x=d["analysis"][key]
+              assert x["corrected_LINK_BASE"]=="0x8003000"
+              assert x["difference_bytes"]==0xD000
+              assert x["decompression"]["valid"]
+              assert x["five_names_in_expected_historical_order_proven"]
+              assert [v["decoded_name"] for v in x["five_PWM_RAM_name_fields"]]==[
+                 "pwm1","pwm3","pwm4","pwm5","pwm8"
+              ]
+              assert not x["real_bootloader_content_on_user_MCU_authenticated"]
+              assert not x["actual_live_CFS_RAM_read"]
+              assert not x["v323_firmware_release_allowed"]
+          print("PASS: corrected original 0x08003000 link base with scatter SRAM and 5 PWM names")
+          PY
+      - name: Gate v3.23 release using CORRECT physical 0x08003000 APP map (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_corrected_release_gate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-v323-release-gate.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-v323-release-gate.json") as f: d=json.load(f)
+          f=d["flash"]; g=d["gates"]
+          assert f["actual_app_link_base"]=="0x8003000"
+          assert f["actual_v322_APP_end_exclusive"]=="0x802e7dc"
+          assert f["actual_last_2KiB_page_index"]==92
+          assert f["old_incorrect_last_2KiB_page_index"]==118
+          assert f["old_incorrect_bytes_to_policy"]==36
+          assert f["corrected_bytes_to_arbitrary_old_policy_NOT_CERTIFIED_FREE"]==53284
+          assert len(d["required_release_gates"])==9
+          assert d["required_gates_met"]==0
+          assert not d["approve_v323_firmware_flash"]
+          assert not d["approve_v323_motor_active_writes"]
+          assert not d["performed_device_or_CM5_actions"]
+          assert not d["modified_original_firmware_bytes"]
+          print("PASS: corrected physical page=92, +53284B arithmetic only; v3.23 MCU flash safety BLOCKED")
+          PY
+      - name: Flag nominal-vs-physical v3.22 builder addresses before any v3.23 release (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v322_builder_address_space_audit.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --builder build-v3_22.py --handler handler-v3_22.S \
+            --linker link.ld --json-out /tmp/cfs-builder-link-base-review.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-builder-link-base-review.json") as f: d=json.load(f)
+          assert d["nominal_minus_physical_bytes"]==0xD000
+          assert d["validated_vendor_APP_link_origin"]=="0x8003000"
+          assert d["actual_physical_handler_location_if_APP_starts_at_verified_base"]=="0x802de38"
+          assert d["verified_physical_saved_APP_end_exclusive"]=="0x802e7dc"
+          assert d["outside_saved_vendor_APP_reference_count"]>=1
+          assert any(x["symbol"]=="STOCK_MEMCMP" for x in d["out_of_image_references"])
+          assert not d["external_absolute_references_AUTOMATICALLY_relocated"]
+          assert not d["may_flash_or_change_runtime_motor_guard"]
+          print("PASS: corrected Flash base, unverified builder absolute symbol entries remain a release blocker")
+          PY
+      - name: Reject MCU motor-busy false-idle and race cases in model (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_busy_guard_contract.py \
+            --handler handler-v3_22.S \
+            --json-out /tmp/cfs-motor-busy-interlock-model.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-busy-interlock-model.json") as f: d=json.load(f)
+          assert set(d["current_handler_paths"]) == {
+              "op_config_v2_set", "op_config_v2_reset"
+          }
+          assert all(x["box_state_only_guard_sequence_found"] for x in d["current_handler_paths"].values())
+          assert d["synthetic_tests_passed"] == 10
+          assert sum(x["candidate_accepts_in_simulation"] for x in d["tests"]) == 1
+          assert next(x for x in d["tests"] if x["case"] == "real_observed_box_idle_during_feeding")["candidate_accepts_in_simulation"] is False
+          for key in ("real_feeder_hub_buffer_feedback_source_authenticated",
+                      "motor_start_and_ISR_coverage_proven",
+                      "atomic_write_commit_implemented_in_MCU",
+                      "release_gate_9_independent_motor_stop_PROVEN",
+                      "real_v323_flash_or_motor_writes_authorized",
+                      "performed_CFS_or_CM5_IO"):
+              assert d[key] is False
+          print("PASS: 10 fail-closed motor activity/epoch/ISR fixtures, real MCU interlock remains blocked")
+          PY
+      - name: Rebase 102 original motor BL sites to physical Flash PCs (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_command_real_address_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-real-addresses.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-real-addresses.json") as f: d=json.load(f)
+          x=d["v322"]
+          assert d["versions_same_physically_rebased_callgraph"]
+          assert x["real_APP_link_base"]=="0x8003000"
+          assert x["corrected_PC_delta"]==-0xD000
+          assert x["physical_rebased_BL_count"]==102
+          assert [x[k] for k in ("physical_forward_BL","physical_reverse_BL",
+                   "physical_zero_command_BL","physical_direct_controller_BL")] == [33,17,50,2]
+          assert x["corrected_common_controller_PC"]=="0x80110cc"
+          assert not x["physical_encoder_idle_feedback_proven"]
+          assert not x["covers_other_indirect_or_async_motion_paths"]
+          assert not x["safe_to_authorize_MCU_writes"]
+          assert not d["v323_flash_release_authorized"]
+          print("PASS: 102 original CFS motor BLs rebased and verified at physical Flash PCs")
+          PY
+      - name: Validate five original GD32 PWM GPIO alternate-function pin descriptors (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_gpio_af_pinmap_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gd32-pwm-af-gpio.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gd32-pwm-af-gpio.json") as f: d=json.load(f)
+          assert d["same_for_v313_and_v322"]
+          x=d["v322"]; m=x["OEM_PWM_descriptors"]
+          assert [x["RTThread_PWM_name"] for x in m] == ["pwm1","pwm3","pwm4","pwm5","pwm8"]
+          assert [x["gpio_pin"] for x in m] == ["E13","D12","D13","D15","D14"]
+          assert [x["pin_mask"] for x in m] == ["0x2000","0x1000","0x2000","0x8000","0x4000"]
+          assert x["original_GPIO_init_mode_value"]=="0x18"
+          assert x["mode_per_GD32F30x_header"]=="GPIO_MODE_AF_PP"
+          assert x["GD32F30x_GPIO_init_speed_value"]==3
+          assert x["mutations_rejected_count"]==5
+          assert len(x["original_Thumb_instruction_pins"])==13
+          assert [y["timer"] for y in x["original_TIMER0_and_TIMER3_ROM_references"]]==[
+             "TIMER0","TIMER3","TIMER0","TIMER3"
+          ]
+          assert not x["TIMER0_or_TIMER3_counter_enable_proves_rotor_stop"]
+          assert not x["timer_peripheral_register_reads_performed"]
+          assert not x["actual_TIMER_instance_or_channel_identified"]
+          assert not x["motor_physical_stopped_detected"]
+          assert not x["safe_MCU_SET_RESET_interlock_found"]
+          assert not d["active_CFS_access"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: five manufacturer PWM AF-output GPIO pins; no physical motor stop claim")
+          PY
+      - name: Map five CFS GPIO pin descriptors and MCU motor duty command shadows (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_motor_command_shadow_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-shadow-audit.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-shadow-audit.json") as f: d=json.load(f)
+          x=d["v322"]
+          assert d["original_v313_matches"]
+          assert [(p["name"],p["gpio_bank"],p["pin"]) for p in x["complete_PWM_devices"]] == [
+              ("pwm1","GPIOE",13), ("pwm3","GPIOD",12),
+              ("pwm4","GPIOD",13), ("pwm5","GPIOD",15),
+              ("pwm8","GPIOD",14)]
+          assert x["motor_command_shadow_Current"] == "0x20004a1a"
+          assert x["motor_command_shadow_Previous"] == "0x20004a1c"
+          assert x["motor_shadow_flags_written"] == ["0x20004990","0x20004994"]
+          assert x["verified_instruction_count"] == 27
+          assert not x["command_zero_is_physical_STOP_proven"]
+          assert not x["gpio_pin_is_real_motion_feedback_proven"]
+          assert not x["full_feeder_hub_ISR_coverage_proven"]
+          assert not x["motor_stopped_race_free_guard_proven"]
+          assert not d["physical_CFS_motor_feedback_authenticated"]
+          assert not d["v323_flash_safe"]
+          print("PASS: v3.13/v3.22 five original GPIO pins + software duty shadows pinned, NO physical stop proof")
+          PY
+      - name: Prove CFS PWM 0x1E04 and 0x1E05 return constants, NOT motor-stop feedback (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_control_status_not_motor_feedback.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-reply-is-not-motor-status.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-reply-is-not-motor-status.json") as f: d=json.load(f)
+          v=d["v322"]
+          assert d["pwm_control_dispatch_equal_in_v313_v322"]
+          assert len(v["pinned_Thumb_sites"]) == 22
+          p=v["synthetic_original_opcode_probes"]
+          assert [(i["request"],i["caller_buffer_plus_0x14"],i["hardware_MMIO_read_count"]) for i in p] == [
+              ("0x1e04",1,0),("0x1e05",0,0)
+          ]
+          assert not v["1E04_1E05_reads_physical_motor_feedback"]
+          assert not v["1E02_indirect_driver_hardware_behavior_proven"]
+          assert not v["GPIO_or_encoder_motor_IDLE_signal_proven"]
+          assert not v["v323_MCU_motor_busy_guard_implemented"]
+          assert not v["v323_flash_approved"]
+          assert not d["hardware_motor_STOP_confirmed"]
+          assert not d["real_CFS_CM5_accessed"]
+          print("PASS: 1E04/1E05 control replies are constants; cannot certify physical motor stop")
+          PY
+      - name: Trace CFS original PWM 0x1E02 request to real backing driver WITHOUT executing MMIO
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_backing_driver_entry_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-pwm-backing-driver.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-pwm-backing-driver.json") as f: d=json.load(f)
+          x=d["v322"]
+          assert d["v313_equal"]
+          assert x["original_initialized_RAM_root"]=="0x20000758"
+          assert x["original_initialized_RAM_driver_Thumb_pointer"]=="0x801b395"
+          assert x["original_real_driver_PC"]=="0x801b394"
+          assert x["RTThread_control_opcode"]=="0x1e02"
+          assert x["synthetic_original_Thumb_reaches_driver_entry"]
+          assert not x["backing_driver_body_was_executed"]
+          assert len(x["first_decoded_original_driver_instructions"])>=3
+          assert not x["driver_register_or_GPIO_feedback_semantics_proven"]
+          assert not d["physical_motor_active_feedback_proven"]
+          assert d["no_hardware_MMIO_executed"]
+          assert d["no_real_CFS_or_Kalico_modified"]
+          assert d["no_firmware_flash_approved"]
+          print("PASS: 0x1E02 request reaches authentic backend 0x0801B394; hardware feedback remains unknown")
+          PY
+      - name: Classify original CFS motor GPIO pins and command status without assuming rotor stop
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_gpio_signal_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-gpio-provenance.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-gpio-provenance.json") as f: d=json.load(f)
+          assert d["both_original_firmwares_identical"]
+          x=d["v322"]
+          assert [item["name"] for item in x["named_GPIO_port_pin"]] == [
+              "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert [item["nominal_GPIO"] for item in x["named_GPIO_port_pin"]] == [
+              "PE13","PD12","PD13","PD15","PD14"
+          ]
+          q=x["hardware_and_cached_signal_routines"]
+          assert q["motor_command_controller_at"] == "0x080110CC"
+          assert q["command_flag_RAM"] == "0x2000499c"
+          assert q["separate_float_RAM"] == "0x2000498c"
+          assert len(q["original_command_flag_query_callers"]) == 3
+          assert not q["flag_proven_to_be_actual_motor_rotor_stop"]
+          assert not q["GPIO_input_proven_connected_to_motor_feedback"]
+          assert not q["float_proven_independent_encoder_feedback"]
+          assert not x["motor_stop_safeguard_can_be_enabled"]
+          assert not x["all_motor_paths_and_ISRs_covered"]
+          assert not d["actual_installed_CFS_RAM_or_GPIO_read"]
+          assert not d["v323_firmware_flash_release_allowed"]
+          print("PASS: five original PWM GPIO port/pin names; RAM command status distinct from motor feedback")
+          PY
+      - name: Trace original GPIO IRQ pulse producer and sampler, reject stalled motor case (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_pulse_irq_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-pulse-irq.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-pulse-irq.json") as f: d=json.load(f)
+          assert d["same_original_GPIO_irq_counter_and_sampler_both_versions"]
+          a=d["v322"]
+          assert a["genuine_PIN_ID_for_GPIO_interrupt"]=="0x4b"
+          assert a["resolved_interrupt_GPIO_pin"]=="PE11"
+          assert [p["physical_pin"] for p in a["original_board_GPIO_mapping"]] == ["PE3","PE4","PE11"]
+          assert [p["one_hot_mask"] for p in a["original_board_GPIO_mapping"]] == ["0x8","0x10","0x800"]
+          assert a["RT_Thread_upstream_mode_2_corresponds_to_input_pullup"]
+          assert a["RT_Thread_upstream_irq_mode_1_corresponds_to_falling_edge"]
+          assert not a["OEM_actual_falling_edge_or_external_sensor_verified_on_device"]
+          assert a["saved_IRQ_callback_Thumb"]=="0x8010fdd"
+          assert a["original_counter_RAM"]=="0x20004990"
+          assert a["sampled_previous_counter_RAM"]=="0x20004994"
+          assert a["sampled_difference_float_RAM"]=="0x2000498c"
+          assert a["software_activity_flag_RAM"]=="0x2000499c"
+          assert a["counter_increment_reachable_by_configured_GPIO_callback"]
+          assert len(a["pinned_original_thumb_instructions"]) >= 25
+          assert d["synthetic_test_count"]==6
+          assert not any(x["write_approved"] for x in d["fail_closed_stalled_motor_and_pulse_cases"])
+          assert not a["physical_pulse_occurrence_measured_on_user_CFS"]
+          assert not a["pin_0x4B_verified_as_encoder_not_filament_or_other_sensor"]
+          assert not a["covers_feeder_hub_buffer_and_async_tasks"]
+          assert not a["zero_pulses_prove_motor_stopped"]
+          assert not a["MCU_WRITE_interlock_safe_to_activate"]
+          assert not d["MCU_motor_guard_verified"]
+          print("PASS: pinned GPIO IRQ registration, pulse counter, derived metric, stalled motor rejected")
+          PY
+      - name: Resolve five CFS GPIO/PWM objects and bound candidate motor status byte (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_gpio_and_motor_status_provenance.py \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-motor-signal.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-motor-signal.json") as f: d=json.load(f)
+          assert d["corrected_saved_APP_base"] == "0x8003000"
+          assert [x["name"] for x in d["objects"]] == [
+              "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert [x["GPIO_port_name"]+str(x["GPIO_pin_number"]) for x in d["objects"]] == [
+              "GPIOE13","GPIOD12","GPIOD13","GPIOD15","GPIOD14"
+          ]
+          assert d["motor_RAM_root_from_original_PC_literal"] == "0x20004960"
+          assert d["motor_possible_status_or_timeout_byte"] == "0x2000499c"
+          assert len(d["getter_3_verified_BL_call_sites"]) == 3
+          assert d["software_countdown_semantics_proven"]
+          assert d["software_countdown_read_PC"] == "0x8010ebe"
+          assert d["software_countdown_subtract_one_PC"] == "0x8010ec4"
+          assert d["software_countdown_writeback_PC"] == "0x8010ed4"
+          assert not d["counter_zero_proves_all_rotors_stopped"]
+          assert d["getter_return_when_byte_nonzero"] == 0
+          assert d["getter_return_when_byte_zero"] == 1
+          assert d["pinned_instruction_count"] >= 32
+          assert not d["GPIO_READ_helper_direct_motor_feedback_proven"]
+          assert not d["all_motors_and_ISR_paths_covered_proven"]
+          assert not d["byte_represents_hardware_encoder_or_rotor_stop_proven"]
+          assert not d["can_authorize_volatile_MCU_SET_RESET"]
+          assert not d["can_authorize_flash_v323"]
+          print("PASS: five GPIO PWM objects and three callers of motor software byte, NO MCU safety claim")
+          PY
+      - name: Confirm OEM TIMER0/TIMER3 AFIO mux code and original register writes (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_timer_afio_remap_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-timer-afio-remap.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-timer-afio-remap.json") as f: d=json.load(f)
+          assert d["same_oem_AFIO_code_on_v313_and_v322"]
+          a=d["v322"]
+          assert a["AFIO_PCF0_physical_register"]=="0x40010004"
+          assert a["AFIO_PCF0_original_RMW_instructions_pinned"]
+          assert len(a["verified_manufacturer_thumb_instructions"]) >= 20
+          paths=a["two_OEM_mux_configuration_paths"]
+          assert [x["original_gpio_pin_remap_config_argument_r0"] for x in paths] == ["0x1000","0x1600c0"]
+          assert [x["original_selector_r6_plus_0x18"] for x in paths] == [1,2]
+          assert [x["required_AFIO_PCF0_bits"] for x in paths] == ["0x1000","0xc0"]
+          assert a["TIMER0_full_remap_requested_in_original_code"]
+          assert a["TIMER3_remap_requested_in_original_code"]
+          assert not a["live_AFIO_and_TIMER_channel_configuration_read"]
+          assert not a["motor_energized_state_independently_known"]
+          assert not a["motor_active_MCU_WRITE_safe"]
+          assert not a["v323_flash_approved"]
+          assert not d["active_CFS_or_Kalico_modified"]
+          print("PASS: two manufacturer timer remap paths pinned, live motor idle still UNKNOWN")
+          PY
+      - name: Prove all 5 OEM TIMER channel compare and output-enable register offsets (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_pwm_timer_channel_register_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-timer-five-channel-map.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-timer-five-channel-map.json") as f: d=json.load(f)
+          assert d["same_original_five_timer_channel_bases_both_versions"]
+          x=d["v322"]
+          assert x["OEM_peripheral_timer_selectors_and_channel_indices_proven"]
+          assert x["verified_manufacturer_Thumb_count"]>=25
+          pins=x["full_oem_timer_channel_register_map"]
+          assert [v["TIMER_channel"] for v in pins] == [
+             "TIMER0_CH2","TIMER3_CH0","TIMER3_CH1","TIMER3_CH3","TIMER3_CH2"
+          ]
+          assert [v["original_channel_compare_register"] for v in pins] == [
+             "0x40012c3c","0x40000834","0x40000838","0x40000840","0x4000083c"
+          ]
+          assert [v["channel_output_enable_bit"] for v in pins] == [256,1,16,4096,256]
+          assert x["original_pwm_init_calls_output_state_helper_with_zero"]
+          assert not x["independent_rotor_stop_sensor_identified"]
+          assert not x["driver_enable_all_motors_verified"]
+          assert x["no_duty_or_channel_enable_bit_is_valid_STOP_proof"]
+          assert not x["safe_MCU_SET_RESET_interlock_implemented"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["real_CFS_or_Kalico_touched"]
+          fixtures=d["synthetic_channel_enable_safety_fixtures"]
+          assert len(fixtures)==6
+          assert [len(x["active_manufacturer_PWM_outputs"]) for x in fixtures]==[1,1,1,1,1,0]
+          assert all(not x["interlock_write_permission"] for x in fixtures)
+          assert all(not x["genuine_driver_or_encoder_stop_measured"] for x in fixtures)
+          print("PASS: OEM five channel CCR/CHCTL2 addresses + six fail-closed masks, no physical idle proof")
+          PY
+      - name: Cross-verify OEM PWM+PE11 evidence, reject all 16 synthetic motor-stop claims (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_multisignal_observation_plan.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-multisignal-observation.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-multisignal-observation.json") as f: d=json.load(f)
+          x=d["original_signal_manifest"]
+          assert d["v313_equals_v322"]
+          assert x["unique_timer_channel_pairs"]==5
+          assert x["gpio_pulse_input"]=="PE11"
+          assert x["pulse_counter_RAM"]=="0x20004990"
+          assert x["afio_remap_register"]=="0x40010004"
+          assert [p["device"] for p in x["pwm_command_output_registers"]]==[
+            "pwm1","pwm3","pwm4","pwm5","pwm8"
+          ]
+          assert d["safety_cases_executed"]==16
+          assert len(d["synthetic_safety_cases"])==16
+          assert not any(v["MCU_SET_RESET_permission"] for v in d["synthetic_safety_cases"])
+          assert not any(v["physical_motor_STOPPED_proven"] for v in d["synthetic_safety_cases"])
+          assert next(v for v in d["synthetic_safety_cases"] if v["case"]=="uint32_pulse_wrap")["modulo_uint32_gpio_pulse_delta"]==3
+          assert next(v for v in d["synthetic_safety_cases"] if v["case"]=="all_hypothetically_quiet_still_unqualified")["reason"]=="physical_standstill_and_atomic_commit_not_proven"
+          assert not d["physical_motor_sensors_authenticated"]
+          assert not d["all_motor_driver_and_ISR_owners_recovered"]
+          assert not d["MCU_motion_interlock_implemented"]
+          assert not d["safe_to_flash_extended_v323"]
+          assert not d["real_CFS_CM5_Kalico_interacted"]
+          print("PASS: pinned 5 PWM command channels + PE11 pulse producer, 16 synthetic fails closed")
+          PY
+      - name: Verify public historical CFS PCB PE11 tach + 4 brushed current pins against OEM ROM (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          curl -fsSL --retry 3 --max-time 30 \
+            -o /tmp/cfs-public-historical-PCBs.md \
+            https://raw.githubusercontent.com/fake-name/cfs-reverse-engineering/21f9a813654b1feb6ba8597f0f48ed4650f51f3d/PCBs.md
+          python cfs_historical_pcb_motor_pinout_crosswalk.py \
+            --pcb-md /tmp/cfs-public-historical-PCBs.md \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-public-board-and-oem-crosswalk.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-public-board-and-oem-crosswalk.json") as f: d=json.load(f)
+          assert d["independent_source_integrity"]["upstream_PCB_doc_git_blob_sha1"] == (
+              "8a8345e299e48221f3b4859e8a0d34eefb95672c")
+          assert d["pinned_v313_and_v322_original_ROM_crosswalk_equal"]
+          assert d["historical_PCB_pinout"]["historical_bldc"] == {
+              "SS":"PE4","FG":"PE11","F/R":"PE3","PWM":"PE13"}
+          assert d["tampered_historical_PCB_pinout_cases_rejected"]==2
+          assert len(d["synthetic_stop_safety_cases"])==8
+          assert not any(x["MCU_write_authorized"] for x in d["synthetic_stop_safety_cases"])
+          x=d["crosswalk"]
+          assert x["saved_CFS_GPIO_IRQ_PE11_matches_historical_BLDC_FG_tach"]
+          assert x["four_current_feedback_analog_pads_from_external_PCB"] == [
+              "PC5","PC0","PA1","PA0"]
+          assert not x["PWM_device_names_cover_all_brushed_driver_input_pins"]
+          assert not x["installed_CFS_PCB_revision_matching_historical_board_proven"]
+          assert not x["safe_to_authorize_MCU_motor_active_writes"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["real_CFS_CM5_or_Kalico_access"]
+          print("PASS: source-pinned 2025 PCB BLDC FG PE11 and four current-sense pads agree with saved CFS ROM")
+          PY
+          rm -f /tmp/cfs-public-historical-PCBs.md
+      - name: Enumerate RT-Thread GPIO IDs for operator-confirmed BLDC + four DC motor pins (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_adc_pin_table_inventory.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-motor-adc-pin-table.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-motor-adc-pin-table.json") as f: d=json.load(f)
+          assert d["v313_v322_physical_pin_table_agreement"]
+          m=d["v322"]
+          assert m["physical_ROM_APP_link_base"]=="0x8003000"
+          assert m["manufacturer_pin_table_ROM"]=="0x802ad5c"
+          assert {p:[x["oem_RTThread_logical_pin"] for x in m["resolved_oem_logical_records_by_confirmed_physical_pad"][p]]
+                for p in ("PE3","PE4","PE11")} == {
+              "PE3":["0x43"],"PE4":["0x44"],"PE11":["0x4b"]
+          }
+          assert m["all_16_operator_confirmed_pads_resolved_from_oem_ROM"]
+          assert m["unresolved_pads_not_in_112_record_oem_table"]==[]
+          expected={
+              "PE13":"0x4d","PE11":"0x4b","PE3":"0x43","PE4":"0x44",
+              "PD3":"0x33","PD2":"0x32","PC5":"0x25",
+              "PD1":"0x31","PD0":"0x30","PC0":"0x20",
+              "PD15":"0x3f","PD14":"0x3e","PA1":"0x1",
+              "PD13":"0x3d","PD12":"0x3c","PA0":"0x0"
+          }
+          assert {pad:rows[0]["oem_RTThread_logical_pin"] for pad,rows in
+                  m["resolved_oem_logical_records_by_confirmed_physical_pad"].items()
+                 } == expected
+          assert m["installed_CFS_matches_historical_PCB_wiring_operator_reported"]
+          assert not m["installed_CFS_wiring_independently_electrically_measured"]
+          assert not m["ADC_read_path_and_calibration_authenticated"]
+          assert not m["M1_M2_actual_motor_command_control_paths_authenticated"]
+          assert not m["all_motors_physically_stopped_proven"]
+          assert not m["v323_MCU_write_or_flash_authorized"]
+          assert not d["motor_write_safety_release"]
+          print("PASS: source-pinned CFS RT pin lookup for operator-confirmed PCB; electrical/ADC safety unverified")
+          PY
+      - name: Inventory original ADC0/ADC1/ADC2 and GPIO_D ROM literal usages (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_gpio_literal_xref_discovery.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-gpio-literal-candidates.json >/tmp/cfs-adc-gpio-literal-candidates-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-gpio-literal-candidates.json") as f: d=json.load(f)
+          for key in ("baseline_saved_v313","current_saved_v322"):
+              x=d[key]
+              assert x["physical_saved_APP_origin"]=="0x8003000"
+              assert x["number_of_aligned_ROM_constant_candidates"] == len(
+                  x["raw_literal_and_candidate_xref_records"])
+              assert not x["ADC0_ADC1_ADC2_initialization_and_config_flow_authenticated"]
+              assert not x["motor_current_channel_sequence_proven"]
+              assert not x["motor_current_RAM_destinations_proven"]
+              assert not x["motor_current_ADC_calibration_or_fault_handling_proven"]
+              assert not x["GPIO_D_PD0_PD3_actual_command_ownership_proven"]
+              assert not x["any_real_CFS_register_or_RAM_read_performed"]
+              assert not x["motor_physical_STOPPED_status_proven"]
+              assert not x["v323_flash_or_MCU_SET_RESET_authorized"]
+              print("Saved",key,"candidate literal counts",x["literal_candidates_by_peripheral"])
+              print("Candidates with Thumb PC-literal loads",x["literal_candidates_with_possible_PC_relative_load"])
+              for row in x["raw_literal_and_candidate_xref_records"]:
+                  if row["total_candidate_loads_before_display_cap"]:
+                      print("REVIEW",row["peripheral"],row["literal_ROM_slot"],
+                            row["candidate_register_address"],
+                            row["candidate_thumb_pc_relative_loads"][:6])
+          assert d["source_only_scoping_not_complete_control_flow"]
+          assert d["no_real_device_interaction"] and not d["safe_to_flash_v323"]
+          print("PASS: ADC/PD GPIO ROM candidate discovery, NO claims of ADC channel sampling or motor idle")
+          PY
+      - name: Pin four real ADC0_CTL1 Thumb literal loads and bound surrounding OEM code (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc0_ctl1_original_source_trace.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-ctl1-source-trace.json >/tmp/cfs-adc0-ctl1-source-trace-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-ctl1-source-trace.json") as f: d=json.load(f)
+          assert d["both_saved_versions_same_original_ADC0_CTL1_code"]
+          x=d["v322"]
+          assert x["original_ADC0_CTL1_MMIO_register"]=="0x40012408"
+          assert x["original_ADC0_CTL1_ROM_literal_PC"]=="0x8022c88"
+          assert [r["physical_original_Thumb_PC"] for r in x["pinned_literal_loads"]]==[
+              "0x8022926","0x8022932","0x8022988","0x8022bbc"
+          ]
+          for context in x["bounded_disassembly_contexts"]:
+              print("ORIGINAL_ADC0_CONTEXT",context["window"])
+              for row in context["rows"]:
+                  print(row["pc"],row["opcode"])
+          assert not x["ADC0_initialization_or_read_flow_fully_recovered"]
+          assert not x["brushed_M1_M2_M3_M4_ADC_channels_sampled_proven"]
+          assert not x["ADC_conversion_RDATA_RAM_consumer_proven"]
+          assert not x["safe_to_read_ADC_live_without_side_effects_verified"]
+          assert not x["motor_idleness_interlock_proven"]
+          assert not x["firmware_flash_or_SET_RESET_permitted"]
+          assert not d["live_MCU_access_performed"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: original ADC0_CTL1 source xrefs; no brush-motor channel conversion inferred")
+          PY
+      - name: Enumerate original GPIO helper BL sites and nearby M1/M2 pin IDs (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_m1_m2_gpio_helper_callsites.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-m1-m2-helper-calls.json >/tmp/cfs-m1-m2-helper-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-m1-m2-helper-calls.json") as f: d=json.load(f)
+          assert d["original_callsite_census_equal"]
+          x=d["v322"]
+          assert x["physical_saved_APP_base"]=="0x8003000"
+          assert x["target_motor_pin_helper_candidate"]=="0x8018eec"
+          assert x["original_brake_related_call_known"]=="0x801119e"
+          assert x["BL_candidates_found"]==len(x["callsites"])
+          for call in x["callsites"]:
+              if call["preceding_nearby_r0_immediate_PD0_PD3_candidates"]:
+                  print("PD0_PD3_REVIEW",call["possible_original_helper_call_pc"],
+                    call["preceding_nearby_r0_immediate_PD0_PD3_candidates"])
+          print("Original GPIO helper BL candidates",x["BL_candidates_found"])
+          print("Near PD0..PD3 immediate calls",x["candidate_nearby_PD0_PD3_sites"])
+          assert not x["all_PD0_PD3_owner_control_paths_recovered"]
+          assert not x["all_direct_and_indirect_GPIO_writes_exhaustively_discovered"]
+          assert not x["hardware_motor_current_or_tach_read_proven"]
+          assert not x["v323_MCU_write_or_flash_authorized"]
+          assert not d["safe_to_flash_v323"]
+          print("PASS: M1/M2 GPIO helper candidate audit only; no motor-stop authority")
+          PY
+      - name: Prove OEM ADC0_RDATA read helper and candidate original callers (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc0_rdata_source_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-result-provenance.json >/tmp/cfs-adc0-result-provenance-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-result-provenance.json") as f:d=json.load(f)
+          assert d["both_saved_original_versions_identical"]
+          x=d["v322"]
+          assert x["original_Thumb_instruction_sites_checked"]==17
+          assert x["original_ADC0_CTL1_register"]=="0x40012408"
+          assert x["original_ADC0_RDATA_register"]=="0x4001244c"
+          assert x["ADC0_RDATA_helper_physical_PC"]=="0x8022bbc"
+          assert x["original_method_reads_32bit_ADC0_RDATA"]
+          assert x["number_of_direct_BL_candidates"]==len(x["BL_encoded_direct_callsite_candidates"])
+          print("ADC0_RDATA direct BL candidate sites",x["BL_encoded_direct_callsite_candidates"])
+          print("ADC0_RDATA ROM pointer candidates",x["ROM_word_references_to_helper"])
+          assert x["number_of_ROM_word_pointer_references"]==len(x["ROM_word_references_to_helper"])
+          assert not x["any_call_to_RDATA_helper_from_actual_motor_current_logic_proven"]
+          assert x["possible_EOC_clear_side_effect_on_RDATA_read"]
+          assert not x["safe_to_poll_ADC_RDATA_concurrently_on_live_CFS"]
+          assert not x["OEM_ADC_channels_15_10_1_0_actually_configured_proven"]
+          assert not x["actual_brushed_motor_current_read_consumers_recovered"]
+          assert not x["ADC_result_RAM_locations_or_motor_gain_calibration_proven"]
+          assert not x["MCU_flash_or_SET_RESET_authorized"]
+          assert d["no_real_CFS_ADC_or_GPIO_reads"] and not d["safe_to_flash_v323"]
+          print("PASS: exact OEM ADC0_RDATA Thumb instructions source verified; no motor current claims")
+          PY
+      - name: Verify physical GPIO_D literal consumers and their bounded original Thumb contexts (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_d_physical_literal_access_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpiod-physical-context.json >/tmp/cfs-gpiod-physical-context-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpiod-physical-context.json") as f:d=json.load(f)
+          assert d["original_saved_v313_v322_windows_match"]
+          x=d["v322"]
+          assert x["real_APP_link_base"]=="0x8003000"
+          assert x["GPIO_D_base"]=="0x40011400"
+          assert x["original_loads_validated"]==2
+          assert [c["original_source_instruction"] for c in
+                  x["confirmed_original_GPIO_D_literal_consumers"]]==[
+                      "0x801b686","0x80236f6"]
+          assert [c["original_ROM_literal_slot"] for c in
+                  x["confirmed_original_GPIO_D_literal_consumers"]]==[
+                      "0x801b75c","0x8023948"]
+          for row in x["confirmed_original_GPIO_D_literal_consumers"]:
+              print("GPIO_D_CONSUMER",row["window"],row["original_source_instruction"])
+              print("CANDIDATE_R4_OFFSET_COUNT",len(row["potential_R4_relative_accesses"]))
+              for opcode in row["assembly_window"][:45]:
+                  print("BOUNDED_ORIGINAL_GPIO_D",opcode["pc"],opcode["instruction"])
+              for ref in row["potential_R4_relative_accesses"][:12]:
+                  print("CANDIDATE_OFFSET",ref["pc"],ref["instruction"],
+                        ref.get("candidate_peripheral_register_if_R4_still_base"))
+              assert row["original_prefix_uses_GPIO_D_value_for_arithmetic"]
+              assert not row["direct_R4_based_MMIO_load_store_in_128B_window"]
+              assert not row["potential_R4_relative_accesses"]
+              assert not row["source_region_is_proven_M1_M2_motor_peripheral_owner"]
+              assert not row["definite_control_flow_reachability_from_motor_task_proven"]
+              assert not row["R4_register_live_range_proven"]
+              assert not row["actual_GPIO_pin_state_observed"]
+          assert not x["M1_M2_PD0_PD3_motor_driver_control_dataflow_proven"]
+          assert not x["motor_running_or_stopped_feedback_proven"]
+          assert not x["independent_motor_interlock_safe_for_flash"]
+          assert d["no_hardware_or_firmware_changes"]
+          assert not d["v323_flash_release_allowed"]
+          print("PASS: 2 original GPIO_D literal consumers with bounded Thumb contexts; no motor ownership implied")
+          PY
+      - name: Inspect real original RT-Thread GPIO helper and known PE4 brake caller (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_rt_helper_entry_trace.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-rt-helper-entry.json >/tmp/cfs-gpio-rt-helper-stdout.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-rt-helper-entry.json") as f: d=json.load(f)
+          assert d["v313_v322_original_helper_contexts_identical"]
+          x=d["v322"]
+          assert x["physical_oem_APP_link_base"]=="0x8003000"
+          assert x["brake_known_GPIO_helper_BL_source"]=="0x801119e"
+          assert x["original_helper_entry"]=="0x8018eec"
+          assert x["known_BL_thumb_encoding_verified"]
+          assert x["original_callback_dispatch_instruction_sites_checked"]==12
+          assert x["known_PE4_brake_caller_sites_checked"]==4
+          assert x["original_global_object_literal_ROM_PC"]=="0x801916c"
+          assert x["pin_argument_copied_into_callback_r1"]
+          assert x["value_argument_copied_into_callback_r2"]
+          assert x["GPIO_device_loaded_from_global_object_plus_0x40"]
+          assert x["device_callback_pointer_loaded_from_device_plus_0x04"]
+          assert x["callback_invoked_by_indirect_BX_r3"]
+          assert x["original_PE4_brake_call_r0"]=="0x44"
+          assert x["original_PE4_brake_call_r1_value"]==1
+          assert not x["effective_runtime_device_callback_pointer_resolved"]
+          assert not x["driver_MMIO_write_reached_in_this_static_study"]
+          print("GLOBAL_GPIO_OBJECT_CONST",x["saved_original_global_object_root_constant"])
+          assert len(x["contexts"])==2
+          for section in x["contexts"]:
+              print("OEM_GPIO_CONTEXT",section["window"])
+              for row in section["bounded_instructions"][:48]:
+                  print("ORIGINAL_THUMB",row["pc"],row["mnemonic"],row["operands"])
+              assert not section["register_liveness_through_branches_PROVEN"]
+              assert not section["GPIO_driver_register_side_effect_PROVEN"]
+          assert not x["pin_table_conversion_or_M1_M2_owner_proven"]
+          assert not x["all_M1_M2_write_callers_identified"]
+          assert not x["real_GPIO_MMIO_access_or_motor_state_measured"]
+          assert not x["safe_to_flash_v323"]
+          assert not d["live_CFS_or_CM5_access"]
+          assert not d["MCU_SET_RESET_motor_active_authorized"]
+          print("PASS: source-pinned GPIO helper and brake caller; M1/M2 control remains unproven")
+          PY
+      - name: Verify GPIO callback is BSS runtime-only and classify exact adjacent arguments (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_dispatch_runtime_boundary_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-runtime-dispatch-provenance.json > /tmp/cfs-gpio-runtime-dispatch-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-runtime-dispatch-provenance.json") as f: d=json.load(f)
+          assert d["saved_v313_v322_source_provenance_identical"]
+          x=d["original_GPIO_dispatch"]
+          assert x["GPIO_dispatch_root_ROM_literal"]=="0x801916c"
+          assert x["GPIO_dispatch_root_RAM_object"]=="0x20004c44"
+          assert x["GPIO_dispatch_device_pointer_field"]=="0x20004c84"
+          assert x["first_initialized_RAM_end_exclusive"]=="0x20000bc4"
+          assert x["device_callback_pointer_requires_runtime_registration"]
+          assert not x["saved_APP_image_directly_contains_callback_at_runtime_field"]
+          assert x["original_GPIO_helper_Thumb_PC"]=="0x8018eec"
+          assert x["all_halfword_scan_BL_candidates"]==122
+          assert x["PE4_brake_argument_path_source_verified"]
+          assert len(x["strict_adjacent_immediate_argument_candidates"])==x["strict_candidate_count"]
+          assert x["strict_candidate_count"]==58
+          assert x["strict_candidates_on_known_pins"]==9
+          expected_known={
+              ("0x8011004","0x43",0),
+              ("0x8011014","0x44",1),
+              ("0x80110c0","0x43",1),
+              ("0x801116c","0x44",0),
+              ("0x8011186","0x44",0),
+              ("0x801119e","0x44",1),
+              ("0x801135a","0x44",0),
+              ("0x801139e","0x44",1),
+              ("0x801153e","0x44",1),
+          }
+          actual_known={
+              (row["call_pc"],row["pin_id"],row["value_argument"])
+              for row in x["strict_adjacent_immediate_argument_candidates"]
+              if row["pin_from_confirmed_gpio_lookup"]
+          }
+          assert actual_known==expected_known
+          for row in x["strict_adjacent_immediate_argument_candidates"]:
+              if row["pin_from_confirmed_gpio_lookup"]:
+                  print("PIN_LITERAL_DIRECT_BL_CANDIDATE",row)
+          print("strict_immediate_count",x["strict_candidate_count"])
+          print("strict_known_pin_count",x["strict_candidates_on_known_pins"])
+          assert not x["any_M1_M2_driver_command_ownership_proven"]
+          assert not x["full_callgraph_and_RTOS_registration_reachability_proven"]
+          assert not x["safe_to_enable_v323_MCU_writes_or_flash"]
+          assert not d["read_or_write_on_actual_CFS_or_CM5_performed"]
+          print("PASS: GPIO callback field lies in zero-init BSS; no fictitious ROM callback or motor stop")
+          PY
+      - name: Audit bounded straight-line GPIO args without asserting M1 M2 motor ownership (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_bounded_argument_provenance.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-bounded-arguments.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-bounded-arguments.json") as f:d=json.load(f)
+          a=d["analysis"]
+          assert d["v313_v322_identical"]
+          assert a["physical_base"]=="0x8003000"
+          assert a["all_existing_BL_candidates"]==122
+          assert a["short_straight_line_argument_candidates"]>=0
+          assert not a["all_callers_reachable_proven"]
+          assert not a["GPIO_driver_runtime_callback_known"]
+          assert not a["actual_M1_M2_owner_and_current_feedback_known"]
+          assert not a["safe_to_flash_or_enable_motor_writes"]
+          assert not d["real_hardware_access"] and not d["flash_release"]
+          print("PASS: bounded GPIO argument census preserves unknown M1/M2 ownership and MCU safety block")
+          PY
+      - name: Test original ADC register-base immediate dataflow without motor current assertions (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_bounded_register_dataflow.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-bounded-register-dataflow.json > /tmp/cfs-adc-bounded-register-dataflow-output.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-bounded-register-dataflow.json") as f:d=json.load(f)
+          x=d["v322"]
+          assert d["local_original_Thumb_not_proof_of_reachable_execution"]
+          assert x["ROM_physical_base"]=="0x8003000"
+          assert x["original_ADC0_RDATA_source_instruction_locally_verified"]=="0x8022bc0"
+          assert x["ADC_literal_load_candidates"]>=1
+          assert x["bounded_register_access_candidates"]==9
+          assert x["adc_channel_selection_register_access_candidates"]==[]
+          assert x["adc_sampling_register_access_candidates"]==[]
+          assert x["candidate_access_counts_by_peripheral_role"] == [
+              {"peripheral":"ADC0","register":"CTL0","direction":"read","count":2},
+              {"peripheral":"ADC0","register":"CTL0","direction":"write","count":2},
+              {"peripheral":"ADC0","register":"CTL1","direction":"read","count":2},
+              {"peripheral":"ADC0","register":"CTL1","direction":"write","count":2},
+              {"peripheral":"ADC0","register":"RDATA","direction":"read","count":1},
+          ]
+          assert not x["can_prove_actual_channel_15_10_1_0_conversions"]
+          assert not x["can_prove_motor_task_reached_ADC_helpers"]
+          assert not x["can_prove_ADC_result_saved_in_motor_RAM"]
+          assert not x["real_MCU_ADC_EOC_or_DMA_touched"]
+          assert not x["v323_flash_or_SET_RESET_release"]
+          print("OEM_ADC_LOCAL_ACCESS_COUNT",x["bounded_register_access_candidates"])
+          for row in x["candidate_access_counts_by_peripheral_role"]:
+              print("OEM_ADC_REGISTER_ROLE",row)
+          for row in x["adc_channel_selection_register_access_candidates"][:20]:
+              print("UNREACHED_ADC_CHANNEL_SELECTION_CANDIDATE",row)
+          assert d["no_live_ADC_read_and_no_flash"]
+          print("PASS: bounded manufacturer ADC local register roles, no false motor/flash claims")
+          PY
+      - name: Cross-check original ADC0 control helper BLs and pointer references (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_helper_reference_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc0-helper-reference-census.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc0-helper-reference-census.json") as f:d=json.load(f)
+          a=d["audit"]
+          assert d["original_v313_v322_reference_census_identical"]
+          assert a["physical_link_base"]=="0x8003000"
+          assert len(a["function_entries"])==4
+          assert [x["PC"] for x in a["function_entries"]]==[
+            "0x8022926","0x8022932","0x8022988","0x8022bbc"
+          ]
+          assert a["original_ADC0_RDATA_direct_BL_candidates"]==0
+          assert a["original_ADC0_RDATA_aligned_ROM_pointer_words"]==0
+          assert a["direct_BL_candidate_total"]==sum(len(x["direct_BL_candidates"]) for x in a["function_entries"])
+          assert a["aligned_ROM_word_reference_total"]==sum(len(x["aligned_ROM_word_refs"]) for x in a["function_entries"])
+          for fn in a["function_entries"]:
+              print("OEM_ADC_HELPER_REFERENCE",fn)
+          assert not a["ADC_helper_reachable_from_actual_motor_control_proven"]
+          assert not a["ADC_conversion_rank_and_channel_current_measurement_proven"]
+          assert not a["safe_to_read_ADC_RDATA_on_live_CFS"]
+          assert not a["safe_to_flash_or_SET_RESET_v323"]
+          assert d["ROM_census_does_not_prove_dead_code"]
+          print("PASS: 4 ADC0 original helper reference-census; no invented reachable motor ADC consumer")
+          PY
+      - name: Check adjacent MOVW/MOVT ADC address creation beyond ROM literal pools (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_movw_movt_address_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-movw-movt-candidates.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-movw-movt-candidates.json") as f:d=json.load(f)
+          m=d["saved_v322"]
+          assert m["real_saved_APP_origin"]=="0x8003000"
+          assert d["same_original_saved_v313_v322_ADC_MOVW_MOVT_pair_candidates"]
+          assert m["candidate_pair_count"]==0
+          assert m["adjacent_ADC_register_MOVW_MOVT_candidates"]==[]
+          for x in m["adjacent_ADC_register_MOVW_MOVT_candidates"]:
+              print("ADC_MOVW_MOVT_SOURCE_CANDIDATE",x)
+              assert x["candidate_peripheral"] in ("ADC0","ADC1","ADC2")
+              assert not x["actual_executable_reachability_proven"]
+              assert not x["ADC_current_source_channel_proven"]
+          assert not m["full_nonadjacent_or_register_arithmetic_coverage_proven"]
+          assert not m["reachable_ADC_channel_selector_or_motor_current_sampler_proven"]
+          assert not m["read_from_actual_CFS_ADC_register"]
+          assert not m["MCU_physical_stop_proven"]
+          assert not m["v323_flash_or_MCU_SET_RESET_authorized"]
+          assert not d["release_gate_passed"]
+          assert d["no_CFS_CM5_or_Kalico_interaction"]
+          print("PASS: strict MOVW/MOVT address census, no ADC motor measurement or firmware release claims")
+          PY
+      - name: Locate candidate GPIO device registration BSS field accesses (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_runtime_registration_root_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-runtime-registration-census.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-runtime-registration-census.json") as f: d=json.load(f)
+          assert d["v313_and_v322_original_GPIO_BSS_root_traces_identical"]
+          p=d["v322"]
+          assert p["runtime_global_address"]=="0x20004c44"
+          assert p["runtime_GPIO_device_BSS_field"]=="0x20004c84"
+          assert p["number_of_aligned_exact_ROM_root_constants"]==1
+          assert p["number_of_root_load_candidate_sites"]==15
+          assert p["local_direct_field_access_counts"]=={"read":7}
+          traces={t["source_candidate_pc"] for t in p["bounded_candidate_traces"]}
+          assert {"0x8018eee","0x8018f10"}.issubset(traces)
+          assert p["static_BSS_init_value_is_zero_not_runtime_device_pointer"]
+          assert not p["actual_registration_writer_found_on_reachable_path"]
+          assert not p["runtime_GPIO_device_callback_at_device_plus_0x04_recovered"]
+          assert not p["all_motor_pin_write_paths_recovered"]
+          assert not p["physical_motor_STOPPED_proven"]
+          assert not p["safe_to_enable_v323_writes_or_flash"]
+          assert not p["live_CFS_CM5_Kalico_access"]
+          assert d["no_actual_hardware_operation"] and d["no_v323_release"]
+          print("PASS: OEM GPIO BSS global source references, no speculative runtime callback claims")
+          PY
+      - name: Triage original GPIO BSS registration neighborhood, source-only (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_registration_neighborhood_census.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-registration-neighborhood.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-registration-neighborhood.json") as f: d=json.load(f)
+          assert d["v313_v322_unchanged_original_neighborhood"]
+          x=d["v322"]
+          assert x["original_ROM_gpio_root_loads"]==15
+          assert x["original_local_reads_from_0x20004c84"]==7
+          assert not x["source_window_is_verified_executable_CFG"]
+          assert not x["any_0x40_store_targets_BSS_global_proven"]
+          assert not x["actual_GPIO_driver_registration_callback_recovered"]
+          assert not x["M1_M2_GPIO_driver_source_paths_recovered"]
+          assert not x["motor_idle_or_flash_release_authorized"]
+          assert not x["live_CFS_CM5_or_Kalico_access"]
+          assert d["offline_only"] and not d["release_allowed"]
+          print("PASS: narrow GPIO BSS field +0x40 neighborhood inspected without claiming a registration writer")
+          PY
+      - name: Trace exact original R1 liveness into potential GPIO BSS writer (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_registration_store_r1_liveness_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpio-BSS-writer-liveness.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpio-BSS-writer-liveness.json") as f: d=json.load(f)
+          assert d["v313_equal_to_v322_original_ROM"]
+          x=d["source_analysis"]
+          assert x["root_LDR_source"]=="0x8018dfe"
+          assert x["original_root_pointer_value"]=="0x20004c44"
+          assert x["possible_STR_source"]=="0x8018e1a"
+          assert x["possible_STR_target_if_r1_unchanged"]=="0x20004c84"
+          assert x["connected_straight_line_source_bytes"]
+          assert not x["r1_may_be_clobbered_between_LDR_and_STR"]
+          assert x["branch_or_stack_barriers_between_LDR_and_STR"]==[]
+          assert x["register_root_to_store_source_proven_without_control_flow"]
+          assert x["original_GPIO_registrar_prologue"]=="0x8018dfa"
+          assert x["original_second_argument_saved_to_r4"]
+          assert x["original_r4_preserved_until_write_at_0x08018E1A"]
+          assert x["original_registrar_direct_BL_candidates_count"]==0
+          assert x["original_registrar_aligned_ROM_pointer_candidates_count"]==0
+          assert not x["candidate_CALLER_supplies_valid_GPIO_device_pointer_proven"]
+          assert not x["runtime_registration_executed_proven"]
+          assert not x["actual_registered_GPIO_device_pointer_recovered"]
+          assert not x["M1_M2_driver_callback_or_motor_STOPPED_proven"]
+          assert not x["real_CFS_CM5_Kalico_access"]
+          assert not x["v323_MCU_write_or_flash_permitted"]
+          assert d["not_a_live_registration_trace"] and not d["release_allowed"]
+          print("PASS: original Thumb GPIO BSS registration candidate liveness examined without live claims")
+          PY
+      - name: Verify OEM PWM duty shadow versus physical STOP state (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_motor_duty_shadow_physical_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-duty-command-shadow.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-duty-command-shadow.json") as f: d=json.load(f)
+          x=d["manufacturer_original_software_command_shadow"]
+          assert d["v313_equals_v322_original_motor_command_shadow"]
+          assert x["original_motor_duty_controller_entry"]=="0x80110cc"
+          assert x["zero_initialized_motor_data_root"]=="0x20004960"
+          assert x["motor_command_structure_base"]=="0x20004a14"
+          assert x["current_requested_duty_field"]=="0x20004a1a"
+          assert x["previous_requested_duty_field"]=="0x20004a1c"
+          assert len(x["source_verified_instructions"])==12
+          assert x["duty_values_are_software_command_history_only"]
+          assert not x["zero_command_means_real_motor_stopped"]
+          assert not x["MCU_set_reset_gate_ready"]
+          assert len(d["synthetic_command_vs_physical_feedback_cases"])==5
+          assert sum(v["synthetic_stop_status_possible"] for v in d["synthetic_command_vs_physical_feedback_cases"])==1
+          assert not d["actual_MCU_motor_STOP_feedback_proven"]
+          assert not d["eligible_v323_motor_guard_release"]
+          assert not d["live_CFS_CM5_accessed"]
+          print("PASS: OEM 0x20004A1A command shadow proven, physical rotor stop still unproven")
+          PY
+      - name: Verify OEM GPIO-D and ADC0 helpers are not motor feedback evidence (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_d_adc0_helper_reachability_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-gpiod-adc0-helper-evidence.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-gpiod-adc0-helper-evidence.json") as f:
+              d=json.load(f)
+          a=d["OEM_GPIO_and_ADC_helper_audit"]
+          assert d["v313_v322_original_helper_provenance_equal"]
+          assert a["verified_OEM_Thumb_pins"]==18
+          assert a["gpio_d_hardware_base"]=="0x40011400"
+          assert a["gpio_d_generic_setup_only_direct_bl"]=="0x801b53e"
+          assert a["adc0_effective_read_addr_if_called"]=="0x4001244c"
+          assert a["direct_BL_candidate_sites"]["0x801b684"]==["0x801b53e"]
+          for key in ("0x8022926","0x8022932","0x8022bbc","0x80236f4"):
+              assert a["direct_BL_candidate_sites"][key]==[]
+          # This negative inventory is scoped to aligned raw ROM pointer
+          # values only; it does not exclude indirect device callbacks.
+          assert all(not hits for hits in
+              a["aligned_full_word_function_pointer_candidates"].values())
+          assert a["zero_direct_BL_does_NOT_prove_zero_indirect_calls"]
+          for key in ("ADC0_motor_current_channels_configured_and_sampled_proven",
+                      "M1_M2_active_drive_state_proven",
+                      "independent_stop_status_for_all_motors_proven",
+                      "safe_MCU_write_interlock_implemented",
+                      "v323_flash_or_motor_write_permitted",
+                      "live_CFS_read_or_write"):
+              assert not a[key]
+          assert d["no_v323_release"]
+          print("PASS: OEM GPIOD generic-setup and ADC0 helper paths verified, no motor-idle inference")
+          PY
+      - name: Fail closed on ADC_RDATA side effects in motor telemetry plans (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_telemetry_no_side_effect_contract.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-safe-telemetry-contract.json
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-safe-telemetry-contract.json") as f: d=json.load(f)
+          assert d["original_v313_v322_ADC_reader_verified"]
+          assert d["synthetic_cases_passed"] == 9
+          assert sum(x["synthetic_plan_only"] for x in d["synthetic_cases"]) == 1
+          assert not any(x["permission_for_actual_MCU_read"] for x in d["synthetic_cases"])
+          assert not any(x["physical_motor_stopped_proven"] for x in d["synthetic_cases"])
+          assert not d["actual_MCU_ADC_RDATA_probed"]
+          assert not d["motor_current_feedback_and_calibration_proven"]
+          assert not d["v323_flash_or_MCU_write_permitted"]
+          print("PASS: 9 ADC/RDATA no-side-effect contracts; motor-stop and v3.23 remain blocked")
+          PY
+      - name: Inspect bounded non-adjacent ADC MOVW/MOVT address construction (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_movw_movt_bounded_reachability.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-movw-movt-bounded.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path("/tmp/cfs-adc-movw-movt-bounded.json").read_text())
+          # The distinct v3.22 build contains one additional MOVW-shaped
+          # halfword in patched ROM; that is not a discovered ADC consumer.
+          assert not d["original_v313_v322_full_scan_identical"]
+          assert d["matched_ADC_address_candidates_same_across_versions"]
+          assert d["original_v313"]["halfword_scan_MOVW_candidates"] == 363
+          assert d["original_v322"]["halfword_scan_MOVW_candidates"] == 364
+          assert d["original_v313"]["matched_ADC_candidate_count"] == 0
+          assert d["original_v322"]["matched_ADC_candidate_count"] == 0
+          assert d["reference_synthetic_fixture"]["synthetic_bounded_pair_validated"]
+          assert d["reference_synthetic_fixture"]["synthetic_clobber_and_two_branch_barriers_validated"]
+          assert d["reference_synthetic_fixture"]["synthetic_address"]=="0x4001244c"
+          x=d["original_v322"]
+          assert x["correct_saved_APP_origin"]=="0x8003000"
+          assert not x["actual_original_motor_ADC_channel_owner_authenticated"]
+          assert not x["complete_address_construction_coverage_proven"]
+          assert not x["physical_motor_idle_proven"]
+          assert not x["safe_to_read_live_ADC_RDATA"]
+          assert not x["motor_active_SET_RESET_write_or_v323_flash_allowed"]
+          assert not d["no_ADC_EOC_side_effect_and_no_firmware_flash"] is False
+          print("PASS: bounded nonadjacent ADC MOVW/MOVT search; no physical motor-idle or live ADC authorization")
+          PY
+      - name: Confirm ADC helper is NOT qualified as motor current feedback (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_adc_motor_current_evidence_gate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --json-out /tmp/cfs-adc-motor-current-gate.json >/dev/null
+          python - <<'PY'
+          import json
+          with open("/tmp/cfs-adc-motor-current-gate.json") as f: d=json.load(f)
+          bounds=d["bounded_source_scope_and_absence_limit"]
+          assert bounds["bounded_original_ADC0_register_operations"]==9
+          assert bounds["original_ADC0_RDATA_read_source_pc"]=="0x08022BC0"
+          assert bounds["bounded_ADC_RSQ_rank_register_operations"]==0
+          assert bounds["bounded_ADC_SAMPT_sampling_register_operations"]==0
+          assert not bounds["absence_of_ADC_rank_or_sample_code_globally_proven"]
+          assert not bounds["actual_M1_M4_ADC_current_channel_configuration_proven"]
+          assert not bounds["any_live_ADC_RDATA_read_safe_or_authorized"]
+          assert d["same_motor_channel_evidence_across_versions"]
+          assert d["same_bounded_MOVW_MOVT_ADC_matches_across_versions"]
+          assert len(d["synthetic_negative_cases"]) == 10
+          assert not any(s["MCU_SET_RESET_allowed"] for s in d["synthetic_negative_cases"])
+          assert not any(s["flash_extended_v323_allowed"] for s in d["synthetic_negative_cases"])
+          for version in ("saved_v313","saved_v322"):
+              s=d[version]
+              assert s["ADC_register_dataflow_candidates"]["original_ADC0_RDATA_source_instruction_locally_verified"] == "0x8022bc0"
+              assert not s["original_ADC_current_channel_sequence_for_M1_M4_proven"]
+              assert not s["original_motor_task_consumes_ADC_sample_proven"]
+              assert not s["EOC_safe_nonintrusive_live_observation_proven"]
+              assert not s["current_zero_permits_firmware_write"]
+          assert not d["safe_to_read_live_ADC_RDATA"]
+          assert not d["physical_motor_feedback_authenticated"]
+          assert not d["v323_release_gate_passed"]
+          assert not d["installed_CFS_or_CM5_access"]
+          print("PASS: ADC0 source helper not motor current proof; 10 motor-current negative cases fail closed")
+          PY
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
