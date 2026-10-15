@@ -2012,6 +2012,34 @@ jobs:
           assert not d['MCU_SET_RESET_or_flash_authorized']
           print('PASS: 15 outgoing OEM branch targets, 14 incoming hook BLs, 5 fail-closed tests')
           PYTEST
+      - name: Recover original RT-Thread pin_ops callback and GPIOD M1/M2 GPIO writer (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_pin_ops_registration_and_m1m2_gpiod_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-pinops-gpiod-evidence.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-pinops-gpiod-evidence.json') as f: r=json.load(f)
+          assert r['v313_v322_GPIO_ops_source_bytes_agree']
+          a=r['original_rom_evidence']
+          assert a['manufacturer_source_flow_confirmed']
+          assert a['pin_ops_ROM_table']=='0x802b49c'
+          assert a['registered_global_BSS_field']=='0x20004c84'
+          assert a['GPIO_write_callback']=='0x801ab90'
+          assert a['GPIO_write_peripheral_helper']=='0x802381e'
+          assert len(a['all_six_pin_ops_function_pointers'])==6
+          assert len(a['original_PD0_PD3_GPIO_records'])==4
+          assert a['GPIO_write_nonzero_sets_BOP_zero_clears_BC']
+          assert len(r['negative_fixtures_rejected'])==6
+          assert not a['board_initializer_executed_on_live_CFS_proven']
+          assert not a['all_M1_M2_motor_start_stop_callers_recovered']
+          assert not a['motor_current_and_physical_stop_verified']
+          assert not a['MCU_SET_RESET_or_flash_authorized']
+          assert not r['v323_release_permitted']
+          print('PASS: OEM pin registration, 6 callback ops, M1/M2 GPIO drive and 6 negative cases')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
