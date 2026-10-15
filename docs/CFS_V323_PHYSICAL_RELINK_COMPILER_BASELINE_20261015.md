@@ -56,6 +56,31 @@ Expected: SHA-pinned saved-image identity, physically recompiled
 handler size 2468, 13 shifted Flash symbols, 15 external control
 transfers, 14 patched OEM entry transfers, 7 rejection fixtures.
 
+## Verified full saved-image parity (follow-up)
+
+The second source-only rehearsal, `cfs_v323_physical_full_image_parity.py`,
+reassembles the corrected handler and reconstructs the **whole** known
+v3.22 APP entirely in process memory using the physical hook PCs and
+symbol addresses. Because the v3.13 source includes a previous
+handler tail (177,700 bytes), the historical builder truncates that
+source at the fixed `0x2AE38` append offset before placing the
+new 2,468-byte handler. The full-image audit reproduces:
+
+- **178,140 bytes** exactly; **SHA-256**
+  `40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`;
+- **14 physically encoded OEM-to-handler BL patches**, exact wrapper targets;
+- the existing sidecar/heap-root update from `0x20006EE8` to
+  `0x20006F28` at its physical OEM code position;
+- the unchanged manufacturer-update metadata fields and CRC16
+  **`0xC36F`**; and
+- **5 synthetic corruptions rejected**, including an unknown hook,
+  altered ROM symbol/linker and modified saved firmware inputs.
+
+No rewritten image is emitted, exported or offered to the loader.
+The fact that the historical known v3.22 image can be regenerated
+correctly **does not prove that an expanded v3.23 image can be
+accepted or safely recovered by the CFS bootloader**.
+
 ## Development scope: freeze before adding more features
 
 The next firmware work should use this **physical link baseline** and
