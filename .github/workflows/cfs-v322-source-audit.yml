@@ -2174,16 +2174,18 @@ jobs:
           assert a['known_static_GPIO_pin_tail_sites']==9
           assert a['other_gpio_tail_sites_with_table_or_runtime_pin_source']==9
           assert a['unbounded_parameter_parser_gpio_tail']=='0x8019156'
+          assert a['OEM_parser_software_value_words']==['high','on','low','off']
+          assert not a['OEM_parser_access_from_external_connection_proven']
           assert a['pin_ops_ROM_Thumb_write_callback']=='0x801ab91'
           assert a['existing_source_classified_direct_GPIO_BL']==118
-          assert len(d['negative_fixtures_rejected'])==14
+          assert len(d['negative_fixtures_rejected'])==18
           assert a['indirect_RT_Thread_registered_pin_ops_dispatch_proven_in_ROM']
           assert not a['all_indirect_BLX_callbacks_source_enumerated']
           assert not a['parameter_parser_is_nonmotor_and_safe']
           assert not a['motor_STOP_or_idle_is_physically_confirmed']
           assert not a['MCU_SET_RESET_or_v323_flash_allowed']
           assert not d['v323_release_approved']
-          print('PASS: OEM 18 GPIO B/B.W, 2 motor B/B.W, callback BX, 14 corruption rejects')
+          print('PASS: OEM 18 GPIO B/B.W, 2 motor B/B.W, callback BX, 18 corruption rejects')
           PYTEST
       - name: Remove disposable compiled image
         if: always()
