@@ -23,6 +23,11 @@ from flash_ram_phase2_audit import pinned
 from cfs_app_real_link_base_audit import audited, LINK_BASE
 
 PIN_INIT = 0x0801AE2A
+PIN_INIT_VECTOR_SLOT = 0x0802D764
+EARLY_INIT_VECTOR_START = 0x0802D758
+EARLY_INIT_VECTOR_END = 0x0802D774
+EARLY_INIT_LOOP = 0x0801D584
+EARLY_INIT_CALLER = 0x0801A8E0
 ROOT_LITERAL = 0x0801AE5C
 PIN_NAME = 0x0801AE60
 REGISTRAR = 0x08018DFA
@@ -86,6 +91,36 @@ def at(data: bytes, pc: int, cs: Cs, expected: tuple[str, str]):
 
 def source_audit(data: bytes) -> dict:
     cs = decoder()
+
+    # Source-level indirect startup vector reachability: the real ROM
+    # initializer Thumb pointer is present in the seven-entry ROM table
+    # iterated by the manufacturer's function-pointer BLX loop.
+    # This is evidence of a call path, NOT observation that boot ran it.
+    if read32(data, PIN_INIT_VECTOR_SLOT) != (PIN_INIT | 1):
+        raise ValueError("OEM RT startup vector is missing pin registrar initializer")
+    if read32(data, 0x0801D620) != EARLY_INIT_VECTOR_START:
+        raise ValueError("startup vector first bound changed")
+    if read32(data, 0x0801D624) != EARLY_INIT_VECTOR_END:
+        raise ValueError("startup vector exclusive bound changed")
+    if not (EARLY_INIT_VECTOR_START <= PIN_INIT_VECTOR_SLOT < EARLY_INIT_VECTOR_END):
+        raise ValueError("GPIO initializer excluded from startup range")
+    if (EARLY_INIT_VECTOR_END-EARLY_INIT_VECTOR_START) != 7*4:
+        raise ValueError("unexpected early GPIO startup vector length")
+    for pc, op in (
+        (EARLY_INIT_CALLER, ("bl", f"#{EARLY_INIT_LOOP:#x}")),
+        (EARLY_INIT_LOOP, ("push", "{r4, r5, r6, lr}")),
+        (0x0801D586, ("ldr", "r4, [pc, #0x98]")),
+        (0x0801D588, ("ldr", "r5, [pc, #0x98]")),
+        (0x0801D58C, ("ldr", "r0, [r4]")),
+        (0x0801D58E, ("blx", "r0")),
+        (0x0801D590, ("adds", "r4, r4, #4")),
+        (0x0801D592, ("cmp", "r4, r5")),
+        (0x0801D594, ("blo", "#0x801d58c")),
+    ):
+        at(data, pc, cs, op)
+    if (((0x0801D586 + 4) & ~3)+0x98 != 0x0801D620 or
+            ((0x0801D588 + 4) & ~3)+0x98 != 0x0801D624):
+        raise ValueError("ROM early initializer loop bounds literal PC mismatch")
 
     # The OEM board init function at 0x0801AE2A tail-jumps (B.W) to
     # rt_device_pin_register. The earlier BL-only census could not find it.
@@ -199,6 +234,12 @@ def source_audit(data: bytes) -> dict:
 
     return {
         "saved_image_real_APP_base": hex(LINK_BASE),
+        "ROM_pin_initializer_early_init_vector_slot": hex(PIN_INIT_VECTOR_SLOT),
+        "ROM_early_init_vector_start": hex(EARLY_INIT_VECTOR_START),
+        "ROM_early_init_vector_end_exclusive": hex(EARLY_INIT_VECTOR_END),
+        "OEM_early_init_indirect_BLX_loop": hex(EARLY_INIT_LOOP),
+        "OEM_early_init_loop_direct_caller": hex(EARLY_INIT_CALLER),
+        "pin_initializer_present_and_reachable_in_OEM_ROM_loop": True,
         "OEM_board_initialization_tail_branch": hex(0x0801AE32),
         "RT_Thread_GPIO_registrar": hex(REGISTRAR),
         "configured_device_name_from_ROM": "pin",
@@ -229,6 +270,9 @@ def negative_fixtures(original: bytes) -> list[str]:
         ("corrupted_GPIOD_BOP_write", PERIPHERAL_WRITE + 2),
         ("corrupted_PD0_record_port_base", PIN_MAP + 0x30*16 + 4),
         ("corrupted_pin_name", PIN_NAME),
+        ("corrupted_ROM_pin_init_vector_entry", PIN_INIT_VECTOR_SLOT),
+        ("corrupted_ROM_init_vector_start_bound", 0x0801D620),
+        ("corrupted_ROM_init_loop_BLX_instruction", 0x0801D58E),
     )
     for label, location in sites:
         changed = bytearray(original)
@@ -265,7 +309,7 @@ def main():
     }
     if args.self_test:
         failed = negative_fixtures(new)
-        if len(failed) != 6:
+        if len(failed) != 9:
             raise ValueError("not all GPIO negative cases were rejected")
         result["negative_fixtures_rejected"] = failed
     body = json.dumps(result, indent=2)+"\n"
