@@ -42,6 +42,42 @@ def examine(image:bytes)->dict:
       "current_zero_permits_firmware_write":False,
     }
 
+def verify_bounded_adc_register_roles(analysis:dict)->dict:
+    """Assert actual locally decoded OEM roles, not a generic ADC label.
+
+    Empty rank/sample lists do NOT demonstrate the channels are unused;
+    they demonstrate only that this strictly bounded scanner has no
+    source-accurate path through those registers.
+    """
+    d=analysis["ADC_register_dataflow_candidates"]
+    roles=d["candidate_access_counts_by_peripheral_role"]
+    expected=[
+      ("ADC0","CTL0","read",2),("ADC0","CTL0","write",2),
+      ("ADC0","CTL1","read",2),("ADC0","CTL1","write",2),
+      ("ADC0","RDATA","read",1),
+    ]
+    observed=sorted((r["peripheral"],r["register"],r["direction"],r["count"])
+                    for r in roles)
+    if observed!=sorted(expected):
+        raise ValueError("original bounded ADC operation inventory changed")
+    if d["bounded_register_access_candidates"]!=9:
+        raise ValueError("OEM ADC bounded operation count changed")
+    if (d["adc_channel_selection_register_access_candidates"] or
+            d["adc_sampling_register_access_candidates"]):
+        raise ValueError("ADC rank/sample local dataflow changed; re-qualify safety")
+    if d["original_ADC0_RDATA_source_instruction_locally_verified"]!="0x8022bc0":
+        raise ValueError("pinned ADC result instruction missing")
+    return {
+      "bounded_original_ADC0_register_operations":9,
+      "original_ADC0_RDATA_read_source_pc":"0x08022BC0",
+      "bounded_ADC_RSQ_rank_register_operations":0,
+      "bounded_ADC_SAMPT_sampling_register_operations":0,
+      "absence_of_ADC_rank_or_sample_code_globally_proven":False,
+      "actual_M1_M4_ADC_current_channel_configuration_proven":False,
+      "any_live_ADC_RDATA_read_safe_or_authorized":False,
+    }
+
+
 def negative_cases():
     names=[
       "generic_ADC0_RDATA_helper_present_but_no_motor_caller",
@@ -70,11 +106,16 @@ def main():
     a=p.parse_args()
     old=examine(pinned(a.v313,"intermediate_v313"))
     new=examine(pinned(a.v322,"running_v322"))
+    bounded_old=verify_bounded_adc_register_roles(old)
+    bounded_new=verify_bounded_adc_register_roles(new)
+    if bounded_old!=bounded_new:
+        raise ValueError("v3.13/v3.22 bounded ADC roles diverged")
     d=new["ADC_register_dataflow_candidates"]
     # Existing dataflow scanner independently enforces genuine
     # saved Thumb opcode content for its original ADC0_RDATA path.
     result={
        "saved_v313":old,
+       "bounded_source_scope_and_absence_limit":bounded_new,
        "saved_v322":new,
        "same_motor_channel_evidence_across_versions":(
           old["motor_current_pad_hardware_candidates"]==
