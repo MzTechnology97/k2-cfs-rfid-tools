@@ -2073,6 +2073,33 @@ jobs:
           assert r['safe_to_flash_v323'] is False
           print('PASS OEM GPIO: 58 immediate + 29 SRAM-table + 4 ROM-table; 31 unknown, 10 reject tests')
           PYTEST
+      - name: Trace OEM four-motor 0xAC-stride records to GPIO direct calls (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_oem_four_brushed_motor_pin_provenance_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-four-motor-gpio-provenance.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-four-motor-gpio-provenance.json') as f: r=json.load(f)
+          a=r['source']
+          assert r['two_generations_source_identical']
+          assert a['initial_motor_object_base']=='0x20000270'
+          assert a['original_motor_object_stride']==172
+          assert [x['original_initialized_pin_pair'] for x in a['original_brushed_motor_records']]==[
+              ['0x32','0x33'],['0x30','0x31'],['0x3e','0x3f'],['0x3c','0x3d']]
+          assert a['new_motor_record_sourced_direct_GPIO_BLs']==3
+          assert a['total_categorized_direct_GPIO_BLs']==94
+          assert a['unresolved_direct_GPIO_BL_candidate_count']==28
+          assert len(r['negative_mutation_cases_rejected'])==14
+          assert not a['motor_record_selection_index_range_verified_live']
+          assert not a['all_callers_and_task_IRQ_ownership_recovered']
+          assert not a['physically_stopped_and_race_free_MCU_write_proven']
+          assert not a['v323_flash_or_SET_RESET_authorized']
+          assert not r['firmware_flash_permitted']
+          print('PASS 4 motor records, 8 pin map entries, 3 motor direct BL, 94/122 classified, 14 rejects')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
