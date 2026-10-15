@@ -708,6 +708,47 @@ jobs:
           assert not d["v323_release_authorized"]
           print("PASS: original callback literal callsite provenance, runtime PWM1 identity unresolved")
           PY
+          python cfs_public_2025_loader_app_split_crc_audit.py \
+            --historic-flash /tmp/cfs-2025-original-flash.bin \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-public-original-loader-app-split.json >/dev/null
+          python - <<'PY'
+          import json
+          with open('/tmp/cfs-public-original-loader-app-split.json') as f: a=json.load(f)
+          b=a['public_archived_CFS']
+          m=a['modern_tested_APP']
+          assert a['historical_archived_Flash_SHA256']=='58b8b90890c08aae81235dd4625fc75ff955e09e82f6c47ee2d74276498bc125'
+          assert b['historical_2025_public_flash_bytes']==524288
+          assert b['historic_boot_vector_at']=='0x8000000'
+          assert b['historical_boot_reset_Thumb']=='0x80005b9'
+          assert b['second_independent_APP_vector_at']=='0x8003000'
+          assert b['historical_APP_reset_Thumb']=='0x8015b21'
+          assert b['three_original_ROM_literal_sources_of_APP_base']==['0x8000aa4','0x8001360','0x8001a88']
+          assert b['source_proven_handoff_reads_APP_vector_and_sets_MSP_before_BX']
+          assert b['historic_APP_metadata_length']==150312
+          assert b['historic_APP_metadata_CRC16']=='0x172f'
+          assert b['historic_APP_end_exclusive']=='0x8027b28'
+          assert b['CRC16_saved_header_matches_implemented_algorithm']
+          assert m['physical_original_APP_base']=='0x8003000'
+          assert m['v322_APP_end_exclusive']=='0x802e7dc'
+          assert m['v322_last_2KiB_page']==92
+          assert m['v323_readonly_candidate_end_exclusive']=='0x802e800'
+          assert m['v323_readonly_candidate_last_occupied_2KiB_page']==92
+          assert m['arithmetic_headroom_to_arbitrary_historical_POLICY_NOT_loader_guarantee']==53248
+          assert b['historical_receive_dispatch_slot6_Thumb']=='0x8001d5d'
+          assert b['original_loader_slot6_passes_final_Flash_page_to_FMC_erase']
+          assert b['loader_FMC_erase_target_last_page']=='0x807f800'
+          assert not b['historic_loader_all_APP_erase_paths_authenticated']
+          assert len(a['mutations_rejected'])==18
+          assert not m['installed_loader_matches_archived_2025_bytes']
+          assert not m['loader_maximum_APP_length_authenticated']
+          assert not m['loader_actual_ERASE_pages_authenticated']
+          assert not m['interrupted_flash_update_recovery_verified']
+          assert not m['v323_flash_authorized']
+          assert not a['active_hardware_access']
+          print('PASS complete historical 2025 CFS Flash loader+APP vectors/CRC/13 mutants; no flash permission')
+          PY
           rm -f /tmp/cfs-2025-original-flash.bin /tmp/cfs-2025-original-ram.bin
       - name: Compare exact v3.13 vs v3.22 scatter source and bounded pointer offset hypotheses (OFFLINE)
         working-directory: firmware/v3.22-readonly-state-probes
