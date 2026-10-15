@@ -60,14 +60,19 @@ After relinking at the physical `0x0802DE38` origin:
 - Experimental candidate checksum and SHA-256 are reported solely
   in the offline JSON report; no BIN/ELF/HEX is saved or uploaded.
 
-**Critical space finding:** the 36-byte addition ends at
-`0x0802E800`, **exactly the previous conservative, unverified
-build-policy boundary**. There is *zero remaining code headroom*
-under that policy. This boundary is NOT an authenticated
-bootloader/page/partition boundary; it must **never** be described
-as evidence that this candidate is safe to flash. The next
-feature must first solve actual Flash ownership or trim/move
-code safely.
+**Corrected Flash interpretation (historical dump reviewed):**
+the +36-byte candidate ends at `0x0802E800`, exactly a **2-KiB
+page boundary**, immediately after page 92. **This is NOT an
+application-size or bootloader limit.** The older study's hypothetical,
+non-loader-authenticated code-policy stop is the *absolute physical
+address* `0x0803B800`; the candidate has **53,248 arithmetic
+bytes** to that policy boundary, but these bytes are **NOT certified
+free or safe to flash**. The public 2025 archived CFS Flash has
+bootloader/vector code at `0x08000000` and a separate application
+vector at `0x08003000`; its own loader's max size and erase policy
+must be independently proven and cannot be transferred to the installed
+CFS without matching the loader bytes. See the subsequent historical
+bootloader provenance audit.
 
 ## Offline dynamic tests
 
@@ -107,9 +112,9 @@ is never copied into the public repository.
 This is **the first actual trial v3.23 behavior implemented**, NOT a
 flashable or hardware-proven release. It does not disable/repair
 the preexisting v3.22 write behavior or establish motor quiescence.
-The historical build limit is now exhausted, and the loader's
-real page geometry, update/recovery and backup behavior remain
-unknown. A proper motor-active RFID interlock is likewise unproven.
+The current candidate ends on a 2 KiB page boundary, but the loader's
+real erase-page ownership, update/recovery and backup behavior remain
+unknown. Never interpret the arithmetic headroom as an authorization. A proper motor-active RFID interlock is likewise unproven.
 
 Before considering even a spare-CFS test, independently confirm
 the bootloader Flash erase/install boundaries, documented rescue
