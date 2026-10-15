@@ -78,6 +78,26 @@ arbitrary point. No part of that gap is certified free or loader
 accepted. The fact that the old loader checks a CRC does **not**
 prove it has a safe larger-image acceptance/erase policy.
 
+## Additional original loader update command finding
+
+The historical 8-way receive dispatcher at
+`0x08001A32..0x08001A38` uses ROM Thumb pointers.
+Its **slot 6** points to `0x08001D5D`. The code at
+`0x08001D60..0x08001D70` disables interrupts, initializes
+Flash programming, loads an original literal
+**`0x0807F800`** at `0x08001DD8`, calls the
+manufacturer FMC Flash page-erase helper
+**`0x080002B8`** and then locks Flash and
+reenables interrupts.
+
+This establishes that **one historical loader dispatch path
+explicitly requests an erase of the final 2-KiB Flash page**.
+It does **not** establish where all application firmware update
+pages are erased, which pages the current loader uses, or
+whether this slot can be invoked from a specific unauthenticated
+external connection. Do not run this operation on the user's
+production device.
+
 ## Automated test
 
 `firmware/v3.22-readonly-state-probes/cfs_public_2025_loader_app_split_crc_audit.py`:
@@ -88,7 +108,7 @@ prove it has a safe larger-image acceptance/erase policy.
 - pins Thumb load/branch/handoff code and the historic CRC16;
 - proves historic APP metadata and modern v3.13/v3.22 checksums;
 - checks corrected 2-KiB page numbers;
-- rejects **13 synthetic corruptions** covering loader vectors,
+- rejects **18 synthetic corruptions** covering loader vectors,
   app vectors, the CRC polynomial, handoff and header;
 - **never** accesses a physical CFS or publishes a BIN/HEX/ELF.
 
