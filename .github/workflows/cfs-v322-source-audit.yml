@@ -2043,6 +2043,36 @@ jobs:
           assert not r['v323_release_permitted']
           print('PASS: OEM pin registration, 6 callback ops, M1/M2 GPIO drive and 9 negative cases')
           PYTEST
+      - name: Classify 33 OEM GPIO table-fed pin callsites and preserve unresolved M1 M2 scope (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_gpio_table_fed_callsite_provenance_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v322-table-fed-gpio-evidence.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v322-table-fed-gpio-evidence.json') as f: r=json.load(f)
+          s=r['source_only']
+          assert r['two_saved_versions_agree']
+          assert s['original_direct_BL_candidate_count']==122
+          assert s['reviewed_bounded_immediate_pin_and_value_sites']==58
+          assert len(s['reviewed_RAM_loaded_BL_sites'])==29
+          assert len(s['reviewed_ROM_loaded_BL_sites'])==4
+          assert s['total_source_classified_direct_BL_sites']==91
+          assert s['still_unclassified_direct_BL_candidates']==31
+          assert s['immediate_and_table_classification_overlap'] is False
+          assert s['original_keil_decompressed_RAM']['initialized_pair_hex']==['0x1a','0x1b']
+          assert s['original_keil_decompressed_RAM']['ROM_pair_hex']==['0x2b','0x2c']
+          assert len(r['negative_scenarios_rejected'])==10
+          assert s['all_GPIO_callsites_are_reachable_proven'] is False
+          assert s['remaining_sites_are_M1_M2_excluded'] is False
+          assert s['real_motor_start_stop_callgraph_recovered'] is False
+          assert s['safe_to_approve_v323_MCU_SET_RESET_or_flash'] is False
+          assert r['motor_interlock_verified'] is False
+          assert r['safe_to_flash_v323'] is False
+          print('PASS OEM GPIO: 58 immediate + 29 SRAM-table + 4 ROM-table; 31 unknown, 10 reject tests')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
