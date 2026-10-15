@@ -1939,6 +1939,14 @@ jobs:
           python - <<'PY'
           import json
           with open("/tmp/cfs-adc-motor-current-gate.json") as f: d=json.load(f)
+          bounds=d["bounded_source_scope_and_absence_limit"]
+          assert bounds["bounded_original_ADC0_register_operations"]==9
+          assert bounds["original_ADC0_RDATA_read_source_pc"]=="0x08022BC0"
+          assert bounds["bounded_ADC_RSQ_rank_register_operations"]==0
+          assert bounds["bounded_ADC_SAMPT_sampling_register_operations"]==0
+          assert not bounds["absence_of_ADC_rank_or_sample_code_globally_proven"]
+          assert not bounds["actual_M1_M4_ADC_current_channel_configuration_proven"]
+          assert not bounds["any_live_ADC_RDATA_read_safe_or_authorized"]
           assert d["same_motor_channel_evidence_across_versions"]
           assert d["same_bounded_MOVW_MOVT_ADC_matches_across_versions"]
           assert len(d["synthetic_negative_cases"]) == 10
