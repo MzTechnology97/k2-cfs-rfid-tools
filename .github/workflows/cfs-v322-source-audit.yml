@@ -1965,6 +1965,29 @@ jobs:
           assert not d["installed_CFS_or_CM5_access"]
           print("PASS: ADC0 source helper not motor current proof; 10 motor-current negative cases fail closed")
           PY
+      - name: Verify 11 CFS v3.22 STOCK_* physical PC-relative branch targets (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v322_stock_branch_relocation_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --self-test \
+            --json-out /tmp/cfs-v322-branch-relocation.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          from collections import Counter
+          with open('/tmp/cfs-v322-branch-relocation.json') as f: d=json.load(f)
+          assert d['physical_app_base'] == '0x8003000'
+          assert d['appended_handler_physical_start'] == '0x802de38'
+          assert d['compiled_handler_matches_SHA_pinned_saved_v322']
+          assert d['verified_STOCK_branch_occurrences'] == 11
+          assert Counter(x['symbol'] for x in d['OEM_direct_branch_targets_source_relocated'])['STOCK_MEMCMP'] == 3
+          assert all(x['saved_vendor_ROM_target_verified'] for x in d['OEM_direct_branch_targets_source_relocated'])
+          assert d['negative_regressions']['total_rejected'] == 4
+          assert not d['absolute_nonbranch_references_proven_safe']
+          assert not d['MCU_motor_safe_or_flash_release_approved']
+          print('PASS: all 11 existing OEM STOCK branches relocate; four negative mutations rejected')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
