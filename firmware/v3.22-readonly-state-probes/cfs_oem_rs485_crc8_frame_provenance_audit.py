@@ -118,7 +118,7 @@ def inspect(data: bytes) -> dict:
         "CRC8_initial_value":0,
         "CRC8_polynomial":hex(7),
         "CRC8_reflected":False,
-        "CRC8_octets_per_byte":8,
+        "CRC8_bit_rounds_per_byte":8,
         "source_checksum_input_starts_at_declared_length_not_sync":True,
         "manufacturer_TX_sync":hex(0xF7),
         "OEM_transmit_entry":hex(TX_ENTRY),
