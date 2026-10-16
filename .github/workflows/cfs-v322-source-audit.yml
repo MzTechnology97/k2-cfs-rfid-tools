@@ -2823,6 +2823,91 @@ jobs:
           assert not a['MCU_flash_approved']
           print('PASS OEM raw read-only PWM output enable 13 cases, failclosed CONFIG 14 cases and 3 faults')
           PYCHK
+      - name: Exhaustively deny unverified MCU motor guard states (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_pwm_motor_guard_exhaustive_contract.py --json-out /tmp/cfs-v323-motor-interlock-contract.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-motor-interlock-contract.json') as f: x=json.load(f)
+          assert x['enumerated_model_states']==1024
+          assert x['synthetic_only_accepted_cases']==2
+          assert x['paired_PWM_off_on_contract_equal']
+          assert not x['timer_enable_registers_sufficient_as_stop_evidence']
+          assert not x['actual_CFS_sensor_identity_authenticated']
+          assert not x['atomic_RTThread_ISR_motor_lock_in_original_MCU']
+          assert not x['write_SET_RESET_unblocked_in_first_test_build']
+          assert x['existing_v323_config_guard_remains_fail_closed']
+          assert not x['real_flash_or_motor_io'] and not x['Kalico_source_edited']
+          print('PASS 1024 fail-closed synthetic interlock states, PWM off/on invariance')
+          PYTEST
+      - name: Emulate original hub command duty and PE11 IRQ counter read-only diagnostic (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_oem_hub_command_fg_snapshot_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-hub-command-FG-offline.json >/dev/null
+          python - <<'PYHUB'
+          import json
+          with open('/tmp/cfs-v323-hub-command-FG-offline.json') as f: a=json.load(f)
+          c=a['candidate']
+          assert c['previous_pwm_only_APP_bytes']==178464
+          assert c['new_hub_command_FG_APP_bytes']==178520
+          assert c['new_source_bytes']==56
+          assert c['physical_APP_base']=='0x8003000'
+          assert c['APP_end_exclusive']=='0x802e958'
+          assert c['last_2KiB_flash_page']==93
+          assert c['original_manufacturer_incoming_hooks']==18
+          assert c['original_manufacturer_outgoing_calls']==21
+          assert len(c['config_SET_RESET_entry_guards_still_present'])==2
+          assert c['new_opcode']=='0x57/0x17'
+          assert c['payload_bytes']==8
+          assert c['oem_hub_requested_duty_RAM']=='0x20004a1a'
+          assert c['oem_hub_previous_requested_duty_RAM']=='0x20004a1c'
+          assert c['oem_hub_FG_irq_pulse_counter_RAM']=='0x20004990'
+          assert c['transient_crc16']=='0xf956'
+          assert c['transient_sha256']=='0439c780e75ef78de50e09d11070efecac62e11c0a77f442c601e01be7cdacd0'
+          for f in ('word_reads_are_RTOS_atomic_as_a_group',
+                    'hub_FG_covers_four_feeders',
+                    'zero_duty_and_zero_pulse_means_motor_stopped',
+                    'zero_duty_means_motor_deenergized',
+                    'motor_safe_SET_RESET_approved',
+                    'flash_approved','persistent_BIN_output'):
+            assert not c[f]
+          assert c['Kalico_source_and_config_unchanged']
+          cases=a['hub_motor_command_FG_original_Thumb_cases']
+          assert len(cases)==9
+          assert [x['case'] for x in cases[:6]]==[
+            'both_zero_no_pulses','command_nonzero_stalled',
+            'previous_command_nonzero','pulses_after_zero_duty',
+            'nonzero_all','full_width']
+          for x in cases[:6]:
+            assert x['status']==0 and len(x['payload_hex'])==16
+            assert x['SRAM_reads']==[
+              ['0x20004a1a',2],['0x20004a1c',2],['0x20004990',4]]
+            assert x['SRAM_MMIO_nonstack_writes']==0
+            assert not x['hub_and_feeder_motors_stopped']
+            assert not x['safe_to_apply_RAM_parameters']
+          for x in cases[-3:]:
+            assert x['status']==1 and not x['payload_hex']
+            assert not x['SRAM_reads']
+          pwm=a['previous_PWM_snapshot_preserved']
+          assert pwm['replied_status']==0 and len(pwm['known_PWM_OUTPUT_ENABLE_bits_set'])==5
+          assert len(a['CONFIG_SET_RESET_denied_all_BOX_STATES'])==12
+          assert all(x['status']==7 and not x['sidecar_changed'] and x['nonstack_writes']==0
+                     for x in a['CONFIG_SET_RESET_denied_all_BOX_STATES'])
+          assert a['original_heap_boot_sidecar_still_cleared']['magic_and_enabled_mask_cleared']
+          assert a['source_mutation_fixtures_rejected']==[
+            'swap_hub_command_source','swap_hub_FG_counter_source',
+            'skip_payload_length_validation']
+          assert not a['real_CFS_hardware_io']
+          assert not a['Kalico_touched']
+          assert not a['firmware_BIN_emitted']
+          assert not a['motor_interlock_qualified']
+          print('PASS 9 original OEM hub/FG reads, 3 deliberate source mutants, 12 motor-unsafe SET/RESET denials; no CFS/Flash')
+          PYHUB
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
