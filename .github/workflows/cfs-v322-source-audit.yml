@@ -2908,6 +2908,51 @@ jobs:
           assert not a['motor_interlock_qualified']
           print('PASS 9 original OEM hub/FG reads, 3 deliberate source mutants, 12 motor-unsafe SET/RESET denials; no CFS/Flash')
           PYHUB
+      - name: Certify first-test APP geometry and OEM source continuity (OFFLINE NO FIRMWARE BIN)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_first_test_image_preflight.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-first-hardware-image-preflight.json >/dev/null
+          python - <<'PYPROOF'
+          import json
+          with open('/tmp/cfs-v323-first-hardware-image-preflight.json') as f: r=json.load(f)
+          h=r['image_header'];g=r['OEM_loader_geometry'];c=r['candidate']
+          assert r['release_track']=='FIRST_HARDWARE_TEST_PREVIEW_NOT_APPROVED_FOR_FLASH'
+          assert c['new_hub_command_FG_APP_bytes']==178520
+          assert c['new_opcode']=='0x57/0x17'
+          assert h['trial_image_sha256']=='0439c780e75ef78de50e09d11070efecac62e11c0a77f442c601e01be7cdacd0'
+          assert h['stored_header_length']==178520
+          assert h['stored_header_crc16']==h['recomputed_header_crc16']=='0xf956'
+          assert h['manufacturer_original_v322_sha256']=='40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7'
+          assert g['app_start']=='0x8003000' and g['end_exclusive']=='0x802e958'
+          assert g['first_2KiB_erase_page']==6 and g['last_2KiB_erase_page']==93
+          assert g['erase_page_count']==88 and g['first_param_erase_page']==255
+          assert g['buffered_program_end_exclusive']=='0x802ea00'
+          assert g['transport_chunk_count_128B']==1395
+          assert g['buffered_program_count_256B']==698
+          assert g['loader_pages_0_to_5_untouched_by_APP_geometry']
+          assert g['parameter_page_255_untouched_by_APP_geometry']
+          assert not g['image_can_be_flashing_authorized_from_geometry_alone']
+          assert len(r['unmodified_manufacturer_code_and_guard']['untouched_original_OEM_code_sites'])==8
+          assert r['unmodified_manufacturer_code_and_guard']['CONFIG_SET_RESET_firmware_entries_BW_redirect_to_busy']
+          assert r['12_original_ARM_CONFIG_SET_RESET_denials_checked']
+          assert r['unsafe_image_mutations_rejected']==[
+            'loader_base','param_page_overlap','zero_length',
+            'bad_length_header','bad_checksum_header','changed_reset_vector',
+            'missing_final_app_byte','modified_original_manufacturer_reader']
+          assert len(r['remaining_test_release_blockers'])==3
+          for not_yet in ('advanced_speed_buffer_runtime_writes_qualified',
+                         'auto_load_custom_RAM_profile_after_CFS_boot',
+                         'Kalico_source_or_active_config_edited',
+                         'MCU_serial_flash_erase_motor_mmio_accessed',
+                         'firmware_BIN_ELF_HEX_written',
+                         'qualified_to_flash_on_users_only_CFS'):
+            assert not r[not_yet]
+          print('PASS OEM APP preflight 178520B, CRC/Vectors, page6..93, immutable OEM RFID, 8 negatives, 12 denied writes; NOT FLASH AUTHORIZED')
+          PYPROOF
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
