@@ -2908,6 +2908,59 @@ jobs:
           assert not a['motor_interlock_qualified']
           print('PASS 9 original OEM hub/FG reads, 3 deliberate source mutants, 12 motor-unsafe SET/RESET denials; no CFS/Flash')
           PYHUB
+      - name: Validate four OEM GPIO feeder command latches plus hub brake and direction (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_raw_gpio_feeder_drive_snapshot_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-raw-gpio-latches-offline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-raw-gpio-latches-offline.json') as f: a=json.load(f)
+          c=a['candidate']
+          assert c['previous_hub_FG_preview_APP_bytes']==178520
+          assert c['new_gpio_latch_preview_APP_bytes']==178568
+          assert c['delta_bytes']==48
+          assert c['end_exclusive']=='0x802e988' and c['last_flash_page']==93
+          assert c['param_page_unchanged']=='0x807f800'
+          assert c['new_opcode']=='0x57/0x18' and c['output_bytes']==8
+          assert c['new_entry']=='0x802e8c4'
+          assert c['incoming_original_hooks']==18
+          assert c['outgoing_original_calls']==21
+          assert c['raw_GPIO_read_addresses']==['0x4001140c','0x4001180c']
+          assert c['crc16_in_memory_only']=='0xba83'
+          assert c['sha256_in_memory_only']=='946197ff853762815d5e5d9b3c0827469b0a916ec49491334a65552bf58773d1'
+          assert c['old_readonly_PWM_opcode_0x16_preserved']
+          assert c['old_readonly_hub_FG_opcode_0x17_preserved']
+          assert c['motor_source']['four_saved_OEM_PWM_flags_are_zero']
+          assert c['motor_source']['four_feed_pairs_on_GPIOD']==[[2,3],[0,1],[14,15],[12,13]]
+          assert not c['motor_source']['output_latch_proves_all_feeders_unelectrified']
+          matrix=a['raw_feeder_and_hub_GPIO_output_latch_Thumb_cases']
+          assert len(matrix)==13
+          assert all(x['nonstack_writes']==0 and not x['physical_motor_stop_proven'] and
+                     not x['CONFIG_WRITE_authorized'] for x in matrix)
+          assert all(x['GPIO_MMIO_reads']==['0x4001140c','0x4001180c'] and
+                     x['status']==0 and len(x['reply_hex'])==16 for x in matrix[:10])
+          assert all(x['GPIO_MMIO_reads']==[] and x['status']==1 for x in matrix[10:])
+          assert a['previous_PWM_mmio_snapshot']['replied_status']==0
+          assert a['previous_hub_command_FG_snapshot']['status']==0
+          assert len(a['still_denied_CONFIG_SET_RESET_all_six_BOX_STATES'])==12
+          assert all(x['status']==7 and not x['sidecar_changed'] and
+                     x['nonstack_writes']==0 for x in a['still_denied_CONFIG_SET_RESET_all_six_BOX_STATES'])
+          assert a['old_OEM_heap_boot_profile_reset']['magic_and_enabled_mask_cleared']
+          assert a['mutated_GPIO_sources_or_length_guards_rejected']==[
+            'swap_D_to_E','swap_E_to_D','bypass_request_size_guard']
+          assert not c['RTThread_motor_ISR_mutex_qualified']
+          assert not c['safe_to_apply_motor_RAM_profile']
+          assert not c['MCU_flash_approved']
+          assert a['no_live_CFS_motor_or_serial_IO']
+          assert a['Kalico_source_untouched']
+          assert not a['firmware_file_emitted']
+          assert not a['motor_safe_write_interlock_complete']
+          print('PASS four original GPIO-only feeder records, 13 raw MMIO diagnostic cases, 3 mutations; SET/RESET fenced')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
