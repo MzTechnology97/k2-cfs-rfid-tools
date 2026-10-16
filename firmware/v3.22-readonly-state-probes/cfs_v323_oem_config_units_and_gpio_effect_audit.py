@@ -33,6 +33,12 @@ OEM_BRANCHES={
     0x08004E10:("movs","r3, #0xa"),
     0x08004E14:("mov.w","r1, #0x3e8"),
     0x08004E1A:("bl",f"#{OEM_WAIT_HUB_SENSOR:#x}"),
+    0x080042E6:("mov.w","r8, #0x12c"),
+    0x080042EE:("mov","r1, r8"),
+    0x080042F2:("bl",f"#{OEM_WAIT_HUB_SENSOR:#x}"),
+    0x080048A4:("movs","r1, #0x32"),
+    0x080048A8:("bl",f"#{OEM_WAIT_HUB_SENSOR:#x}"),
+    0x080048BA:("mov.w","r7, #0x12c"),
     0x08005E54:("mov.w","r0, #0x1f4"),
     0x08005E58:("bl",f"#{OEM_DELAY:#x}"),
     0x08006072:("bl","#0x800d27a"),
@@ -109,6 +115,18 @@ def inspect_generation(app:bytes)->dict:
         "id_10_initial_raw":1000,
         "id_10_effective_timeout_approx_ms":1000*10,
         "id_10_catalog_ms_unit_is_wrong":True,
+        "id_26_original_builder_hook_nominal":"0x80112e6",
+        "id_26_physical_hook_PC":"0x80042e6",
+        "id_26_raw_default":300,
+        "id_26_raw_register":"r8",
+        "id_26_call_wait_hub_sensor":"0x80042f2",
+        "id_26_timeout_approx_ms":3000,
+        "id_26_catalog_ms_unit_is_wrong":True,
+        "id_26_different_50poll_call_at":"0x80048a8",
+        "id_26_different_50poll_timeout_approx_ms":500,
+        "id_26_different_700poll_call_at":"0x80048ce",
+        "id_26_different_700poll_timeout_approx_ms":7000,
+        "id_26_source_r7_300_not_argument_for_0x80048a8":True,
         "id_19_physical_nominal_builder_hook":hex(0x08013078-APPEND_OLD_NOMINAL_TO_PHYSICAL_DELTA),
         "id_19_100ms_source_at":hex(0x08006076),
         "id_19_delay_CALL_at":hex(0x08006078),
@@ -132,14 +150,17 @@ def negatives(app:bytes)->list[str]:
         (0x08005E54,"change_separate_500ms"),
         (0x08006078,"corrupt_id19_delay_target"),
         (0x080101EE,"corrupt_feeder_direct_GPIO_writer"),
+        (0x080042E6,"change_id26_original_300raw_source"),
+        (0x080048A4,"change_other_50raw_sensor_source"),
+        (0x080048BA,"change_unrelated_r7_300_source"),
     ):
         b=bytearray(app)
         b[pc-LINK_BASE]^=1
         try:inspect_generation(bytes(b))
         except ValueError:names.append(label)
         else:raise AssertionError("source mutation not detected "+label)
-    if len(names)!=7:
-        raise ValueError("expected 7 rejected OEM timing/GPIO corruptions")
+    if len(names)!=10:
+        raise ValueError("expected 10 rejected OEM timing/GPIO corruptions")
     return names
 
 def main()->None:
@@ -158,6 +179,10 @@ def main()->None:
         raise ValueError("v3.13 original ID8 callsite must initialize 700 raw polls")
     if decode_ins(v322,0x080042CA)!=("bl","#0x802e7cc"):
         raise ValueError("installed v3.22 ID8 wrapper at physical callsite has changed")
+    # The old v3.14 source lists the exact ID26 R8 hook under nominal
+    # old APP placement 0x08010000; physical position is minus 0xD000.
+    if "(0x080112E6,'cfg26_r8_wrapper')" not in a.builder.read_text():
+        raise ValueError("ID26 old nominal physical R8 hook mapping changed")
     first=inspect_generation(v313)
     second=inspect_generation(v322)
     if first!=second:
@@ -187,6 +212,7 @@ def main()->None:
         "id8_stock_v313_700_RAW_polls_replaced_by_current_v322_BL":True,
         "id8_running_v322_hook_target":"0x802e7cc",
         "independent_other_700_raw_polls_callsite":"0x80048c8",
+        "ID26_nominal_builder_R8_hook_matches_installed_physical":"0x80042e6",
         "OEM_findings":second,
         "OEM_negative_fixtures_rejected":negatives(v322),
         "current_v323_feature_candidate_APP_bytes":len(image),
