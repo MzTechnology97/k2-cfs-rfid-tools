@@ -2700,6 +2700,62 @@ jobs:
           assert not a['firmware_BIN_exported']
           print('PASS 32 OEM original physical Thumb BL and sensor-event scenarios, rollback mutation; no flash/hardware')
           PYTEST
+      - name: Deny unproven motor-unsafe CONFIG SET RESET, keep diagnostic GET, prove cold RAM reset (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_safe_config_readonly_preview.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-config-failclosed-boot-ram-proof.json >/dev/null
+          python - <<'PYCFG'
+          import json
+          with open('/tmp/cfs-v323-config-failclosed-boot-ram-proof.json') as f: a=json.load(f)
+          c=a['candidate']
+          assert c['previous_full_v323_APP_length']==178416
+          assert c['read_only_config_preview_APP_length']==178416
+          assert c['size_and_last_Flash_page_unchanged']
+          assert c['end_exclusive']=='0x802e8f0'
+          assert c['last_Flash_page']==93
+          assert c['preexisting_0x57_CONFIG_INFO_GET_persists']
+          assert c['preexisting_0x57_CONFIG_SET_RESET_never_write']
+          assert [x['opcode'] for x in c['fail_closed_original_command_entries']]==['0x12','0x13']
+          assert [x['entry_PC'] for x in c['fail_closed_original_command_entries']]==[
+            '0x802e0a0','0x802e120']
+          assert [x['existing_busy_status_target'] for x in c['fail_closed_original_command_entries']]==[
+            '0x802e28e','0x802e28e']
+          assert c['old_stock_speed_ids_read_only']==list(range(6))
+          assert c['effective_advanced_timing_ids_only_if_host_enable_later']==[7,8]
+          assert c['storage_only_tuning_ids_not_effective']==list(range(9,28))
+          assert c['MCU_boot_clears_volatile_override_magic_and_mask']
+          assert not c['automatic_custom_Kalico_RAM_profile_on_MCU_boot']
+          assert not c['independent_motor_stop_signal_fully_proven']
+          assert not c['motion_task_ISR_atomic_interlock_implemented']
+          assert not c['firmware_ready_to_flash']
+          assert c['no_permanent_firmware_image_generated']
+          assert c['experimental_in_memory_sha256']=='7fa91cfdcddf9c9ffc4d6882f7d1ac28535b23fea8c0b1514823bb0ba97b0a38'
+          assert c['experimental_in_memory_crc16']=='0xa1ca'
+          previous=a['original_staging_v323_SET_before_guard']
+          assert previous['command']=='0x12' and previous['BOX_STATE']==0
+          assert previous['status']==0 and previous['sidecar_changed']
+          assert previous['nonstack_writes']==2
+          tests=a['fail_closed_CONFIG_SET_RESET_motor_state_matrix']
+          assert len(tests)==20
+          assert all(t['status']==7 and not t['sidecar_changed'] and
+                     t['nonstack_writes']==0 for t in tests if t['command'] in ('0x12','0x13'))
+          assert tests[-2]['command']=='0x10' and tests[-2]['payload_hex']=='021c01d7'
+          assert tests[-1]['command']=='0x11' and tests[-1]['payload_hex']=='07800c'
+          b=a['original_OEM_heap_boot_sidecar_reset']
+          assert b['OEM_heap_hook_invoked'] and b['magic_and_enabled_mask_cleared']
+          assert b['old_sidecar_stored_values_ignored_after_boot']
+          assert b['no_custom_override_profile_reloaded']
+          assert b['changed_global_SRAM_only_two_words']
+          assert not a['Kalico_changes_performed']
+          assert not a['CFS_hardware_io']
+          assert not a['flash_approved']
+          assert not a['firmware_BIN_exported']
+          print('PASS v3.23 20 original-ARM config cases, 2 denied SET/RESET, INFO/GET and OEM cold boot SRAM reset; no flash')
+          PYCFG
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
