@@ -39,6 +39,8 @@ OEM_BRANCHES={
     0x080048A4:("movs","r1, #0x32"),
     0x080048A8:("bl",f"#{OEM_WAIT_HUB_SENSOR:#x}"),
     0x080048BA:("mov.w","r7, #0x12c"),
+    0x080048F4:("mov","r1, r7"),
+    0x080048F8:("bl",f"#{OEM_WAIT_HUB_SENSOR:#x}"),
     0x08005E54:("mov.w","r0, #0x1f4"),
     0x08005E58:("bl",f"#{OEM_DELAY:#x}"),
     0x08006072:("bl","#0x800d27a"),
@@ -127,6 +129,11 @@ def inspect_generation(app:bytes)->dict:
         "id_26_different_700poll_call_at":"0x80048ce",
         "id_26_different_700poll_timeout_approx_ms":7000,
         "id_26_source_r7_300_not_argument_for_0x80048a8":True,
+        "id_26_distinct_R7_retry_300raw_loaded_at":"0x80048ba",
+        "id_26_distinct_R7_retry_300raw_CALL_at":"0x80048f8",
+        "id_26_distinct_R7_retry_timeout_approx_ms":3000,
+        "id_26_advanced_R8_hook_does_not_override_R7_retry":True,
+        "id_26_two_independent_3second_paths":True,
         "id_19_physical_nominal_builder_hook":hex(0x08013078-APPEND_OLD_NOMINAL_TO_PHYSICAL_DELTA),
         "id_19_100ms_source_at":hex(0x08006076),
         "id_19_delay_CALL_at":hex(0x08006078),
@@ -153,14 +160,16 @@ def negatives(app:bytes)->list[str]:
         (0x080042E6,"change_id26_original_300raw_source"),
         (0x080048A4,"change_other_50raw_sensor_source"),
         (0x080048BA,"change_unrelated_r7_300_source"),
+        (0x080048F4,"disconnect_R7_retry_300raw_argument"),
+        (0x080048F8,"disconnect_R7_retry_300raw_call"),
     ):
         b=bytearray(app)
         b[pc-LINK_BASE]^=1
         try:inspect_generation(bytes(b))
         except ValueError:names.append(label)
         else:raise AssertionError("source mutation not detected "+label)
-    if len(names)!=10:
-        raise ValueError("expected 10 rejected OEM timing/GPIO corruptions")
+    if len(names)!=12:
+        raise ValueError("expected 12 rejected OEM timing/GPIO corruptions")
     return names
 
 def main()->None:
