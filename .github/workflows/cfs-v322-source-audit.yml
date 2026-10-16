@@ -2561,6 +2561,54 @@ jobs:
           assert not a['CI_releasing_flash_image']
           print('PASS 2 source-pinned secure sink guards × 3 chip states, no flash, no hardware IO')
           PYTEST
+      - name: Exercise real OEM RFID usage task with post-gate record races (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_original_usage_task_race_emulator.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-oem-usage-task-races-offline.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-oem-usage-task-races-offline.json') as f: a=json.load(f)
+          assert a['OEM_original_ARM_VFP_usage_task']=='0x800dc94'
+          assert a['earlier_gate_only_candidate_APP_bytes']==178320
+          assert a['with_two_secure_sinks_candidate_APP_bytes']==178352
+          assert a['only_original_OEM_task_code_emulated']
+          assert a['stubs_are_synthetic_and_no_OEM_RFID_hardware_code_executed']
+          assert a['two_original_secure_sink_branch_PCs']==['0x800de68','0x800dec2']
+          assert a['original_tag_reread_branch_source_only']==['0x800dfda']
+          assert a['earlier_valid_original_MCU_entry_gate_emulated']['gate_result']==1
+          assert not a['earlier_valid_original_MCU_entry_gate_emulated']['global_SRAM_writes']
+          case={c['case']:c for c in a['case_results']}
+          assert len(case)==15
+          assert [(case[k]['old_used_mm'],case[k]['guarded_used_mm'],
+                   case[k]['old_percent'],case[k]['guarded_percent']) for k in (
+                     'type4_print_5000mm','type4_print_25000mm',
+                     'type4_print_55000mm')]==[
+                       (5000,5000,78,78),(25000,25000,70,70),
+                       (55000,55000,58,58)]
+          for key in ('type4_unload_dirty','invalid_record_dirty',
+                      'type7_record_dirty','race_print_to_unload',
+                      'race_record_removed','race_type4_to_type7',
+                      'race_bad_type_and_dirty','race_bad_type_after_detect'):
+            assert case[key]['earlier_gate_only_secure_calls']>0
+            assert case[key]['with_two_secure_sink_guards_secure_calls']==0
+          for key in ('type7_secure_board','type7_secure_unload'):
+            assert case[key]['earlier_gate_only_secure_calls']==2
+            assert case[key]['with_two_secure_sink_guards_secure_calls']==2
+          mutations=a['two_single_hook_removal_mutations_rejected']
+          assert [m['fault'] for m in mutations]==[
+              'remove_secure_detect_guard','remove_secure_write_guard']
+          assert all(m['OEM_secure_accesses_after_one_hook_removed']>0 and
+                     m['OEM_secure_accesses_with_both_hooks']==0 for m in mutations)
+          assert not a['real_RTOS_preemption_or_IRQ_qualified']
+          assert not a['flash_approved']
+          assert not a['hardware_IO']
+          assert not a['firmware_BIN_emitted']
+          print('PASS 15 actual OEM ARM VFP usage-task race pairs + 2 single-hook-removal mutants; no physical CFS IO')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
