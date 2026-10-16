@@ -79,6 +79,24 @@ This tool is **not an uploader** and cannot issue RS485 commands.
 No installable BIN/ELF, write operation, SWD call, GPIO change or
 Kalico access is performed.
 
+## Recovery is a documented stock-loader feature — exact qualification limit
+
+The independent OpenCFS loader specification (PR #5) documents
+the existing manufacturer boot-window and recovery protocol; this
+audit pins its `F0/01` writer path, APP base and parameter erase
+behavior against the archived full Flash. **We no longer need to
+invent a recovery protocol for v3.23.** The two outstanding
+uncertainties are the installed loader's byte identity and a safe
+hardware recovery check, neither of which invalidates the
+*archived loader design*.
+
+The APP begins at `0x08003000` and must have exclusive end no
+later than `0x0807F800`, so the purely arithmetic image span is
+`0x7C800` = **509,952 bytes**. This is NOT a vendor-approved
+maximum length and the old `0x0803B800` build-policy address
+is not a loader enforcement limit. The experimental #40 type4
+candidate ends at `0x0802E8B0`, inside the observed geometry.
+
 ## Recovery assumptions still unverified on the installed MCU
 
 The OpenCFS PR #5 historical specification says enumeration within
