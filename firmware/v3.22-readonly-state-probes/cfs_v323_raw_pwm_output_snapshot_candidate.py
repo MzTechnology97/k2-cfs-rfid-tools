@@ -123,18 +123,28 @@ MOTOR_ENABLE_MASKS={
     "pwm8_feeder_PD14_TIMER3_CH2":(1,0x100),
 }
 
-def extend_with_readonly_pwm(asm:str)->str:
+def extend_with_readonly_pwm(asm:str,*,extra_dispatch:str="",
+                             extra_entry:str="")->str:
     text=live_source(asm)
     if text.count(DISPATCH_BEFORE)!=1:
         raise ValueError("0x57 extended dispatch source changed")
     text=text.replace(DISPATCH_BEFORE,DISPATCH_AFTER,1)
+    if extra_dispatch:
+        anchor="    cmp     r5, #0x16\n    beq.w   op_raw_pwm_enable_snapshot\n    b       status_bad\n"
+        if text.count(anchor)!=1 or not extra_entry:
+            raise ValueError("further read-only MCU dispatcher extension invalid")
+        replacement=anchor.replace("    b       status_bad\n",extra_dispatch+"    b       status_bad\n",1)
+        text=text.replace(anchor,replacement,1)
+    elif extra_entry:
+        raise ValueError("unreachable extra MCU command")
     if text.count(INSERT_ANCHOR)!=1:
         raise ValueError("old v3.22 assembly append anchor changed")
     return text.replace(INSERT_ANCHOR,
-        DEFENSE_CODE+WRAPPER_ASM+NEW_ENTRY+INSERT_ANCHOR,1)
+        DEFENSE_CODE+WRAPPER_ASM+NEW_ENTRY+extra_entry+INSERT_ANCHOR,1)
 
 def build(v313:bytes,v322:bytes,asm:str,ld:str,builder:str,
-          builder_path:Path)->tuple[bytes,dict,dict[str,int]]:
+          builder_path:Path,*,extra_dispatch:str="",
+          extra_entry:str="")->tuple[bytes,dict,dict[str,int]]:
     audited(v313)
     audited(v322)
     _,spool,spool_meta,spool_syms=spool_candidate(
@@ -142,7 +152,8 @@ def build(v313:bytes,v322:bytes,asm:str,ld:str,builder:str,
     )
     protected,ro_meta=fail_closed_preview(spool,spool_syms)
     physical,linked,refs=physically_relocate_source(
-        extend_with_readonly_pwm(asm),ld
+        extend_with_readonly_pwm(asm,extra_dispatch=extra_dispatch,
+                                 extra_entry=extra_entry),ld
     )
     handler,relocs,syms_text=assemble(physical,linked)
     syms=symbol_dict(syms_text)
