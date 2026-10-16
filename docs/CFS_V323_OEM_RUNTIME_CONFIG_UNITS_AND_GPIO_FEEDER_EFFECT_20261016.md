@@ -93,6 +93,14 @@ the legacy v3.14 advanced-hook table resolve it precisely:
   `0x080048A4: movs r1,#0x32`: **50 polls ≈ 500 ms**,
   not 300 polls. A later `mov.w r7,#300` at
   `0x080048BA` is **not** that call's R1 timeout argument.
+- The **retry loop in that other function** is a second
+  3-second path: `0x080048BA: mov.w r7,#300` feeds
+  `0x080048F4: mov r1,r7` and
+  `0x080048F8: bl 0x0800E85A`.
+  It has the same **300 × 10ms = ~3s** raw default
+  as ID26's planned hook at `0x080042E6`, but is
+  **not patched by that hook**. Two independent hooks
+  would be required for both paths to change together.
 - Another separate call at `0x080048CE` is preceded by
   `0x080048C8: mov.w r1,#700`: **700 polls ≈ 7 seconds**.
 
@@ -100,8 +108,10 @@ the legacy v3.14 advanced-hook table resolve it precisely:
 the originally intended site `0x080042E6`, but its name
 `transition_detect_timeout_ms` and
 `milliseconds_u16` type misstate its unit by 10×.
-The two `0x080048xx` sites are not the intended hook;
-do not change the ID26 raw default to 700.
+The `0x080048xx` callsites, including the other 3-second
+retry call at `0x080048F8`, are not the intended ID26 hook;
+do not change the ID26 raw default to 700, or assume
+changing ID26 would adjust both 3-second loops.
 
 ## Finding C — feeder IDs 0 and 4 are *binary GPIO commands*
 
@@ -147,8 +157,8 @@ GPIO-diagnostic candidate entirely in memory.
 
 - **Two matching OEM generations.**
 - **Four motor records**, with the source-pinned GPIO-only configuration.
-- **Ten deliberate ROM corruption mutants** rejected, including the
-  distinct ID26/50-poll/r7 timing paths.
+- **Twelve deliberate ROM corruption mutants** rejected, including the
+  distinct ID26/R8, separate R7 retry, 50-poll and 700-poll timing paths.
 - **Twelve SET/RESET command executions** over six stock BOX_STATE
   values: status **7** for every attempt, no runtime-profile
   sidecar or global RAM writes.
