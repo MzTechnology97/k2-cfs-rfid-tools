@@ -75,6 +75,34 @@ The ID19 advanced hook has **not** been enabled in the
 present v3.23 combined firmware, and no new writable
 RFID operation is being activated by this audit.
 
+## Finding C — ID26 is a 300-poll timeout, *not* 300 milliseconds
+
+An additional [PR #47 comment](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/47#issuecomment-6212649588)
+raised a suspected mismatch around ID26. Both original APPs and
+the legacy v3.14 advanced-hook table resolve it precisely:
+
+- Nominal hook `0x080112E6`, after subtracting `0xD000`, is
+  physical **`0x080042E6`**. The instruction is
+  `mov.w r8,#0x12c`, i.e. **300 raw polls**.
+  `0x080042EE: mov r1,r8` then
+  `0x080042F2: bl 0x0800E85A` uses the original 10-ms
+  per-poll implementation. Effective timeout **~3 seconds**.
+  The intended `cfg26_r8_wrapper` replaces R8's initialized
+  raw poll count; **this advanced hook remains disabled in v3.23**.
+- The separate call at `0x080048A8` is preceded by
+  `0x080048A4: movs r1,#0x32`: **50 polls ≈ 500 ms**,
+  not 300 polls. A later `mov.w r7,#300` at
+  `0x080048BA` is **not** that call's R1 timeout argument.
+- Another separate call at `0x080048CE` is preceded by
+  `0x080048C8: mov.w r1,#700`: **700 polls ≈ 7 seconds**.
+
+**Conclusion:** the catalog ID26 raw default **300** matches
+the originally intended site `0x080042E6`, but its name
+`transition_detect_timeout_ms` and
+`milliseconds_u16` type misstate its unit by 10×.
+The two `0x080048xx` sites are not the intended hook;
+do not change the ID26 raw default to 700.
+
 ## Finding C — feeder IDs 0 and 4 are *binary GPIO commands*
 
 All four OEM initialized motor records, sourced from the original
@@ -119,7 +147,8 @@ GPIO-diagnostic candidate entirely in memory.
 
 - **Two matching OEM generations.**
 - **Four motor records**, with the source-pinned GPIO-only configuration.
-- **Seven deliberate ROM corruption mutants** rejected.
+- **Ten deliberate ROM corruption mutants** rejected, including the
+  distinct ID26/50-poll/r7 timing paths.
 - **Twelve SET/RESET command executions** over six stock BOX_STATE
   values: status **7** for every attempt, no runtime-profile
   sidecar or global RAM writes.
