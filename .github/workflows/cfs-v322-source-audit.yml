@@ -2823,6 +2823,55 @@ jobs:
           assert not a['MCU_flash_approved']
           print('PASS OEM raw read-only PWM output enable 13 cases, failclosed CONFIG 14 cases and 3 faults')
           PYCHK
+      - name: Preserve all 102 original motor BL and deny CONFIG after raw PWM query (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_motor_start_write_fence_regression.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-original-motor-calls-and-write-fence.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-original-motor-calls-and-write-fence.json') as f: a=json.load(f)
+          assert a['underlying_in_memory_preview_APP_length']==178464
+          assert a['underlying_in_memory_preview_APP_sha256']=='4b3319a5c83ed451b30040ccccea116ee97875134c81b4bd9f59b0da376fe293'
+          m=a['original_102_motor_callsite_inventory']
+          assert m['manufacturer_known_direct_motor_BL_preserved']==102
+          assert m['manufacturer_known_tail_branches_preserved']==3
+          assert m['physical_motor_command_targets']=={
+            '0x80110cc':2,'0x8011164':33,'0x801117e':17,'0x8011198':50}
+          assert m['does_not_prove_all_indirect_ISR_task_paths_are_covered']
+          assert m['no_movement_permission_granted']
+          assert a['single_removed_motor_callsite_mutation_rejected']['known_original_command_change_rejected']
+          assert a['single_removed_motor_callsite_mutation_rejected']['mutated_OEM_motor_PC']=='0x8003e84'
+          cases=a['sequential_single_MCU_PWM_then_SET_then_RESET']
+          assert len(cases)==10
+          assert all(x['single_MCU_used_for_all_three_requests'] and
+                     not x['motor_active_or_idle_physically_proven'] and
+                     not x['config_WRITE_permitted'] for x in cases)
+          for item in cases:
+            d,r,s=item['commands']
+            assert d['op']=='0x57/16' and d['status']==0
+            assert d['MMIO_reads']==['0x40012c20','0x40000820']
+            assert len(d['reply_hex'])==16
+            for x,opcode in ((r,'0x57/12'),(s,'0x57/13')):
+              assert x['op']==opcode and x['status']==7
+              assert not x['MMIO_reads'] and not x['reply_hex']
+              assert x['global_writes']==0 and x['sidecar_still_unchanged']
+          assert cases[0]['case']=='false_idle_all_output_enable_bits_zero'
+          assert cases[0]['BOX_STATE']==0
+          assert cases[0]['TIMER0_CHCTL2']=='0x0'
+          assert cases[0]['TIMER3_CHCTL2']=='0x0'
+          assert a['no_complete_ISR_task_or_indirect_start_coverage']
+          assert not a['independent_hardware_motor_stop_proven']
+          assert not a['future_RTTHREAD_atomic_busy_interlock_implemented']
+          assert not a['v323_config_RAM_WRITE_authorized']
+          assert not a['v323_FLASH_authorized']
+          assert not a['physical_CFS_Kalico_or_motor_IO']
+          assert not a['firmware_binary_exported']
+          print('PASS 102 OEM BL + 3 tails intact; 10 consecutive PWM/SET/RESET MCU cases; NO write/Flash permission')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
