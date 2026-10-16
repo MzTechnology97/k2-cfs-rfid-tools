@@ -1,6 +1,47 @@
 # CFS v3.23 — readiness after the real Flash base correction
 *Engineering status: 12 October 2026 — offline analysis only.*
 
+## 16 October clarification — stock RS485 recovery is documented
+
+[OpenCFS's recovered OEM loader specification](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/ca73d2ec99b6b03b9a2c98b4613f32224641e5ec/docs/spec/08-loader-and-recovery.md)
+already describes the **existing manufacturer's RS485 recovery
+mechanism**; this is not a missing new bootloader feature. Its
+update-command and Flash/FMC programming geometry were independently
+checked against the SHA-pinned historical 2025 full Flash ROM in
+[k2-cfs-rfid-tools draft #38](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/38).
+
+- Bootloader: `0x08000000..0x08002FFF` (the archive has its own vectors).
+- APP update starts at `0x08003000` and advances sequentially.
+- The loader receives 128-byte chunks and writes buffered 256-byte
+  blocks; it erases the 2-KiB Flash pages touched by the new image.
+- Reserved parameter page begins at **`0x0807F800`**. A correctly
+  bounded image must end **at or before** that address (exclusive);
+  a one-byte overflow would touch the parameter page. The *theoretical*
+  distance from APP start to that page is `0x7C800` = **509,952
+  bytes**, **not** an approved maximum image size.
+- Our current **in-memory** type4+secure-sink candidate from
+  draft [#40](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/40)
+  is **178,352 bytes** and ends at **`0x0802E8B0`** (page 93).
+  Thus its size alone does not threaten the historical loader or
+  parameter page. Actual linker/Flash/RTOS safety is still separate.
+- The **documented** manufacturer recovery rules: invalid APP CRC
+  keeps the historical loader active; a valid but nonfunctional APP
+  can be bypassed by power-cycling and enumerating within its
+  **approximately 30-second** initial RS485 window. A damaged loader
+  needs SWD. No destructive recovery test has been run here.
+
+**Updated conclusion:** firmware recovery is **documented and
+source-corroborated on the archived OEM loader**, and reasonably
+expected to work on the installed board (reported boot version
+`cfs0_050_G32` matches the archive). Do not describe the recovery
+*protocol itself* as unknown. The open evidence point is **installed
+loader identity and actual recovery validation**, not absence of a
+loader/recovery design.
+
+The original nine release gates remain false; no release approval
+is implied. User has no spare CFS. Do not run RS485 update, reset,
+parameter erase, Flash write or motors as a result of this note.
+
 ## Decision
 
 **Not ready to flash v3.23.** The v3.22 image has been reliably rebuilt,
@@ -84,9 +125,15 @@ Do not enable motor-active MCU writes from these values.
   that byte can misclassify active motion. A verifiable MCU motor/task
   idle state with atomic rejection is needed; host-side Kalico preflight
   is useful but insufficient as an MCU safety proof.
-- **Loader/page ownership.** Authenticate bootloader app maximum length
-  and erase/flash range, NVM reservations, recoverability if update is
-  interrupted. Do not use production loader mode to explore them.
+- **Loader/recovery hardware qualification (design already recovered).**
+  The **historical loader's** RS485 update, image base, 2-KiB page
+  erase, reserved parameter region, 30-second recovery window and
+  checksum requirements are documented. Before flashing the user's
+  CFS, verify the installed loader is equivalent, preserve/backup
+  the parameter page and check length/CRC/last programmed page; an
+  actual interrupted-update recovery and MCU rail/power-cycle have
+  not been validated. Do not use the production unit for destructive
+  protocol experiments.
 - **RAM ownership.** The prospective 512-byte logging ring would occupy
   the current heap region `0x20006F28..0x20007127`. Reserving it
   requires moving the heap and proving actual RTOS stack/DMA/interrupt
