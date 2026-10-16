@@ -2988,6 +2988,11 @@ jobs:
           assert a['id_26_different_700poll_call_at']=='0x80048ce'
           assert a['id_26_different_700poll_timeout_approx_ms']==7000
           assert a['id_26_source_r7_300_not_argument_for_0x80048a8']
+          assert a['id_26_distinct_R7_retry_300raw_loaded_at']=='0x80048ba'
+          assert a['id_26_distinct_R7_retry_300raw_CALL_at']=='0x80048f8'
+          assert a['id_26_distinct_R7_retry_timeout_approx_ms']==3000
+          assert a['id_26_advanced_R8_hook_does_not_override_R7_retry']
+          assert a['id_26_two_independent_3second_paths']
           assert r['id8_physical_stock_source']=='0x80042ca'
           assert r['id8_stock_v313_700_RAW_polls_replaced_by_current_v322_BL']
           assert r['id8_running_v322_hook_target']=='0x802e7cc'
@@ -3001,7 +3006,7 @@ jobs:
           assert len(a['four_oem_GPIO_feeder_records'])==4
           assert all(x['feeder_PWM_flag']==0 and x['feeder_PWM_driver_pointers_zero'] and
                      not x['speed_nonzero_is_proportional_control'] for x in a['four_oem_GPIO_feeder_records'])
-          assert len(r['OEM_negative_fixtures_rejected'])==10
+          assert len(r['OEM_negative_fixtures_rejected'])==12
           assert r['current_v323_feature_candidate_APP_bytes']==178568
           assert r['ids_8_and_10_over_wire_have_no_unit_or_format_change']
           assert r['ids_0_and_4_should_be_readonly_on_GPIO_only_stock_feeders']
@@ -3015,7 +3020,7 @@ jobs:
           assert r['current_Kalico_existing_extra_unchanged']
           assert r['no_flash_or_MMIO_motor_actions'] and r['no_release_approval']
           assert not r['persistent_binary_exported']
-          print('PASS OEM v3.13/v3.22: GPIO feeders, IDs 8/10/26 raw poll units, ID19 100ms, 10 mutants, 12 SET denials')
+          print('PASS OEM v3.13/v3.22: GPIO feeders, IDs 8/10/26 raw poll units, ID19 100ms, 12 mutants, 12 SET denials')
           PYCHECK
       - name: Remove disposable compiled image
         if: always()
