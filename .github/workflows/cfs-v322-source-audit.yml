@@ -2823,6 +2823,24 @@ jobs:
           assert not a['MCU_flash_approved']
           print('PASS OEM raw read-only PWM output enable 13 cases, failclosed CONFIG 14 cases and 3 faults')
           PYCHK
+      - name: Exhaustively deny unverified MCU motor guard states (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_pwm_motor_guard_exhaustive_contract.py --json-out /tmp/cfs-v323-motor-interlock-contract.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-motor-interlock-contract.json') as f: x=json.load(f)
+          assert x['enumerated_model_states']==1024
+          assert x['synthetic_only_accepted_cases']==2
+          assert x['paired_PWM_off_on_contract_equal']
+          assert not x['timer_enable_registers_sufficient_as_stop_evidence']
+          assert not x['actual_CFS_sensor_identity_authenticated']
+          assert not x['atomic_RTThread_ISR_motor_lock_in_original_MCU']
+          assert not x['write_SET_RESET_unblocked_in_first_test_build']
+          assert x['existing_v323_config_guard_remains_fail_closed']
+          assert not x['real_flash_or_motor_io'] and not x['Kalico_source_edited']
+          print('PASS 1024 fail-closed synthetic interlock states, PWM off/on invariance')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
