@@ -2756,6 +2756,73 @@ jobs:
           assert not a['firmware_BIN_exported']
           print('PASS v3.23 20 original-ARM config cases, 2 denied SET/RESET, INFO/GET and OEM cold boot SRAM reset; no flash')
           PYCFG
+      - name: Validate RAW TIMER PWM output-enable snapshot and CONFIG fail-closed (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_raw_pwm_output_snapshot_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-raw-pwm-output-enable-proof.json >/dev/null
+          python - <<'PYCHK'
+          import json
+          with open('/tmp/cfs-v323-raw-pwm-output-enable-proof.json') as f:
+              a=json.load(f)
+          c=a['candidate']
+          assert c['original_APP_base']=='0x8003000'
+          assert c['prior_safe_CONFIG_APP_bytes']==178416
+          assert c['new_read_only_PWM_snapshot_APP_bytes']==178464
+          assert c['new_source_bytes']==48
+          assert c['end_exclusive']=='0x802e920'
+          assert c['last_flash_page']==93
+          assert c['historical_parameter_page_reserved']=='0x807f800'
+          assert c['incoming_original_manufacturer_hooks']==18
+          assert c['outgoing_original_manufacturer_calls']==21
+          assert c['new_opcode']=='0x57/0x16'
+          assert c['new_opcode_handler_PC']=='0x802e85e'
+          assert c['snapshot_length']==8
+          assert c['TIMER0_raw_output_enable_register']=='0x40012c20'
+          assert c['TIMER3_raw_output_enable_register']=='0x40000820'
+          assert c['config_SET_RESET_entry_guards_shifted_and_still_active']==[
+              '0x802e0a6','0x802e126']
+          assert c['sha256_in_memory_only']=='4b3319a5c83ed451b30040ccccea116ee97875134c81b4bd9f59b0da376fe293'
+          assert c['crc16_in_memory_only']=='0x3779'
+          assert c['original_CMD_0x57_CONFIG_ID_28_31_preserved']
+          assert c['manufacturer_command_or_GPIO_behavior_unchanged']
+          assert not c['raw_output_enable_registers_prove_physical_motor_STOP']
+          assert not c['inferred_absent_PWM_proves_all_motors_deenergized']
+          assert not c['can_apply_RAM_config_profile_on_boot']
+          assert not c['MCU_motor_write_allowed']
+          assert not c['flash_qualified']
+          assert not c['firmware_file_exported']
+          matrix=a['new_RAW_PWM_snapshot_emulator_matrix']
+          assert len(matrix)==13
+          good=[x for x in matrix if x['subcmd']=='0x16' and x['request_payload_len']==4]
+          assert len(good)==8
+          assert all(x['MMIO_reads']==['0x40012c20','0x40000820'] and
+                     x['MMIO_writes']==0 and x['other_nonstack_writes']==0 and
+                     x['replied_status']==0 and len(x['reply_hex'])==16 and
+                     not x['motor_STOP_verified'] and not x['permission_to_write_RAM_overrides']
+                     for x in good)
+          assert len(matrix[6]['known_PWM_OUTPUT_ENABLE_bits_set'])==5
+          assert all(x['MMIO_reads']==[] and x['replied_status']==1 for x in matrix[-2:])
+          assert matrix[-3]['case']=='existing_READONLY_BOX_STATE_snapshot'
+          assert matrix[-3]['replied_status']==0 and matrix[-3]['reply_hex']=='2300'
+          assert len(a['raw_MMIO_source_and_opcode_mutations_rejected'])==3
+          guard=a['still_denied_CONFIG_and_diagnostic_GET_matrix']
+          assert len(guard)==14
+          assert all(x['status']==7 and not x['sidecar_changed'] and
+                     x['nonstack_writes']==0 for x in guard[:12])
+          assert guard[-2]['status']==0
+          assert guard[-1]['status']==0 and guard[-1]['payload_hex']=='07800c'
+          assert a['unchanged_original_heap_boot_reset']['magic_and_enabled_mask_cleared']
+          assert a['exposed_sensor_feedback_is_raw_pwm_outputs_not_motor_STOP']
+          assert not a['firmware_BIN_HEX_ELF_generated']
+          assert not a['Kalico_source_or_config_touched']
+          assert not a['CFS_hardware_serial_MMIO_accessed']
+          assert not a['MCU_flash_approved']
+          print('PASS OEM raw read-only PWM output enable 13 cases, failclosed CONFIG 14 cases and 3 faults')
+          PYCHK
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
