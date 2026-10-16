@@ -2654,6 +2654,52 @@ jobs:
           assert a['no_installable_firmware_image_produced']
           print('PASS OEM v3.13/v3.22 vs OpenCFS GD32 board map: 4 motors, 5 PWM, hub FG, 4 miswire rejections; no motor stop/flash authorization')
           PYBOARD
+      - name: Exercise original OEM slot removal with guarded legacy type4 cleanup (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_type4_spool_lifecycle_candidate.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-type4-spool-lifecycle-proof.json >/dev/null
+          python - <<'PYTEST'
+          import json
+          with open('/tmp/cfs-v323-type4-spool-lifecycle-proof.json') as f: a=json.load(f)
+          b=a['candidate']
+          assert b['previous_TYPE4_candidate_bytes']==178352
+          assert b['new_spool_lifecycle_candidate_bytes']==178416
+          assert b['extra_bytes']==64
+          assert b['image_end_exclusive']=='0x802e8f0'
+          assert b['last_flash_page']==93
+          assert b['new_OEM_hook_site']=='0x80064a6'
+          assert b['new_wrapper_entry']=='0x802e816'
+          assert b['total_incoming_hooks']==18
+          assert b['total_outgoing_OEM_edges']==21
+          assert b['no_other_OEM_prefix_changes']
+          assert b['reserved_param_page_start']=='0x807f800'
+          assert b['no_RFID_reader_or_motor_or_secure_backend_change']
+          assert b['no_flash_authorization']
+          assert b['crc16_unflashed_transient_image']=='0x2c17'
+          assert b['sha256_unflashed_transient_image']=='0f5b543cd088ec26cac63ae8289f1d17fed08c276d8cd3416cf1535e999b3ce7'
+          matrix=a['test_cases']
+          assert len(matrix)==32
+          assert set(x['slot'] for x in matrix)=={0,1,2,3}
+          assert all(x['OEM_remove_notifier_invoked'] and x['post_event']==2 for x in matrix)
+          expected=[x for x in matrix if x['FM15L013_flag']==0 and x['type']==4 and x['valid']==1 and x['mode']!=1]
+          assert len(expected)==8
+          assert all(x['OEM_clear_called'] and x['post_record_valid']==0 and x['post_report_percent']==255 for x in expected)
+          assert all(not x['OEM_clear_called'] and x['post_report_percent']==62 for x in matrix if x not in expected)
+          assert a['old_unpatched_removal_leaves_stale_record']
+          assert a['one_new_OEM_callsite_mutant_detected']
+          assert a['runout_during_print_handled_in_host_not_automatically_cleared']
+          assert a['spool_removal_uses_original_sensor_filter_and_OEM_notifier']
+          assert a['does_not_prove_inlet_absence_is_spool_runout']
+          assert a['does_not_prove_RTOS_interrupt_atomicity']
+          assert not a['CFS_hardware_io']
+          assert not a['flash_approved']
+          assert not a['firmware_BIN_exported']
+          print('PASS 32 OEM original physical Thumb BL and sensor-event scenarios, rollback mutation; no flash/hardware')
+          PYTEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
