@@ -3022,6 +3022,63 @@ jobs:
           assert not r['persistent_binary_exported']
           print('PASS OEM v3.13/v3.22: GPIO feeders, IDs 8/10/26 raw poll units, ID19 100ms, 12 mutants, 12 SET denials')
           PYCHECK
+      - name: Preflight latest v3.23 GPIO and RFID APP against loader boundaries (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_latest_image_preflight.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-latest-gpio-rfid-preflight.json >/dev/null
+          python - <<'PYLATEST'
+          import json
+          with open('/tmp/cfs-v323-latest-gpio-rfid-preflight.json') as f: a=json.load(f)
+          assert a['release_track']=='FIRST_HARDWARE_TEST_PREVIEW_NOT_APPROVED_FOR_FLASH'
+          h=a['image_header']
+          assert h['trial_image_length']==178568
+          assert h['trial_image_sha256']=='946197ff853762815d5e5d9b3c0827469b0a916ec49491334a65552bf58773d1'
+          assert h['stored_header_length']==178568
+          assert h['stored_header_crc16']==h['recomputed_header_crc16']=='0xba83'
+          assert h['MSP_unchanged_from_hardware_used_v322']=='0x20006ee8'
+          assert h['Thumb_reset_vector_unchanged_from_v322']=='0x801a969'
+          g=a['OEM_loader_geometry']
+          assert g['app_start']=='0x8003000'
+          assert g['end_exclusive']=='0x802e988'
+          assert (g['first_2KiB_erase_page'],g['last_2KiB_erase_page'],g['erase_page_count'])==(6,93,88)
+          assert g['transport_chunk_count_128B']==1396
+          assert g['buffered_program_count_256B']==698
+          assert g['buffered_program_end_exclusive']=='0x802ea00'
+          assert g['first_param_erase_page']==255
+          assert g['loader_pages_0_to_5_untouched_by_APP_geometry']
+          assert g['parameter_page_255_untouched_by_APP_geometry']
+          assert not g['loader_acceptance_of_size_confirmed_on_installed_board']
+          check=a['unmodified_manufacturer_code_and_guard']
+          assert len(check['untouched_original_OEM_code_sites'])==8
+          assert check['CONFIG_SET_RESET_firmware_entries_BW_redirect_to_busy']
+          assert check['both_manufacturer_secure_callsite_guards_present']
+          assert check['OEM_GPIO_sources_are_exact_and_read_only']
+          assert a['12_original_ARM_CONFIG_SET_RESET_denials_checked']
+          cases=a['latest_GPIO_latch_Thumb_snapshot_cases']
+          assert [x['case'] for x in cases]==[
+              'all_zero','four_feeder_outputs','hub_direction_and_brake','invalid_request_length']
+          assert [x['status'] for x in cases]==[0,0,0,1]
+          assert all(x['nonstack_writes']==0 for x in cases)
+          assert all(x['physical_motor_stop_proven'] is False for x in cases)
+          assert a['unsafe_image_mutations_rejected']==[
+              'loader_base','param_page_overlap','zero_length','bad_length_header',
+              'bad_checksum_header','changed_reset_vector','missing_final_app_byte',
+              'modified_original_manufacturer_reader','config_set_protection_removed',
+              'config_reset_protection_removed','gpio_port_D_latch_source_corrupted',
+              'gpio_port_E_latch_source_corrupted']
+          assert a['gpio_latches_are_motor_commands_not_STOP_feedback']
+          assert not a['advanced_speed_buffer_runtime_writes_qualified']
+          assert not a['auto_load_custom_RAM_profile_after_CFS_boot']
+          assert not a['MCU_serial_flash_erase_motor_mmio_accessed']
+          assert not a['firmware_BIN_ELF_HEX_written']
+          assert not a['qualified_to_flash_on_users_only_CFS']
+          assert not a['Kalico_source_or_active_config_edited']
+          print('PASS current 178568B v3.23 original APP header, 88-page footprint, 12 negatives, GPIO telemetry and 12 denied writes')
+          PYLATEST
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
