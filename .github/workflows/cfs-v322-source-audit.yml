@@ -2609,6 +2609,51 @@ jobs:
           assert not a['firmware_BIN_emitted']
           print('PASS 15 actual OEM ARM VFP usage-task race pairs + 2 single-hook-removal mutants; no physical CFS IO')
           PYTEST
+      - name: Crosscheck latest OpenCFS GD32F303 board port with OEM motor source (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_opencfs_board_gd32_motor_safety_crosswalk.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --self-test --json-out /tmp/cfs-v323-opencfs-motor-board-map.json >/dev/null
+          python - <<'PYBOARD'
+          import json
+          with open('/tmp/cfs-v323-opencfs-motor-board-map.json') as f: a=json.load(f)
+          assert a['two_original_qualified_generations_match']
+          b=a['crosswalk']
+          assert b['OpenCFS_current_public_board_checkpoint']=='ca73d2ec99b6b03b9a2c98b4613f32224641e5ec'
+          assert b['four_OEM_motor_records_and_public_OpenCFS_GPIO_pairs_agree']
+          assert len(b['four_motor_board_pin_crosswalk'])==4
+          assert [r['OEM_original_record_pin_pair'] for r in b['four_motor_board_pin_crosswalk']]==[
+            ['PD2','PD3'],['PD0','PD1'],['PD14','PD15'],['PD12','PD13']]
+          assert [r['OpenCFS_current_monitor_pad'] for r in b['four_motor_board_pin_crosswalk']]==[
+            'PC5','PC0','PA1','PA0']
+          assert [r['OpenCFS_ADC_channel_peripheral_association'] for r in b['four_motor_board_pin_crosswalk']]==[
+            15,10,1,0]
+          assert all(not r['IN1_IN2_polarity_and_FORWARD_direction_electrically_verified']
+                     for r in b['four_motor_board_pin_crosswalk'])
+          assert b['OEM_hub_FG_counter_RAM']=='0x20004990'
+          assert b['OEM_hub_PWM']=='PE13'
+          assert b['OEM_hub_brake']=='PE4'
+          assert b['OEM_hub_direction']=='PE3'
+          assert b['OEM_hub_FG']=='PE11'
+          assert len(b['OEM_PWM_register_channels'])==5
+          assert len(b['documented_OpenCFS_PR5_discrepancies'])==2
+          assert b['documented_OpenCFS_PR5_discrepancies'][1]['OEM_and_board_port_current_pin']=='PC0'
+          assert [r['kind'] for r in b['documented_OpenCFS_PR5_discrepancies']]==[
+            'IN1_IN2_label_reversed_for_every_feeder_in_old_spec_06',
+            'older_motor_spec_claims_PC1_instead_of_PC0_for_slot_B']
+          assert len(a['synthetic_miswired_board_mutations_rejected'])==4
+          assert not b['zero_FG_pulses_proves_motor_stopped']
+          assert not b['ADC_ripple_below_threshold_proves_motor_stopped']
+          assert not b['BLOCKED_flag_proves_motor_stopped']
+          assert not b['OEM_BOX_STATE_IDLE_proves_motor_stopped']
+          assert not b['any_automated_gpio_motor_set_command_allowed']
+          assert not b['v323_motor_write_and_firmware_flash_authorized']
+          assert a['no_kernel_or_CFS_IO']
+          assert a['no_installable_firmware_image_produced']
+          print('PASS OEM v3.13/v3.22 vs OpenCFS GD32 board map: 4 motors, 5 PWM, hub FG, 4 miswire rejections; no motor stop/flash authorization')
+          PYBOARD
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
