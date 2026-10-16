@@ -2961,6 +2961,67 @@ jobs:
           assert not a['motor_safe_write_interlock_complete']
           print('PASS four original GPIO-only feeder records, 13 raw MMIO diagnostic cases, 3 mutations; SET/RESET fenced')
           PYTEST
+      - name: Reconcile ID8/ID10 10ms poll units, ID19 delay and GPIO feeder speed modes (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_oem_config_units_and_gpio_effect_audit.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-original-config-units-gpio-proof.json >/dev/null
+          python - <<'PYCHECK'
+          import json
+          with open('/tmp/cfs-v323-original-config-units-gpio-proof.json') as f: r=json.load(f)
+          a=r['OEM_findings']
+          assert r['source_v313_and_v322_match']
+          assert a['CFS_original_sensor_poll_delay_ms']==10
+          assert a['id_8_initial_raw']==700 and a['id_8_effective_timeout_approx_ms']==7000
+          assert a['id_10_initial_raw']==1000 and a['id_10_effective_timeout_approx_ms']==10000
+          assert a['id_8_catalog_ms_unit_is_wrong'] and a['id_10_catalog_ms_unit_is_wrong']
+          assert r['ID26_nominal_builder_R8_hook_matches_installed_physical']=='0x80042e6'
+          assert a['id_26_physical_hook_PC']=='0x80042e6'
+          assert a['id_26_raw_default']==300 and a['id_26_raw_register']=='r8'
+          assert a['id_26_call_wait_hub_sensor']=='0x80042f2'
+          assert a['id_26_timeout_approx_ms']==3000 and a['id_26_catalog_ms_unit_is_wrong']
+          assert a['id_26_different_50poll_call_at']=='0x80048a8'
+          assert a['id_26_different_50poll_timeout_approx_ms']==500
+          assert a['id_26_different_700poll_call_at']=='0x80048ce'
+          assert a['id_26_different_700poll_timeout_approx_ms']==7000
+          assert a['id_26_source_r7_300_not_argument_for_0x80048a8']
+          assert a['id_26_distinct_R7_retry_300raw_loaded_at']=='0x80048ba'
+          assert a['id_26_distinct_R7_retry_300raw_CALL_at']=='0x80048f8'
+          assert a['id_26_distinct_R7_retry_timeout_approx_ms']==3000
+          assert a['id_26_advanced_R8_hook_does_not_override_R7_retry']
+          assert a['id_26_two_independent_3second_paths']
+          assert r['id8_physical_stock_source']=='0x80042ca'
+          assert r['id8_stock_v313_700_RAW_polls_replaced_by_current_v322_BL']
+          assert r['id8_running_v322_hook_target']=='0x802e7cc'
+          assert r['independent_other_700_raw_polls_callsite']=='0x80048c8'
+          assert a['id_19_physical_nominal_builder_hook']=='0x8006078'
+          assert a['id_19_source_is_100ms_delay_not_500ms']
+          assert a['id_19_delay_CALL_at']=='0x8006078'
+          assert a['different_500ms_DELAY_CALL']=='0x8005e58'
+          assert a['id_0_and_id_4_stock_speed_is_effectively_binary_on_off']
+          assert a['id_0_and_id_4_stock_writable_speed_is_unproven']
+          assert len(a['four_oem_GPIO_feeder_records'])==4
+          assert all(x['feeder_PWM_flag']==0 and x['feeder_PWM_driver_pointers_zero'] and
+                     not x['speed_nonzero_is_proportional_control'] for x in a['four_oem_GPIO_feeder_records'])
+          assert len(r['OEM_negative_fixtures_rejected'])==12
+          assert r['current_v323_feature_candidate_APP_bytes']==178568
+          assert r['ids_8_and_10_over_wire_have_no_unit_or_format_change']
+          assert r['ids_0_and_4_should_be_readonly_on_GPIO_only_stock_feeders']
+          assert r['id_19_100ms_is_a_real_delay_hook_candidate_not_currently_enabled']
+          assert r['current_v323_effective_timing_ids']==[7,8]
+          assert r['current_v323_advanced_storage_only_ids']==list(range(9,28))
+          denials=r['current_v323_firmware_CONFIG_SET_RESET_denied_all_BOX_STATES']
+          assert len(denials)==12
+          assert all(x['status']==7 and not x['sidecar_changed'] and x['nonstack_writes']==0
+                     for x in denials)
+          assert r['current_Kalico_existing_extra_unchanged']
+          assert r['no_flash_or_MMIO_motor_actions'] and r['no_release_approval']
+          assert not r['persistent_binary_exported']
+          print('PASS OEM v3.13/v3.22: GPIO feeders, IDs 8/10/26 raw poll units, ID19 100ms, 12 mutants, 12 SET denials')
+          PYCHECK
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
