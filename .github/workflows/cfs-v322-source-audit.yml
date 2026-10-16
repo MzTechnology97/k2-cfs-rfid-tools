@@ -3079,6 +3079,40 @@ jobs:
           assert not a['Kalico_source_or_active_config_edited']
           print('PASS current 178568B v3.23 original APP header, 88-page footprint, 12 negatives, GPIO telemetry and 12 denied writes')
           PYLATEST
+      - name: Verify Creality crypto keys retained in latest OEM APP without exposing secrets (OFFLINE)
+        working-directory: firmware/v3.22-readonly-state-probes
+        run: |
+          python cfs_v323_creality_crypto_rom_keyless_parity.py \
+            --v313 ../v3.19-volatile-ram/cfs0_050_G32-cfs0_000_153-runtime-config-v3_13.bin \
+            --v322 CFS-v3_22-PROBE-EXPERIMENTAL-UNFLASHED.bin \
+            --asm handler-v3_22.S --linker link.ld --builder build-v3_22.py \
+            --json-out /tmp/cfs-v323-rfid-crypto-keyless-parity.json >/dev/null
+          python - <<'PYKEYLESS'
+          import json
+          with open('/tmp/cfs-v323-rfid-crypto-keyless-parity.json') as f: a=json.load(f)
+          p=a['proof']
+          assert a['reference_public_OpenCFS_commit']=='67f0f063736709a20cc0fb22ca15c8b5a01e4435'
+          assert p['parent_original_v313_v322_latest_v323_crypto_table_equivalent']
+          assert p['creality_manufacturer_AES128_K1_and_K2_retained']
+          assert p['standard_AES_forward_inverse_substitution_still_present']
+          assert p['physical_APP_base']=='0x8003000'
+          assert p['source_table_ROM_address']=='0x802bd59'
+          assert p['source_ROM_reference_offset']=='0x231bc'
+          assert p['manufacturer_MIFARE_Creality_reader_and_secure_callsites_preserved']
+          assert p['v323_type4_remaining_is_not_NFC_ISODEP_Type4']
+          assert p['no_personal_local_headers_accessed']
+          assert p['no_key_values_or_digests_exported']
+          assert p['no_crypto_data_modified']
+          assert p['motor_CONFIG_SET_RESET_still_fail_closed']
+          assert not p['flash_approved']
+          assert len(a['tampered_secret_region_or_source_mutations_rejected'])==4
+          assert not a['OEM_runtime_RFID_decode_called_on_hardware']
+          assert not a['private_KeyA_AES_KDF_used_to_unlock_real_tag']
+          assert not a['reference_private_PC_key_pair_checked_externally_without_transmission']
+          assert a['no_BIN_HEX_ELF_created']
+          assert not any(k.lower().endswith(('key_a','k1','k2','fingerprint','digest')) for k in p.keys())
+          print('PASS v3.13/v3.22/v3.23 OEM Creality crypto parity, 4 mutants, NO SECRETS')
+          PYKEYLESS
       - name: Remove disposable compiled image
         if: always()
         working-directory: firmware/v3.22-readonly-state-probes
