@@ -5,6 +5,8 @@ EXPERIMENTAL HARDWARE-TEST BUILD, NOT PRODUCTION-QUALIFIED. Flash only while the
 Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effective, 5 GET-only.
 15 new IDs: 6, 9, 11-19, 21, 23, 24, 27.
 
+**[Detailed per-parameter guide: actual behavior, limits, CM5 values and risks](PARAMETERS_EN.md)** · [Italiano](PARAMETERS_IT.md).
+
 | ID | Parametro / Parameter | Stock | Range | SET |
 |---:|---|---:|---|:---:|
 | 0 | feeder_forward_speed | 255 | 1-255 raw | NO |
