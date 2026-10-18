@@ -1,4 +1,4 @@
-# K2 CFS RFID v3.12
+# K2 CFS RFID — v3.12 validated; v3.23 CFG4 experimental
 
 This repository contains my current hardware-validated **Creality K2 Pro CFS RFID v3.12 / API7** firmware and the host-side work I use with K2-OpenHost/Kalico.
 
@@ -33,7 +33,23 @@ What v3.22 has done on the reference printer:
 
 Live remaining-filament accounting during prints (type 4) is being prepared as v3.23, in the open `v3.23` pull requests. Stock 153 runs the usage task only on boards with the FM15L013 secure element, and it never writes RFID tags.
 
-## Experimental v3.19 CFS runtime-parameter firmware (2026-10-10)
+## Current experimental v3.23 CFG4 runtime (2026-10-18)
+
+A source-reproducible, SHA256-pinned experimental v3.23 firmware
+is available in [firmware/v3.23-k2oh](firmware/v3.23-k2oh).
+**Only the corresponding modified firmware distributed in this repository
+is compatible with its CFG-only startup parameter writes.**
+Stock Creality and third-party binaries are not compatible.
+OpenCFS is recognized separately using its OCFS identity, but must not
+receive the K2OH patched-stock parameter SET opcodes.
+The CFG4 implementation exposes six effective writable IDs only
+(1, 2, 3, 5, 7, 8); other IDs remain read-only.
+See [all 28 parameters](docs/CFS_V323_PARAMETER_GUIDE_IT.md)
+and [compatibility](docs/CFS_FIRMWARE_COMPATIBILITY.md).
+
+**Not yet hardware-qualified.** Keep the v3.22 recovery route.
+
+## Historical experimental v3.19 CFS runtime-parameter firmware (2026-10-10)
 
 A **separate, NOT production-ready** v3.19 volatile-RAM bench image is now published under [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md). On an actual K2 Pro CFS the 28 default GET values and feature marker `0xF7` passed; one manual SET/GET/RESET of advanced ID 18 also passed. All other advanced writes and any movement effects remain unvalidated. Advanced motor/RFID movement hooks are disabled. Do not use the v3.19 image for regular CFS operations.
 
