@@ -212,3 +212,9 @@ v3.12 does not add:
 The known stock MIFARE write routine at `0x0801970E` and EEPROM write routine at `0x08017F7E` are not referenced by the appended handler.
 
 This is my independent interoperability/reverse-engineering work and is not affiliated with Creality, Bambu Lab or QIDI.
+
+## Italiano — firmware K2-OpenHost CFG4
+
+La v3.23 CFG4 è sperimentale. La scrittura dei parametri è compatibile **esclusivamente con i firmware modificati di questa repository**; non con Creality originale o altri firmware. Kalico rileva OpenCFS come famiglia OCFS separata. Sono regolabili solo ID 1/2/3/5/7/8; gli altri non sono implementati come SET operativi.
+
+[Guida IT](docs/CFS_V323_PARAMETER_GUIDE_IT.md) | [Guide EN](docs/CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](docs/CFS_FIRMWARE_COMPATIBILITY_IT.md) | [Compatibility EN](docs/CFS_FIRMWARE_COMPATIBILITY.md)

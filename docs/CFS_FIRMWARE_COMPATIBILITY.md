@@ -19,3 +19,5 @@ not sufficient identification. The stock GUI's 1.5.3 version also cannot
 distinguish the builds.
 
 [Guida completa ai 28 parametri in italiano](CFS_V323_PARAMETER_GUIDE_IT.md).
+
+[Compatibilità IT](CFS_FIRMWARE_COMPATIBILITY_IT.md) | [English parameter guide](CFS_V323_PARAMETER_GUIDE_EN.md)

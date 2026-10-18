@@ -60,3 +60,5 @@
     #insert_sensor_timeout_ms: 7000
 
 **Attenzione:** l'immagine v3.23 CFG4 è sperimentale; la verifica con Unicorn non certifica i motori o la stabilità fisica RS-485. Tenere disponibile il firmware v3.22 per il recupero.
+
+[English parameter guide](CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](CFS_FIRMWARE_COMPATIBILITY_IT.md)

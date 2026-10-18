@@ -63,3 +63,9 @@ Built 18 October 2026. Not hardware-qualified. No flash or printer motion perfor
 3. If bus fails, restore v3.22 through the custom image path, not a normal version-comparison upgrade.
 4. Once bus works, deploy the Kalico worktree module, enable auto_apply in box.cfg for supported values, restart Klipper at a controlled time, then read back values.
 5. There is no production release approval; no full RFID regressions or motor fault qualification yet.
+
+## Italiano — panoramica
+
+La v3.23 CFG4 è sperimentale. I parametri sono compatibili **solo** con il firmware modificato K2-OpenHost distribuito da questa repository e con Kalico abbinato. Solo gli ID 1/2/3/5/7/8 sono realmente modificabili dal CFG all'avvio. OpenCFS è riconosciuto come OCFS ma non riceve SET CFG4. Mantenere disponibile la v3.22 per il recupero.
+
+[Parametri IT](../../docs/CFS_V323_PARAMETER_GUIDE_IT.md) | [Parameters EN](../../docs/CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](../../docs/CFS_FIRMWARE_COMPATIBILITY_IT.md) | [Compatibility EN](../../docs/CFS_FIRMWARE_COMPATIBILITY.md)
