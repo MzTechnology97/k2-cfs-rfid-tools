@@ -52,7 +52,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - 15 callsite ASM confrontati con lo stock; registri e flag CPU validati.
 - ID6: flag off cambia il ramo BLS ed esclude l'azione reverse de-tooth.
 - Regressioni residuo type 4: avvio/fine stampa, odometro simulato, setter e getter stock passano.
-- Extra Kalico abbinato su ramo di sviluppo separato: 107 test host superati.
+- Extra Kalico CFG6 abbinato integrato sul ramo operativo `k2-pro-openhost`; test host passati.
 - Restano indispensabili prove con hardware e RFID reali, comunicazione prolungata e rollback.
 
 Experimental image: CFG6-ALL-ADVANCED-LAB-NOT-FOR-FLASH.bin
@@ -64,4 +64,12 @@ SHA-256: 6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6
 - SHA-256: `6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6`
 - Identita': `K2OH / v323-cfg6`, API2, feature `0xE3`.
 - L'immagine da laboratorio ha gli stessi byte e lo stesso SHA256; utilizzare preferibilmente il nome del file sopra.
-- Non abilitare `auto_apply` finché il bus RS-485, motori e RFID non siano verificati dopo il flash.
+- Abilitare `auto_apply` soltanto dopo il controllo della firma CFG6 e della comunicazione a stampante inattiva. La prima prova SET/GET è passata; i cicli RFID e i movimenti reali restano da verificare.
+
+## Primo flash fisico e applicazione — 18 ottobre 2026
+
+La CFS è stata aggiornata dall'utente e identificata in lettura come **K2OH v323-cfg6, feature 0xE3**, API2 con 28 parametri. Il bus RS-485 e l'inizializzazione motori sono operativi, sebbene al primo avvio dopo il flash siano comparsi timeout e un errore CRC, recuperati automaticamente.
+
+Con CFS `IDLE`, stampante `standby`, nessuna bobina caricata e nessun asse referenziato, l'extra Kalico CFG6 ha applicato **23 valori su 23** dal file `box.cfg` (`auto_apply: True`). Stato riportato: `applied 23 value(s)`, senza errori. La successiva diagnostica in sola lettura ha confermato **28 GET validi, 23/23 impostazioni corrispondenti al CFG**, con ID 0/4/10/25/26 non modificati.
+
+**Non sono stati eseguiti homing Z, movimenti, caricamento filamento o prove di stampa.** L'attivazione e la lettura dei parametri non dimostrano ancora il comportamento fisico degli hook RFID/motori, il residuo live type 4 durante una stampa o l'affidabilità prolungata del bus. Conservare il firmware CFG5T per il rollback.
