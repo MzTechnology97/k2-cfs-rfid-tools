@@ -55,3 +55,13 @@
 **Experimental image:** hardware/RS485 qualification incomplete; retain v3.22 rollback. Do not treat software BOX_STATE as independent motor-stop feedback.
 
 [Guida italiana](CFS_V323_PARAMETER_GUIDE_IT.md) | [English compatibility](CFS_FIRMWARE_COMPATIBILITY.md) | [Compatibilità italiana](CFS_FIRMWARE_COMPATIBILITY_IT.md)
+
+## Live type-4 filament remaining during printing
+
+v3.23 CFG4 **inherits from v3.12/v3.22** the `remaining_gate_wrapper`, `remaining_init_wrapper` and `remaining_valid_wrapper` hooks. For supported third-party spools, these initialize the stock **type-4** runtime using the geometric percentage and a nominal 330,000 mm reference. Opcode `0x03` can read the initial value without writing to the RFID tag.
+
+**This does not imply live consumption tracking during printing.** OpenCFS analysis of stock APP153 shows that the `rfid_mgr_fila_task`, which accumulates odometer millimeters and updates the percentage, is gated by the FM15L013 secure-element presence flag. On boards without that chip, the task is skipped even for type 4, so the CFS percentage can remain at its loading-time value while Kalico estimates G-code consumption.
+
+v3.23 CFG4 **does not bypass this hardware gate** and does not add an independent odometer task. Live type-4 consumption tracking requires a later patch and dedicated hardware tests. IDs 20 and 22 are recognized and readable catalogue parameters, but have no effective SET hooks in the current CFG4 image.
+
+[OpenCFS technical analysis](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/05-preload-rfid.md) | [Italiano](CFS_V323_PARAMETER_GUIDE_IT.md)
