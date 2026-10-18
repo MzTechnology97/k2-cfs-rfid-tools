@@ -20,3 +20,9 @@ Reproducible byte-for-byte build, preflight, T113 container validation and RS-48
 Install through the Helper experimental-cfs menu only while the printer is idle, with a working CFG4 rollback image. Initially keep the old Kalico runtime extra without applying CFG values; verify RS-485, X/Y discovery, CFS and K2OH identity first. Deploy the paired Kalico CFG5T extra only after this read-only smoke test succeeds, then enable auto_apply deliberately.
 
 [Validazione italiana](VALIDATION_IT.md) | [Firmware information](README.md)
+
+## First hardware observation (18 October 2026)
+
+After a user-initiated flash, the device reported K2OH / v323-cfg5t identity, API2, 28 IDs and feature 0xE5. Klipper reached ready, CFS IDLE/OK, and the X/Y motor discovery completed. **The first Y motor enumeration timed out; a retry then succeeded.** Therefore the shared RS-485 transport cannot yet be considered fully hardware-qualified.
+
+Read-only queries returned stock values ID8 7000ms, ID20 25000ms and ID22 500ms. auto_apply remained disabled, with no homing, print or motor motion performed during verification. Live type-4 physical printing remains untested. Matching Kalico integration is in [draft PR #83](https://github.com/MzTechnology97/kalico-k2pro/pull/83).
