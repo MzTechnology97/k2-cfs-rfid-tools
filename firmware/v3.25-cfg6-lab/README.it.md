@@ -43,7 +43,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - ID6: flag sidecar RAM privato (byte50, bit21), blocca il ramo reale reverse de-tooth. Non scrive lo stato stock.
 - ID17: aggancio all'attesa pre-lettura RFID di 400 ms al sito stock 0x08012A60. Il ritardo separato da 10 ms non viene toccato.
 - ID27: ramo originale delle ripetizioni pretensione al sito 0x08012616, preservando i due target del loop.
-- ID10/25/26: non sbloccati; codice stock non raggiungibile. ID0/4: feeder ON/OFF, nessuna velocita proporzionale.
+- ID10/25/26: GET-only perche' **CFG6 non installa hook su queste costanti**; alcune routine OEM (come il polling sensore di ID26) esistono, ma i rispettivi parametri non sono modificabili con questa build. ID0/4: feeder ON/OFF, nessuna velocita' proporzionale.
 - Gli override sono RAM-only e si applicano solo all'avvio di Klipper attraverso un extra abbinato e con auto_apply esplicitamente abilitato.
 - Il firmware e' disponibile nel menu sperimentale dell'Helper. Conservare CFG5T e v3.22 per il rollback.
 
