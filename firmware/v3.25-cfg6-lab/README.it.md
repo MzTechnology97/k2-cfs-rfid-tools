@@ -1,6 +1,6 @@
 # CFG6 v3.25 - Parametri avanzati (Italiano)
 
-SOLO LABORATORIO - NON FLASHARE. La CFG5T installata non viene modificata.
+VERSIONE SPERIMENTALE PER TEST HARDWARE SUPERVISIONATI, NON QUALIFICATA PER PRODUZIONE. Flash solo con stampante inattiva e rollback CFG5T/v3.22 disponibile.
 
 Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effective, 5 GET-only.
 15 new IDs: 6, 9, 11-19, 21, 23, 24, 27.
@@ -43,7 +43,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - ID27: ramo originale delle ripetizioni pretensione al sito 0x08012616, preservando i due target del loop.
 - ID10/25/26: non sbloccati; codice stock non raggiungibile. ID0/4: feeder ON/OFF, nessuna velocita proporzionale.
 - Gli override sono RAM-only e si applicano solo all'avvio di Klipper attraverso un extra abbinato e con auto_apply esplicitamente abilitato.
-- Il firmware NON e nel menu Helper. Conservare CFG5T e v3.22 per il rollback.
+- Il firmware e' disponibile nel menu sperimentale dell'Helper. Conservare CFG5T e v3.22 per il rollback.
 
 ## Validation / Verifiche
 
@@ -57,3 +57,11 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 
 Experimental image: CFG6-ALL-ADVANCED-LAB-NOT-FOR-FLASH.bin
 SHA-256: 6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6
+
+## BIN installabile tramite Helper (sperimentale)
+
+- File: [`cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin`](cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin)
+- SHA-256: `6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6`
+- Identita': `K2OH / v323-cfg6`, API2, feature `0xE3`.
+- L'immagine da laboratorio ha gli stessi byte e lo stesso SHA256; utilizzare preferibilmente il nome del file sopra.
+- Non abilitare `auto_apply` finché il bus RS-485, motori e RFID non siano verificati dopo il flash.
