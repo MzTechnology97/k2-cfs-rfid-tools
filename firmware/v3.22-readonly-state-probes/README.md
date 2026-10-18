@@ -48,6 +48,21 @@ python3 emulate_v3_22.py
 **During the offline design and build stage no flash, reset, motion or heating was performed.** Subsequently the operator flashed v3.22 and a heater-free physical load/unload test completed successfully. Any future on-device validation must verify the exact image SHA, installer identity checks, Kalico feature handling, rollback and serial stability before physically correlating candidate bytes with movement. Even successful correlation does not automatically establish an atomic MCU motor-activity interlock.
 
 Tracking issue: [independent motor-activity guard #9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9).
+## Use on the reference printer (2026-10-10 to 2026-10-18)
+
+- **Published image:** `cfs0_050_G32-cfs0_000_153-runtime-config-v3_22-READONLY-DIAG-EXPERIMENTAL.bin`, 178,140 bytes, SHA-256 `40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`. It is the image installed on the reference CFS, and it is published here so the installer helper can verify and flash it. The builder above reproduces the same bytes from the v3.13 base.
+- **Prints:** two complete 30 h PETG-CF prints ran on v3.22.
+  - 2026-10-14/15: slot 3 ran out, and the automatic runout swap loaded slot 4 in about 43 s.
+  - 2026-10-16/17: slot 4 ran out, and the swap loaded slot 1 in about 46 s.
+  - Each print had 370k RS-485 requests with no CRC error. One periodic GET to the Y motor timed out once, with no effect.
+- **Paired Kalico:** kalico-k2pro #75 and #80.
+  - Auto-apply and bulk APPLY are skipped, and stock IDs 0..6 are read-only.
+  - Only IDs 7 and 8 accept a manual SET, because the others have no stock callsite.
+  - SET/RESET hold the host motion/RFID lock.
+  - The first probe waits for CFS enumeration (#77), and each CFS is a separate unit (#79).
+- **OpenCFS tests, 2026-10-17/18:** other images were flashed for the tests, and v3.22 was restored afterwards. On 2026-10-18 `BOX_CFS_CONFIG_INFO` read API2/28, `0xD7`.
+- **Status unchanged:** experimental, with issue #9 still open.
+
 ## 2026-10-10 on-device validation and G-code sampling limitation
 
 After the operator flashed v3.22, initial Klipper startup displayed `NO_RESPONSE` / timeouts. Klipper had been stopped by the updater; starting it and one controlled MCU-rail cycle did not immediately clear the condition. Later the CFS **recovered normal RS485 communications** (exact recovery mechanism not determined). A manual `BOX_CFS_CONFIG_INFO` showed API2/28 with expected feature **`0xD7`** and no runtime error. This supersedes the initial suspected flash failure; there is **no confirmed flash corruption**.

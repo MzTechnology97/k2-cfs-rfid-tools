@@ -12,6 +12,27 @@ The current v3.12 release includes three pieces of functionality that I have val
 
 Bambu material/colour recognition is hardware validated. QIDI PET-CF recognition through the generic MIFARE decoder is also hardware validated. The new v3.12 remaining path has so far been hardware validated with Bambu.
 
+## Current status (2026-10-18)
+
+The reference K2 Pro CFS runs **v3.22** (`0xD7`), SHA-256 `40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`. It was flashed on 2026-10-10. During the OpenCFS tests of 2026-10-17/18 other images were tried, and v3.22 was restored after each attempt.
+
+| Image | Feature | Directory | State |
+|---|---|---|---|
+| v3.12 | API7 | [`firmware/v3.12-remaining/`](firmware/v3.12-remaining/) | last release with RFID and remaining-filament validation (Bambu) |
+| v3.13 | API1 | [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/) | rollback base; six stock speeds writable |
+| v3.19 | `0xF7` | [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md) | RAM bench; no ID connected to a stock callsite |
+| v3.20 | `0xB7` | [`firmware/v3.20-timing-hooks/`](firmware/v3.20-timing-hooks/README.md) | timing hooks IDs 7 and 8 |
+| v3.21 | `0x97` | [`firmware/v3.21-busy-guard/`](firmware/v3.21-busy-guard/README.md) | adds the `BOX_STATE` write guard; image rebuilt from source |
+| **v3.22** | **`0xD7`** | [`firmware/v3.22-readonly-state-probes/`](firmware/v3.22-readonly-state-probes/README.md) | **installed**; adds four read-only diagnostic GET IDs; BIN published |
+
+What v3.22 has done on the reference printer:
+- **Bench, 2026-10-10:** boot, 28 GET values and a physical load/unload without heating.
+- **2026-10-14/15 and 2026-10-16/17:** two complete 30 h PETG-CF prints. Each spool ran out mid-print, and the automatic runout swap loaded the next same-material slot in about 43 s and 46 s. The swaps were handled by Kalico through the stock load path. RS-485 had no CRC errors.
+- **Runtime parameters:** never applied during the prints. Kalico skips auto-apply on every experimental signature. Since kalico-k2pro #80 it also refuses a manual SET of any ID without a stock callsite: on v3.20-v3.22 only IDs 7 and 8 are settable, and on v3.19 none.
+- **Still experimental:** v3.22 is not a production release. The MCU-side motor-activity guard is still open ([#9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9)), and the four diagnostic IDs are not a motor-busy indicator.
+
+Live remaining-filament accounting during prints (type 4) is being prepared as v3.23, in the open `v3.23` pull requests. Stock 153 runs the usage task only on boards with the FM15L013 secure element, and it never writes RFID tags.
+
 ## Experimental v3.19 CFS runtime-parameter firmware (2026-10-10)
 
 A **separate, NOT production-ready** v3.19 volatile-RAM bench image is now published under [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md). On an actual K2 Pro CFS the 28 default GET values and feature marker `0xF7` passed; one manual SET/GET/RESET of advanced ID 18 also passed. All other advanced writes and any movement effects remain unvalidated. Advanced motor/RFID movement hooks are disabled. Do not use the v3.19 image for regular CFS operations.
