@@ -606,7 +606,7 @@ reset_done:
     b       send
 
 @ ROM catalogue defaults for 7..27, including corrected ID17=400ms.
-@ Unhooked 9..27 are GET-only in this stage. Do not use as tuning knobs.
+@ CFG6 hooks advanced IDs except dead-stock 10/25/26.
 .balign 2
 compact_defaults_u16:
     .hword 3200  @ ID 7

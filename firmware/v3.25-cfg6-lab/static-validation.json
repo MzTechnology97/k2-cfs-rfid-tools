@@ -170,7 +170,7 @@
         "id": 6,
         "name": "reverse_detooth_enable",
         "type": "bool",
-        "default": "captured-stock",
+        "default": 1,
         "min": 0,
         "max": 1,
         "flags": [
@@ -303,11 +303,10 @@
         "type": "milliseconds_u16",
         "default": 400,
         "min": 1,
-        "max": 1000,
+        "max": 2000,
         "flags": [
           "advanced",
-          "rfid-sensitive",
-          "read-only-unhooked"
+          "rfid-sensitive"
         ]
       },
       {
@@ -336,8 +335,8 @@
       },
       {
         "id": 20,
-        "name": "feed_total_timeout_20ms_ticks",
-        "type": "ticks_20ms_u16",
+        "name": "feed_total_timeout_ms",
+        "type": "milliseconds_u16",
         "default": 25000,
         "min": 5000,
         "max": 60000,
@@ -360,8 +359,8 @@
       },
       {
         "id": 22,
-        "name": "odometer_stall_20ms_ticks",
-        "type": "ticks_20ms_u16",
+        "name": "odometer_stall_timeout_ms",
+        "type": "milliseconds_u16",
         "default": 500,
         "min": 100,
         "max": 2000,
@@ -676,22 +675,35 @@
   "cfs_runtime_diag_read_only": false,
   "v322_timing_hooks": [
     7,
-    8
+    8,
+    9,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    27
   ],
   "v322_hook_addresses": [
     "0x08011116",
     "0x080112CA"
   ],
   "v322_advanced_volatile_only": true,
-  "v322_other_motion_hooks_enabled": false,
+  "v322_other_motion_hooks_enabled": true,
   "v319_heap_start": "0x20006F28",
-  "v322_flash_end_limit": "0x0803B800",
+  "v322_flash_end_limit": "0x0803D000 policy only",
   "v322_flash_end_limit_bootloader_verified": false,
   "fast_fetch_flash_end": "0x08040000 (performance boundary, NOT app limit)",
   "total_main_flash_end": "0x08080000 (silicon capacity, NOT loader-authorised)",
   "beyond_first_256k_code_fetch_slower": true,
   "flash_above_unverified_policy_approved_for_use": false,
-  "v322_diag": "CFG6 lab 23 effective settings, 15 new ID6/9/11-19/21/23/24/27 hooks; 0/4/10/25/26 GET-only",
+  "v322_diag": "CFG6 lab: 23 effective IDs including 15 newly enabled; feeder 0/4 and dead-stock 10/25/26 GET-only; start-up use only",
   "active_advanced_motion_hooks": [
     6,
     7,
