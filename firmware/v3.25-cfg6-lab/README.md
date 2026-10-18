@@ -1,6 +1,6 @@
 # CFG6 v3.25 - Advanced parameters (English)
 
-LABORATORY ONLY - DO NOT FLASH. Installed CFG5T remains unchanged.
+EXPERIMENTAL HARDWARE-TEST BUILD, NOT PRODUCTION-QUALIFIED. Flash only while the printer is idle and verified CFG5T/v3.22 rollback images are available.
 
 Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effective, 5 GET-only.
 15 new IDs: 6, 9, 11-19, 21, 23, 24, 27.
@@ -43,7 +43,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - ID27: the actual pretension retry loop at 0x08012616, with original loop and exit targets preserved.
 - IDs10/25/26: excluded because stock paths are unreachable. IDs0/4: on/off feeder motors, no proportional speed.
 - All overrides are volatile RAM, written only from paired Klipper CFG on startup with deliberate auto_apply.
-- This firmware is NOT in the Helper menu. Keep CFG5T and v3.22 for rollback.
+- This firmware is available from the Helper experimental CFS menu. Keep CFG5T and v3.22 for rollback.
 
 ## Validation / Verifiche
 
@@ -57,3 +57,11 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 
 Experimental image: CFG6-ALL-ADVANCED-LAB-NOT-FOR-FLASH.bin
 SHA-256: 6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6
+
+## Installable experimental Helper image
+
+- File: [`cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin`](cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin)
+- SHA-256: `6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6`
+- Identity: `K2OH / v323-cfg6`, API2 features `0xE3`.
+- Same verified bytes as the laboratory image; the canonical filename above is preferred for installation.
+- Keep `auto_apply` disabled until RS-485, motor and RFID smoke tests have passed following the flash.
