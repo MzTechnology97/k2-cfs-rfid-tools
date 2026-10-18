@@ -75,3 +75,6 @@ The user flashed the CFS; the device identified as **K2OH v323-cfg6 / feature 0x
 With CFS `IDLE`, the printer in `standby`, no filament slot loaded and no axes homed, the paired Kalico CFG6 extra applied **all 23 configured settings** (`auto_apply: True`). The status reported `applied 23 value(s)` with no errors. An independent read-only diagnostic confirmed **28 valid GET responses and a 23/23 match** with the active CFG; unsupported IDs 0/4/10/25/26 remained at stock values.
 
 **No Z homing, axis movement, filament loading, or printing was performed.** Parameter write/readback does not establish the physical RFID/motion hook behavior, live type-4 remaining percentage during printing, or prolonged bus stability. Preserve CFG5T as a rollback.
+
+
+**Latest hardware checks, PR cleanup and unresolved issues:** [GitHub review EN](../../docs/CFG6_STATUS_PR_TRIAGE_20261018_EN.md) · [IT](../../docs/CFG6_STATUS_PR_TRIAGE_20261018_IT.md).
