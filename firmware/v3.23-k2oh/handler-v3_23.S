@@ -40,7 +40,8 @@
 @ 8 CLEAR_KEYS: reader,slot
 @ 9 RUNTIME_INFO: hw_flag, legacy_block0, legacy_block1, legacy_block2
 @ The historical v3.13 API1 opcodes 0x0D..0x0F are NOT dispatched here.
-@ Stock speed IDs 0..5 are READ-ONLY in this API2 experiment.
+@ Stock hub speed IDs 1,2,3,5 are writable RAM-only (CFG at boot).
+@ Feeder pseudo-speeds 0/4 and reverse_detooth flag 6 remain READ-ONLY.
 @ 0x10 CONFIG_V2_INFO: version,count,catalog_revision,features
 @ 0x11 CONFIG_V2_GET: id -> id,value16
 @ 0x12 CONFIG_V2_SET: id,value16 -> id,value16 (idle only)
@@ -223,15 +224,17 @@ op_runtime:
 
 @ Runtime CFS configuration.
 @ Legacy API1 commands are NOT routed by this handler.
-@ Stock motor-table pointer is untouched; speed IDs 0..6 are read-only.
+@ Stock hub speed table bytes for IDs 1,2,3,5 can be set at boot.
+@ IDs 0/4 (feeder GPIO) and 6 remain read-only.
 @ 64 bytes of sidecar SRAM store advanced overrides for bench tests.
 @ Only IDs 7/8 are wired to execution; IDs 9..27 are NO-OP tuning.
 @ Host must protect motion/write independently of BOX_STATE=IDLE.
 .equ CONFIG_V2_COUNT,       28
 
-@ 21 advanced IDs 7..27 store bounded volatile values for bench tests.
-@ ONLY IDs 7/8 have effective stock timing callsite hooks.
-@ All other advanced IDs are STORED-ONLY, not effective motor controls.
+@ The MCU exposes GET for advanced IDs 7..27, but only IDs 7/8
+@ have a proven stock execution hook in this staged image. SET and RESET
+@ for 9..27 are rejected, including known dead-code IDs 10/25/26.
+@ The remaining IDs return ROM defaults until validated hook work exists.
 @ IDs 0..6 remain READ-ONLY on v3.19-v3.22 API2.
 @ 64 bytes at former heap start are isolated by moving heap literal +64.
 @ Magic+bitmask are cleared at RTOS heap init; volatile across resets.
@@ -367,16 +370,29 @@ v322_get_result:
     b       send
 
 op_config_v2_set:
-    @ Bench SET stores IDs 7..27; only ID7/8 can affect behavior.
+    @ CFG-only SET: stock hub speed IDs 1/2/3/5 and verified timing IDs 7/8.
     @ WARNING: stock BOX_STATE=IDLE is NOT proven to exclude early feeding.
-    @ Auto-apply and raw writes without a host motion mutex are unsafe.
+    @ Host allows SET only during Kalico boot and never registers G-code SET.
     ldrb    r0, [r4, #1]
     cmp     r0, #7
     bne.w   status_bad
     ldrb    r6, [r4, #5]
+    @ Stock uses a writable RAM speed table: hub speed IDs 1,2,3,5.
+    @ Feeder IDs 0/4 are GPIO ON/OFF, not effective speed knobs.
+    cmp     r6, #0
+    beq.w   status_bad
+    cmp     r6, #4
+    beq.w   status_bad
+    cmp     r6, #6
+    blo.w   set_stock_speed
     cmp     r6, #7
     blo.w   status_bad
     cmp     r6, #CONFIG_V2_COUNT
+    bhs.w   status_bad
+    @ Step 2: reject write to all storage-only IDs 9..27.
+    @ In particular 10/25/26 are dead-code callsites, always read-only.
+    @ This is an explicit safety interlock until real stock hooks are qualified.
+    cmp     r6, #9
     bhs.w   status_bad
     @ Real stock box-operating state, not RFID worker's remembered slot.
     @ Original CMD_BOX_STATE (0x0A) reads [0x200037D0+2] to return
@@ -399,6 +415,15 @@ op_config_v2_set:
     ldrh    r0, [r5, r3]
     cmp     r7, r0
     bhi.w   status_bad
+    @ Stock waits 10ms per count on ID8. Require exact 10ms values.
+    cmp     r6, #8
+    bne     set_time_units_ok
+    mov.w   r0, #10
+    udiv    r1, r7, r0
+    mul     r1, r1, r0
+    cmp     r1, r7
+    bne.w   status_bad
+set_time_units_ok:
     ldr     r5, sidecar_address_ptr
     ldr     r0, [r5]
     ldr     r1, sidecar_magic_word
@@ -425,6 +450,35 @@ set_sidecar_ready:
     movs    r1, #0
     b       send
 
+set_stock_speed:
+    @ Only reached for IDs 1/2/3/5. RAM table pointer must be the
+    @ verified stock one; reject if stock has not initialized it.
+    @ Caller applies these once at Klipper boot, not from console.
+    ldr     r0, box_operating_state_ptr
+    ldrb    r0, [r0, #2]
+    cmp     r0, #0
+    bne.w   status_busy
+    ldrb    r7, [r4, #6]     @ value low
+    ldrb    r1, [r4, #7]     @ value high
+    cmp     r7, #0
+    beq.w   status_bad
+    cmp     r1, #0
+    bne.w   status_bad      @ must fit stock 1..255 u8
+    bl      config_ptr
+    cmp     r0, #0
+    beq.w   status_bad
+    adr.w   r5, config_offsets
+    ldrb    r1, [r5, r6]
+    strb    r7, [r0, r1]    @ RAM only: one verified stock table byte
+    strb    r6, [sp, #0]
+    strb    r7, [sp, #1]
+    movs    r0, #0
+    strb    r0, [sp, #2]
+    mov     r2, sp
+    movs    r3, #3
+    movs    r1, #0
+    b       send
+
 op_config_v2_reset:
     @ Clear volatile flags only, restoring ROM defaults.
     ldrb    r0, [r4, #1]
@@ -444,6 +498,9 @@ op_config_v2_reset:
     cmp     r6, #7
     blo.w   status_bad
     cmp     r6, #CONFIG_V2_COUNT
+    bhs.w   status_bad
+    @ Step 2: reset only active IDs 7/8. Storage-only IDs are read-only.
+    cmp     r6, #9
     bhs.w   status_bad
     ldr     r5, sidecar_address_ptr
     ldr     r0, [r5]
@@ -468,13 +525,12 @@ reset_done:
     movs    r3, #0
     b       send
 
-@ Nominal ROM catalogue values for IDs 7..27. Values of 9..27
-@ are not all independently verified against original stock callsites.
-@ They are experimental STORAGE-ONLY descriptors, not tuning knobs.
+@ ROM catalogue defaults for 7..27, including corrected ID17=400ms.
+@ Unhooked 9..27 are GET-only in this stage. Do not use as tuning knobs.
 .balign 2
 compact_defaults_u16:
     .hword 3200  @ ID 7
-    .hword 700  @ ID 8
+    .hword 7000  @ ID 8 (host milliseconds, 700 stock polls * 10)
     .hword 5000  @ ID 9
     .hword 1000  @ ID 10
     .hword 160  @ ID 11
@@ -483,7 +539,7 @@ compact_defaults_u16:
     .hword 800  @ ID 14
     .hword 200  @ ID 15
     .hword 1000  @ ID 16
-    .hword 10  @ ID 17
+    .hword 400  @ ID 17
     .hword 400  @ ID 18
     .hword 100  @ ID 19
     .hword 1250  @ ID 20
@@ -498,7 +554,7 @@ compact_defaults_u16:
 .balign 2
 compact_bounds_u16:
     .hword 100, 10000  @ ID 7
-    .hword 100, 5000  @ ID 8
+    .hword 1000, 50000  @ ID 8 (host milliseconds; exact multiples of 10)
     .hword 500, 15000  @ ID 9
     .hword 100, 5000  @ ID 10
     .hword 1, 255  @ ID 11
@@ -643,7 +699,7 @@ identity_payload:
     .byte   4               @ variant: 4 = patched Creality application
     .byte   0               @ bench level: none
     .byte   0x02            @ flags: bit1 parameter page never written
-    .ascii  "v3.23-k2oh\0\0" @ revision[12]
+    .ascii  "v323-cfg4\0\0\0" @ revision[12]
 .global identity_creality_version
 identity_creality_version:
     .space  12              @ Creality version[12], filled by the builder
@@ -1416,7 +1472,8 @@ heap_init_sidecar_wrapper:
     msr     APSR_nzcvq, r4
     pop     {r0-r3}
     pop     {r4, pc}
-@ v3.20 protected timing hooks: each replaces exactly one stock MOVW.
+@ v3.23 timing hooks: ID7 true ms; ID8 host ms / 10 -> stock 10ms polls.
+@ Each replaces exactly one stock MOVW.
 @ Keep original registers/flags and original defaults when no override is set.
 @ DO NOT use MOVS before config_v2_get_value (would clobber APSR).
 .thumb_func
@@ -1431,7 +1488,8 @@ cfg8_r1_wrapper:
     push    {r0, r2, r3, lr}
     mov.w   r0, #8
     bl      config_v2_get_value
-    mov     r1, r0
+    mov.w   r2, #10             @ STOCK polls every 10ms, host config true ms
+    udiv    r1, r0, r2         @ exact because SET accepts multiples of 10
     pop     {r0, r2, r3, pc}
 
 handler_end:
