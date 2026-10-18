@@ -20,3 +20,9 @@ Queste prove **non sostituiscono** una stampa fisica: comunicazione RS-485 prolu
 L'immagine è nel menu **experimental-cfs** dell'Helper. Non installare l'extra Kalico CFG5T prima di avere verificato il riavvio della CFS e la comunicazione dei motori X/Y. La vecchia versione di Kalico può identificare la nuova revisione senza inviare SET; per configurare ID20/22, usare poi l'extra abbinato e configurare auto_apply nel CFG. Il flash va eseguito solo con stampante inattiva e possibilità di ripristinare CFG4.
 
 [English validation](VALIDATION_EN.md) | [Informazioni firmware](README.it.md)
+
+## Prima osservazione hardware (18 ottobre 2026)
+
+Dopo un flash eseguito dall'utente, il firmware ha risposto con identità K2OH / v323-cfg5t, API2, 28 ID e feature 0xE5. Klipper è arrivato in stato ready, CFS IDLE/OK, motori X/Y pronti. **La prima enumerazione del motore Y ha però avuto un timeout; il secondo tentativo è riuscito.** Questo evento impedisce di considerare la comunicazione RS-485 pienamente qualificata.
+
+In sola lettura sono stati ottenuti i valori stock ID8 7000 ms, ID20 25000 ms, ID22 500 ms. auto_apply è rimasto disattivato e non sono stati eseguiti homing, movimenti o stampa per il test. Il residuo type 4 in stampa reale resta da verificare. L'extra abbinato è nella [PR Kalico #83 in bozza](https://github.com/MzTechnology97/kalico-k2pro/pull/83).
