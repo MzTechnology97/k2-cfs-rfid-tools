@@ -69,3 +69,11 @@ Built 18 October 2026. Not hardware-qualified. No flash or printer motion perfor
 La v3.23 CFG4 è sperimentale. I parametri sono compatibili **solo** con il firmware modificato K2-OpenHost distribuito da questa repository e con Kalico abbinato. Solo gli ID 1/2/3/5/7/8 sono realmente modificabili dal CFG all'avvio. OpenCFS è riconosciuto come OCFS ma non riceve SET CFG4. Mantenere disponibile la v3.22 per il recupero.
 
 [Parametri IT](../../docs/CFS_V323_PARAMETER_GUIDE_IT.md) | [Parameters EN](../../docs/CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](../../docs/CFS_FIRMWARE_COMPATIBILITY_IT.md) | [Compatibility EN](../../docs/CFS_FIRMWARE_COMPATIBILITY.md)
+
+## Type-4 runtime versus live usage / Runtime type 4 e consumo live
+
+**EN:** This image inherits the v3.12/v3.22 type-4 initialization, validity and readout hooks. These establish an initial remaining percentage for third-party RFID spools; they do **not** bypass the FM15L013 hardware flag that gates Creality's stock odometer task. On chip-less boards the `0x03` percentage may not fall during printing. Live type-4 accounting is not implemented in CFG4.
+
+**IT:** Il firmware conserva gli hook v3.12/v3.22 per inizializzare e leggere il residuo type 4 delle bobine RFID di terze parti, ma **non** aggira il flag hardware FM15L013 che abilita il task odometro stock. Sulle schede prive del chip la percentuale `0x03` può restare invariata durante la stampa. Il conteggio live type 4 non è implementato nella CFG4.
+
+[Parametri IT](../../docs/CFS_V323_PARAMETER_GUIDE_IT.md) | [Parameters EN](../../docs/CFS_V323_PARAMETER_GUIDE_EN.md)
