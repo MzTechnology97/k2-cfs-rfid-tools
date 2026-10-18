@@ -1,0 +1,76 @@
+{
+  "audit_date": "2026-10-12",
+  "scope": "offline historical 2025 original public CFS Flash vs SHA-pinned v3.13 and v3.22 built APP",
+  "historical_vendor_flash_source": "https://github.com/fake-name/cfs-reverse-engineering/tree/main/reversing/live_dumps",
+  "historical_flash_git_blob_sha1": "44e2d48a144356c1ae2b3fe0b4e23175c050e28e",
+  "v322_validated_app_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "historical_five_named_pwm_devices_callback_in_running_ram": "0x08014555",
+  "historical_callback_entry_original": "0x08014554",
+  "modern_identical_extended_pwm_shim_entry": "0x0802639C",
+  "pwm_callback_exact_Thumb_opcode_count": 19,
+  "pwm_callback_exact_compared_bytes": 40,
+  "pwm_callback_exact_byte_differences": 0,
+  "pwm_callback_cross_generation_sha256": "dd29a80b1b541fa7d7c3142ea67ae1385f4268af1eea3938e1387326dd0128aa",
+  "pwm_function_same_between_v313_and_v322": true,
+  "historical_rom_pointer_literal": {
+    "address": "0x08014A20",
+    "value": "0x08014555",
+    "PC_relative_load": "0x08014626",
+    "store_to_object_offset_0x38": "0x08014628"
+  },
+  "modern_constructor_rom_pointer_literal": {
+    "address": "0x08026868",
+    "value": "0x0801939D",
+    "PC_relative_load": "0x0802646E",
+    "store_to_object_offset_0x38": "0x08026470"
+  },
+  "constructor_original_Thumb_region_old": "0x0801461A",
+  "constructor_original_Thumb_region_modern": "0x08026462",
+  "constructor_exact_compared_bytes": 32,
+  "constructor_exact_byte_differences": 0,
+  "constructor_same_between_v313_and_v322": true,
+  "constructor_cross_generation_sha256": "dc05fd17e099777114f4fd59d56f8db95c291ecbc95ec514d8666f748c4edb86",
+  "modern_extended_pwm_shim_has_plain_literal_pointer_ref": false,
+  "historical_actual_pwm_callback_has_plain_literal_pointer_ref": true,
+  "modern_constructor_other_target_assigned": "0x0801939D",
+  "modern_other_target_entry_standard_AAPCS_proven": false,
+  "modern_pwm1_registered_actual_callback_proven": false,
+  "any_later_callback_overwrite_waived_or_proven": false,
+  "real_motor_idle_or_encoder_stationarity_proven": false,
+  "safe_to_enable_v323_motor_control_writes": false,
+  "safe_to_flash_v323": false,
+  "live_MCU_or_serial_access": false,
+  "proprietary_firmware_uploaded": false,
+  "original_constructor_operations_2026_10_12": [
+    {
+      "field": "+0x30",
+      "literal": "0x08026860",
+      "thumb": "0x080193C5",
+      "pcrel_ldr": "0x08026466",
+      "store": "0x08026468",
+      "entry_is_ordinary_function_prologue_proven": false
+    },
+    {
+      "field": "+0x34",
+      "literal": "0x08026864",
+      "thumb": "0x08019401",
+      "pcrel_ldr": "0x0802646A",
+      "store": "0x0802646C",
+      "entry_is_ordinary_function_prologue_proven": false
+    },
+    {
+      "field": "+0x38",
+      "literal": "0x08026868",
+      "thumb": "0x0801939D",
+      "pcrel_ldr": "0x0802646E",
+      "store": "0x08026470",
+      "entry_is_ordinary_function_prologue_proven": false
+    }
+  ],
+  "three_constructor_destinations_have_verified_sequential_fallthrough_predecessors": true,
+  "synthetic_AAPCS_call_to_plus_0x38_returned_using_caller_stack_not_LR": true,
+  "synthetic_AAPCS_call_identical_behavior_v313_v322": true,
+  "normal_real_RTThread_callback_invocation_context_authenticated": false,
+  "live_CFS_device_name_to_callback_recovered": false,
+  "safe_to_patch_any_constructor_pointer": false
+}

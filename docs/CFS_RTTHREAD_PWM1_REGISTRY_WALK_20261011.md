@@ -1,0 +1,133 @@
+# RT-Thread CFS `pwm1` registry traversal — original ARM audit
+
+**11 October 2026. Fully offline. Draft research, NOT firmware release.**
+
+The original stock CFS APP (Creality 1.5.3) and the verified
+v3.22 both contain the same startup lookup sequence for the
+named type-9 PWM device `pwm1`, culminating in a write of
+the returned pointer into `0x20004A14`.
+
+This research extends the previous
+[named PWM1 lookup](CFS_PWM1_NAMED_DEVICE_LOOKUP_20261011.md).
+Previously, our firmware emulator replaced the *whole* RT-Thread
+lookup with a chosen pointer. Now the entire **manufacturer
+RT-Thread linked-list traversal** also executes in the original
+Thumb code, with only operating-system infrastructure and
+string comparison mocked. Synthetic RAM registry objects remain
+explicitly fake.
+
+## New ROM-level evidence
+
+The original routine at `0x0802E1B4` performs the following:
+
+| Original address | Action |
+| --- | --- |
+| `0x0801E080` | Load the actual ROM string `pwm1` |
+| `0x08023774` | Select registered device type `9` |
+| `0x0802E1BC` | Resolve registry list/class for type |
+| `0x0802E1F4` | Load first device list entry from `[class+4]` |
+| `0x0802E200` | Convert `list node` to containing object by subtracting `0x0C` |
+| `0x0802E206` | Limit device-name comparison to **8 bytes** |
+| `0x0802E20A` | Call RT-Thread string comparator |
+| `0x0802E20E` | Branch on matching name |
+| `0x0802E210` | Otherwise follow next linked-list entry |
+| `0x0802E220` | Return matching containing object |
+| `0x0801E086` | Store returned object pointer into `0x20004A14` |
+
+This establishes how the registry selects an object **by
+type and name**, not by assuming an array index, callback
+offset, hardware timer channel, or guessed function pointer.
+
+It does **not** establish the actual contents of that list
+on the real device.
+
+## Additional finding: five original constructed objects register as type 9
+
+Original code at `0x080283BE` constructs five objects and calls
+`0x0802644A` at `0x08028408`. Its tail at `0x08026484`
+branches to the RT-Thread registration helper `0x0802377A`.
+That helper executes **`movs r1,#9`** at `0x0802379A`
+immediately before calling the RT-Thread registration function
+`0x0802DFD6` at `0x0802379E`.
+
+These newly pinned manufacturer Thumb instructions establish
+that **the five objects are submitted for registration as
+class/type 9 devices**, the same class used in the `pwm1`
+name lookup. This is more than matching object and string counts.
+
+The five objects' actual **names are not yet established**:
+the constructor reads each name through `[object+0x54]`,
+whose real initialized RAM contents are not recovered.
+Neither the callback identity nor whether `pwm1` belongs to
+this five-object group is independently established.
+## Differential emulation cases
+
+The reproducible script
+`firmware/v3.22-readonly-state-probes/pwm1_rt_registry_walk_audit.py`
+constructs several **synthetic type-9 object registries**
+in Unicorn SRAM, then executes original manufacturer
+instructions from the *application `pwm1` lookup itself*,
+through the type wrapper, actual registry linked-list
+traversal, and application RAM-pointer store.
+
+Only the type/class mapping, locks, interrupt-status
+helpers and `strncmp` logic are replaced by strict
+mock operations. They are not the CFS live RTOS or
+real device registrations. The pointer returned to
+the application comes from the actual manufacturer
+ROM's list walk.
+
+| Synthetic registry contents, in order | Object returned |
+| --- | --- |
+| `pwm1, pwm3` | First |
+| `pwm3, pwm1` | Second |
+| `pwm3, pwm4, pwm1` | Third |
+| `pwm3, pwm4` | NULL |
+| Empty | NULL |
+| `pwm12, pwm1` | Second (prefix not equal) |
+| `PWM1, pwm1` | Second (case-sensitive) |
+
+All cases verify the original write to `0x20004A14`.
+Case results are reproducible using the exact validated
+v3.22 input; the locally held manufacturer stock APP can
+be supplied for byte-identical differential comparisons
+once remote machine access is available.
+
+The emulator does **not** read the true RT-Thread
+registry from a running CFS MCU and does **not** run
+any real device callbacks. Distinct synthetic object
+addresses are intentionally chosen to avoid assuming
+they are members of the previous five-object array
+at `0x2000075C`.
+
+**The important unresolved question remains: which
+actual runtime object is registered as `pwm1`, and
+which callback is installed in that instance?**
+
+## Failure isolation and compliance
+
+The script also pins **29 original Thumb instruction
+encodings**, verifies the fixed `pwm1` ROM string,
+and rejects **eleven checksum-corrected in-memory
+mutations** of the name lookup, linked-list traversal
+and device pointer store. GitHub CI runs the checks
+against a fresh rebuild of the exact validated v3.22
+app, without redistributing the proprietary original ROM.
+
+The locally retained original APP was already checked
+in earlier audits; no claim is made that the new
+seven-case registry emulator was executed on the CM5
+after its remote-service usage limit was reached.
+CI results must be consulted for actual pass/fail.
+
+This is a software registry/name lookup, **not
+independent encoder/shaft-speed/driver-stop feedback**.
+Do not use it to authorize MCU motor-active writes,
+enlarge the v3.22 firmware image, or flash the
+experimental v3.23 event-ring build. The loader
+Flash boundary, IRQ/stack ownership and all-motor
+idle proof remain release blockers in issue #9.
+
+**No printer firmware, active Kalico files, serial
+packets, live memory, motor commands or reboot have
+been generated by this study.**

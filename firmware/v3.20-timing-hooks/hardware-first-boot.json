@@ -1,0 +1,43 @@
+{
+  "pass": true,
+  "checks": {
+    "api_v2": true,
+    "feature_0xB7": true,
+    "count_28": true,
+    "defaults_match": true,
+    "no_runtime_error": true,
+    "printer_ready_idle": true
+  },
+  "observed_signature": "0xb7",
+  "values": {
+    "feeder_forward_speed": 255,
+    "hub_forward_speed": 100,
+    "hub_transition_speed": 200,
+    "hub_insert_speed": 155,
+    "feeder_reverse_speed": 255,
+    "hub_reverse_speed": 80,
+    "reverse_detooth_enable": 0,
+    "hub_transition_wait_ms": 3200,
+    "insert_sensor_timeout_ms": 700,
+    "hub_pullback_timeout_ms": 5000,
+    "unload_sensor_timeout_ms": 1000,
+    "rfid_seek_speed": 160,
+    "rfid_measure_speed": 120,
+    "rfid_reposition_speed": 100,
+    "rfid_seek_move_ms": 800,
+    "rfid_seek_settle_ms": 200,
+    "rfid_post_auth_wait_ms": 1000,
+    "rfid_pre_measure_settle_ms": 10,
+    "rfid_neighbor_detect_delay_ms": 400,
+    "rfid_neighbor_settle_ms": 100,
+    "feed_total_timeout_20ms_ticks": 1250,
+    "feed_recovery_timeout_ms": 3000,
+    "odometer_stall_20ms_ticks": 25,
+    "rfid_neighbor_retry_count": 3,
+    "reverse_detooth_timeout_ms": 1000,
+    "buffer_fill_timeout_ms": 30000,
+    "transition_detect_timeout_ms": 300,
+    "load_retry_count": 3
+  },
+  "no_motion_or_set": true
+}

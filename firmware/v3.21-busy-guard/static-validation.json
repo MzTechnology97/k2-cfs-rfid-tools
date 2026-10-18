@@ -1,0 +1,502 @@
+{
+  "base_v313_sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
+  "sha256": "4a918febbee1e411ae736acb7fd79eb718e3401a641ee947008bbecf1e6c0b19",
+  "size": 178100,
+  "handler_size": 2428,
+  "crc16": "0xC0DE",
+  "handler_addr": "0x0803AE38",
+  "nominal_total_mm": 330000,
+  "initial_percent_source": "stock area_percent; K2RL pre-geometry latch + gate override at 0x08013380 + recover 0x20003974+slot when r9 passes 0xFF",
+  "runtime_type": 4,
+  "runtime_config_api": {
+    "opcode": "0x57",
+    "legacy_v1_subcommands": {
+      "info": "0x0D",
+      "set": "0x0E",
+      "reset": "0x0F"
+    },
+    "v2_subcommands": {
+      "info": "0x10",
+      "get": "0x11",
+      "set": "0x12",
+      "reset": "0x13",
+      "describe": "0x14"
+    },
+    "layout_version": 2,
+    "catalog_revision": 1,
+    "parameter_count": 28,
+    "capability_mask": "0x97",
+    "mode": "EXPERIMENTAL_TIMING_ID7_ID8_SAFE_BOX_STATE_GUARD",
+    "v2_writes_enabled": true,
+    "v1_speed_writes_enabled": false,
+    "advanced_hook_patches_enabled": false,
+    "advanced_storage": "64 byte boot-cleared RAM sidecar; all 21 writable; only 7/8 hooked to stock execution",
+    "parameters": [
+      {
+        "id": 0,
+        "name": "feeder_forward_speed",
+        "type": "raw_u8",
+        "default": 255,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 1,
+        "name": "hub_forward_speed",
+        "type": "raw_u8",
+        "default": 100,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 2,
+        "name": "hub_transition_speed",
+        "type": "raw_u8",
+        "default": 200,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 3,
+        "name": "hub_insert_speed",
+        "type": "raw_u8",
+        "default": 155,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 4,
+        "name": "feeder_reverse_speed",
+        "type": "raw_u8",
+        "default": 255,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 5,
+        "name": "hub_reverse_speed",
+        "type": "raw_u8",
+        "default": 80,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "safe"
+        ]
+      },
+      {
+        "id": 6,
+        "name": "reverse_detooth_enable",
+        "type": "bool",
+        "default": "captured-stock",
+        "min": 0,
+        "max": 1,
+        "flags": [
+          "advanced"
+        ]
+      },
+      {
+        "id": 7,
+        "name": "hub_transition_wait_ms",
+        "type": "milliseconds_u16",
+        "default": 3200,
+        "min": 100,
+        "max": 10000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 8,
+        "name": "insert_sensor_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 700,
+        "min": 100,
+        "max": 5000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 9,
+        "name": "hub_pullback_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 5000,
+        "min": 500,
+        "max": 15000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 10,
+        "name": "unload_sensor_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 1000,
+        "min": 100,
+        "max": 5000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 11,
+        "name": "rfid_seek_speed",
+        "type": "raw_u8",
+        "default": 160,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 12,
+        "name": "rfid_measure_speed",
+        "type": "raw_u8",
+        "default": 120,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 13,
+        "name": "rfid_reposition_speed",
+        "type": "raw_u8",
+        "default": 100,
+        "min": 1,
+        "max": 255,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 14,
+        "name": "rfid_seek_move_ms",
+        "type": "milliseconds_u16",
+        "default": 800,
+        "min": 100,
+        "max": 5000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 15,
+        "name": "rfid_seek_settle_ms",
+        "type": "milliseconds_u16",
+        "default": 200,
+        "min": 10,
+        "max": 2000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 16,
+        "name": "rfid_post_auth_wait_ms",
+        "type": "milliseconds_u16",
+        "default": 1000,
+        "min": 100,
+        "max": 5000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 17,
+        "name": "rfid_pre_measure_settle_ms",
+        "type": "milliseconds_u16",
+        "default": 10,
+        "min": 1,
+        "max": 1000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 18,
+        "name": "rfid_neighbor_detect_delay_ms",
+        "type": "milliseconds_u16",
+        "default": 400,
+        "min": 50,
+        "max": 2000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 19,
+        "name": "rfid_neighbor_settle_ms",
+        "type": "milliseconds_u16",
+        "default": 100,
+        "min": 10,
+        "max": 1000,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 20,
+        "name": "feed_total_timeout_20ms_ticks",
+        "type": "ticks_20ms_u16",
+        "default": 1250,
+        "min": 250,
+        "max": 3000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 21,
+        "name": "feed_recovery_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 3000,
+        "min": 500,
+        "max": 10000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 22,
+        "name": "odometer_stall_20ms_ticks",
+        "type": "ticks_20ms_u16",
+        "default": 25,
+        "min": 5,
+        "max": 100,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 23,
+        "name": "rfid_neighbor_retry_count",
+        "type": "count_u16",
+        "default": 3,
+        "min": 1,
+        "max": 10,
+        "flags": [
+          "advanced",
+          "rfid-sensitive"
+        ]
+      },
+      {
+        "id": 24,
+        "name": "reverse_detooth_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 1000,
+        "min": 100,
+        "max": 10000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 25,
+        "name": "buffer_fill_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 30000,
+        "min": 1000,
+        "max": 60000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 26,
+        "name": "transition_detect_timeout_ms",
+        "type": "milliseconds_u16",
+        "default": 300,
+        "min": 50,
+        "max": 5000,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      },
+      {
+        "id": 27,
+        "name": "load_retry_count",
+        "type": "count_u16",
+        "default": 3,
+        "min": 1,
+        "max": 10,
+        "flags": [
+          "advanced",
+          "safety-limit"
+        ]
+      }
+    ],
+    "stock_table_offsets": [
+      1,
+      2,
+      3,
+      5,
+      6,
+      7
+    ],
+    "expected_stock_table_ptr": "0x200037E2",
+    "idle_guard": "stock BOX_STATE byte [0x200037D0 + 2] == 0, fail closed otherwise"
+  },
+  "patches": [
+    {
+      "callsite": "0x0801A4CC",
+      "symbol": "legacy_read0_wrapper",
+      "target": "0x0803B648",
+      "before": "21f019f8",
+      "after": "21f0bcf8"
+    },
+    {
+      "callsite": "0x0801A52C",
+      "symbol": "legacy_read1_wrapper",
+      "target": "0x0803B64E",
+      "before": "20f0ecff",
+      "after": "21f08ff8"
+    },
+    {
+      "callsite": "0x0801A590",
+      "symbol": "legacy_read2_wrapper",
+      "target": "0x0803B654",
+      "before": "20f0bdff",
+      "after": "21f060f8"
+    },
+    {
+      "callsite": "0x080225D0",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B6BA",
+      "before": "18f0d0ff",
+      "after": "19f073f8"
+    },
+    {
+      "callsite": "0x08022604",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B6BA",
+      "before": "18f0b6ff",
+      "after": "19f059f8"
+    },
+    {
+      "callsite": "0x08022638",
+      "symbol": "alt_read_wrapper",
+      "target": "0x0803B6BA",
+      "before": "18f09cff",
+      "after": "19f03ff8"
+    },
+    {
+      "callsite": "0x08012DDC",
+      "symbol": "uid_compare_wrapper",
+      "target": "0x0803B3E2",
+      "before": "28f05efa",
+      "after": "28f001fb"
+    },
+    {
+      "callsite": "0x08012E62",
+      "symbol": "msg_validate_wrapper",
+      "target": "0x0803B474",
+      "before": "28f064fa",
+      "after": "28f007fb"
+    },
+    {
+      "callsite": "0x08013380",
+      "symbol": "remaining_gate_wrapper",
+      "target": "0x0803B57A",
+      "before": "28f058f8",
+      "after": "28f0fbf8"
+    },
+    {
+      "callsite": "0x08013394",
+      "symbol": "remaining_init_wrapper",
+      "target": "0x0803B5A2",
+      "before": "28f062f8",
+      "after": "28f005f9"
+    },
+    {
+      "callsite": "0x0801BF9E",
+      "symbol": "remaining_valid_wrapper",
+      "target": "0x0803B60E",
+      "before": "1ff093fa",
+      "after": "1ff036fb"
+    },
+    {
+      "callsite": "0x08011116",
+      "symbol": "cfg7_r0_wrapper",
+      "target": "0x0803B798",
+      "before": "4ff44860",
+      "after": "2af03ffb"
+    },
+    {
+      "callsite": "0x080112CA",
+      "symbol": "cfg8_r1_wrapper",
+      "target": "0x0803B7A4",
+      "before": "4ff42f71",
+      "after": "2af06bfa"
+    },
+    {
+      "callsite": "0x0802A5F2",
+      "symbol": "heap_init_sidecar_wrapper",
+      "target": "0x0803B776",
+      "before": "fdf76ff9",
+      "after": "11f0c0f8"
+    }
+  ],
+  "unexpected_changed_bytes": 0,
+  "tag_writes_added": false,
+  "release_gate_required": true,
+  "production_release_approved": false,
+  "experimental_test_only": true,
+  "cfs_runtime_diag_read_only": false,
+  "v321_timing_hooks": [
+    7,
+    8
+  ],
+  "v321_hook_addresses": [
+    "0x08011116",
+    "0x080112CA"
+  ],
+  "v321_advanced_volatile_only": true,
+  "v321_other_motion_hooks_enabled": false,
+  "v319_heap_start": "0x20006F28",
+  "v321_flash_end_limit": "0x0803B800",
+  "v321_diag": "21 advanced RAM overrides, two stock timing callsites hooked (IDs 7/8), remaining 19 advanced settings not applied, no RFID motor hooks",
+  "active_advanced_motion_hooks": [
+    7,
+    8
+  ],
+  "never_flash_automatically": true,
+  "eeprom_writes_added": false,
+  "host_extra_for_runtime_config": "klippy/extras/box_cfs_runtime.py"
+}
