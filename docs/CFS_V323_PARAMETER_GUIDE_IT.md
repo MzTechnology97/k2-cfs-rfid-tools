@@ -62,3 +62,13 @@
 **Attenzione:** l'immagine v3.23 CFG4 è sperimentale; la verifica con Unicorn non certifica i motori o la stabilità fisica RS-485. Tenere disponibile il firmware v3.22 per il recupero.
 
 [English parameter guide](CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](CFS_FIRMWARE_COMPATIBILITY_IT.md)
+
+## Residuo type 4 durante la stampa
+
+La v3.23 CFG4 **eredita dalla v3.12/v3.22** gli hook `remaining_gate_wrapper`, `remaining_init_wrapper` e `remaining_valid_wrapper`. Questi inizializzano, per le bobine di terze parti supportate, il runtime stock **type 4** dalla percentuale geometrica e da un riferimento nominale di 330.000 mm. Il comando `0x03` può leggere il residuo iniziale senza scrivere sul tag RFID.
+
+**Non equivale al conteggio live durante la stampa.** L'analisi OpenCFS dello stock APP153 dimostra che il task `rfid_mgr_fila_task`, che accumula i millimetri dell'odometro e ricalcola la percentuale, è condizionato dal flag di presenza del chip FM15L013. Senza quel chip, il task stock viene saltato anche per type 4: il residuo CFS può restare fermo al caricamento, mentre Kalico stima il consumo da G-code.
+
+La v3.23 CFG4 **non elimina questo gate hardware** e non aggiunge un task odometro alternativo. Il consumo live type 4 richiede una futura patch e test hardware specifici. Gli ID 20 e 22 sono riconosciuti da Kalico e leggibili, ma non modificabili nel firmware CFG4 attuale: mancano i relativi hook effettivi.
+
+[Analisi OpenCFS](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/05-preload-rfid.md) | [English](CFS_V323_PARAMETER_GUIDE_EN.md)
