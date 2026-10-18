@@ -52,7 +52,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - 15 new ARM callsites: exact default behaviour, ABI registers and CPU flags verified.
 - ID6 disabled changes BLS condition to skip the actual stock de-tooth action.
 - Type-4 regression passed with simulated odometer, stock print start/finish, percent setter and getter.
-- Paired Kalico candidate is separate and passes 107 host tests.
+- Matching Kalico CFG6 extra has been merged into the operational `k2-pro-openhost` branch; host tests pass.
 - Real hardware, RFID tags, transport stability and rollback remain unqualified.
 
 Experimental image: CFG6-ALL-ADVANCED-LAB-NOT-FOR-FLASH.bin
@@ -64,4 +64,12 @@ SHA-256: 6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6
 - SHA-256: `6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6`
 - Identity: `K2OH / v323-cfg6`, API2 features `0xE3`.
 - Same verified bytes as the laboratory image; the canonical filename above is preferred for installation.
-- Keep `auto_apply` disabled until RS-485, motor and RFID smoke tests have passed following the flash.
+- Enable `auto_apply` only after verifying exact CFG6 identity and the idle RS-485 bus. Initial SET/GET readback succeeded; physical RFID and movement tests are still outstanding.
+
+## First physical flash and startup settings — 18 October 2026
+
+The user flashed the CFS; the device identified as **K2OH v323-cfg6 / feature 0xE3**, API2 with 28 parameters. RS-485 and motor startup are operational, although the first post-flash boot initially saw timeouts and one CRC error before recovering.
+
+With CFS `IDLE`, the printer in `standby`, no filament slot loaded and no axes homed, the paired Kalico CFG6 extra applied **all 23 configured settings** (`auto_apply: True`). The status reported `applied 23 value(s)` with no errors. An independent read-only diagnostic confirmed **28 valid GET responses and a 23/23 match** with the active CFG; unsupported IDs 0/4/10/25/26 remained at stock values.
+
+**No Z homing, axis movement, filament loading, or printing was performed.** Parameter write/readback does not establish the physical RFID/motion hook behavior, live type-4 remaining percentage during printing, or prolonged bus stability. Preserve CFG5T as a rollback.
