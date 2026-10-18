@@ -5,6 +5,8 @@ VERSIONE SPERIMENTALE PER TEST HARDWARE SUPERVISIONATI, NON QUALIFICATA PER PROD
 Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effective, 5 GET-only.
 15 new IDs: 6, 9, 11-19, 21, 23, 24, 27.
 
+**[Guida dettagliata parametro per parametro: comportamento reale, valori, range e rischi](PARAMETERS_IT.md)** · [English](PARAMETERS_EN.md).
+
 | ID | Parametro / Parameter | Stock | Range | SET |
 |---:|---|---:|---|:---:|
 | 0 | feeder_forward_speed | 255 | 1-255 raw | NO |
