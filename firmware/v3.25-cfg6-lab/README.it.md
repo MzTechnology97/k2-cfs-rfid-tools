@@ -75,3 +75,6 @@ La CFS è stata aggiornata dall'utente e identificata in lettura come **K2OH v32
 Con CFS `IDLE`, stampante `standby`, nessuna bobina caricata e nessun asse referenziato, l'extra Kalico CFG6 ha applicato **23 valori su 23** dal file `box.cfg` (`auto_apply: True`). Stato riportato: `applied 23 value(s)`, senza errori. La successiva diagnostica in sola lettura ha confermato **28 GET validi, 23/23 impostazioni corrispondenti al CFG**, con ID 0/4/10/25/26 non modificati.
 
 **Non sono stati eseguiti homing Z, movimenti, caricamento filamento o prove di stampa.** L'attivazione e la lettura dei parametri non dimostrano ancora il comportamento fisico degli hook RFID/motori, il residuo live type 4 durante una stampa o l'affidabilità prolungata del bus. Conservare il firmware CFG5T per il rollback.
+
+
+**Stato aggiornato, PR chiuse e problemi ancora aperti:** [resoconto e audit GitHub IT](../../docs/CFG6_STATUS_PR_TRIAGE_20261018_IT.md) · [EN](../../docs/CFG6_STATUS_PR_TRIAGE_20261018_EN.md).
