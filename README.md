@@ -1,61 +1,79 @@
-# K2 CFS RFID — v3.12 validated; v3.23 CFG4 experimental
+# K2 CFS RFID — CFG6 v3.25 experimental firmware
 
-This repository contains my current hardware-validated **Creality K2 Pro CFS RFID v3.12 / API7** firmware and the host-side work I use with K2-OpenHost/Kalico.
+**Latest firmware candidate: K2OH CFG6 v3.25** for **Creality K2 Pro CFS G32 / stock APP `cfs0_000_153`**. This repository retains the historical **v3.12 API7 RFID release**, the CFG4/CFG5T intermediate builds and the matching Kalico integration.
 
-I started this project to add third-party filament RFID interoperability while keeping Creality's original CFS worker in control of the RF frontend. I do not replace the stock RFID task and I do not expose tag-write operations.
+[**Guida italiana / Italian README**](README.it.md) · [**Download experimental CFG6 firmware**](firmware/v3.25-cfg6-lab/cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin) · [**CFG6 documentation EN**](firmware/v3.25-cfg6-lab/README.md) · [**CFG6 documentation IT**](firmware/v3.25-cfg6-lab/README.it.md)
 
-The current v3.12 release includes three pieces of functionality that I have validated on hardware:
+## Current version — CFG6 v3.25 (18 October 2026)
 
-- the API7 MIFARE Classic Key-A override/capture path introduced in v3.3;
-- guarded fast-accept handling that removes redundant third-party retry rotations;
-- stock-style **remaining-filament estimation for third-party API7 captures**, using the CFS's own geometry calculation and type-4 runtime odometer.
+| Property | CFG6 v3.25 |
+|---|---|
+| MCU/hardware | `cfs0_050_G32` / Creality APP `cfs0_000_153` |
+| Runtime identification | `K2OH`, revision `v323-cfg6`, API v2, feature byte `0xE3` |
+| Runtime parameters | **28 readable; 23 actually writable** through stock execution hooks |
+| New writable IDs compared with CFG5T | **6, 9, 11–19, 21, 23, 24, 27** (15 additional controls) |
+| GET-only IDs | **0, 4, 10, 25, 26** |
+| Installation | [Experimental CFS firmware menu](https://github.com/MzTechnology97/k2-openhost-installer-helper), option **3** in the documented six-candidate manifest |
+| Paired host software | [Kalico `k2-pro-openhost`](https://github.com/MzTechnology97/kalico-k2pro/tree/k2-pro-openhost), `box_cfs_runtime.py` and `box.cfg` |
+| Status | **Installed and SET/GET tested on one CFS**, experimental; **not motion/RFID or long-running production qualified** |
 
-Bambu material/colour recognition is hardware validated. QIDI PET-CF recognition through the generic MIFARE decoder is also hardware validated. The new v3.12 remaining path has so far been hardware validated with Bambu.
+**Installable image:** [`cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin`](firmware/v3.25-cfg6-lab/cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin)
 
-## Current status (2026-10-18)
+**SHA-256:** `6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6`
 
-The reference K2 Pro CFS runs **v3.22** (`0xD7`), SHA-256 `40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`. It was flashed on 2026-10-10. During the OpenCFS tests of 2026-10-17/18 other images were tried, and v3.22 was restored after each attempt.
+To install through the Helper on a compatible idle K2-OpenHost CM5:
 
-| Image | Feature | Directory | State |
+```bash
+cd ~/k2-openhost-installer-helper
+./helper.sh experimental-cfs
+```
+
+Select **CFG6 v3.25** and follow the interactive safeguards. The Helper checks the BIN and its SHA-256 before asking for explicit confirmation. **Flashing is never automatic.** Keep the [CFG5T v3.24](firmware/v3.24-cfg5t/README.md) and [v3.22](firmware/v3.22-readonly-state-probes/README.md) rollback candidates available.
+
+### What CFG6 changes
+
+- **CFS hub loading/unloading:** independent hub forward, transition, insertion and reverse speed controls. These are **raw 1–255 motor commands, not mm/s**. Spool feeders are ON/OFF and their pseudo-speeds (IDs 0/4) remain GET-only.
+- **Motion sequencing:** configurable hub waits, insert sensor/odometer stall and feed/recovery timeouts. These alter delays and failure thresholds, **not toolhead extruder speed**.
+- **RFID behavior:** configurable seek/measurement/reposition speeds, settle times and neighbor search retry count. Physical performance at all settings still needs printing/RFID qualification.
+- **Pretension and reverse de-tooth:** controls for actual pretension loop count (ID27) and gated reverse de-tooth action (IDs 6/24).
+- **Remaining filament:** preserves the stock-based type-4 consumption path; its **real-print percentage decrement remains to be qualified**.
+- **Runtime contract:** Kalico applies selected overrides from `[box_cfs_runtime]` only at startup with the exact firmware identity and `auto_apply: True`. It does **not** send these CFG6 SET operations to stock Creality, CFG4, CFG5T or OpenCFS.
+
+### Hardware validation achieved — and still pending
+
+On **18 October 2026**, the reference CFS reported `K2OH / v323-cfg6 / 0xE3`. In printer standby with the CFS idle, matching Kalico successfully applied **23/23 configured values** and a separate diagnostic read **28/28 IDs**, matching all **23/23 writable overrides**. Klipper and the motor discovery completed. **No G28, Z homing, axis motion, filament loading/unloading or RFID motion was performed during these checks.**
+
+**Safety warning:** early motor enumeration observed RS-485 timeout/CRC warnings before recovery. More importantly, [issue #9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9) remains **open**: the original CFS MCU can report `BOX_STATE=IDLE` while feeding is physically active; a fully proven independent MCU motor-idle/atomic write interlock is still missing. Host-side safety checks and successful idle SET/GET are not evidence of safe writes during physical motion. **Do not send direct SET/RESET during movement. Experimental use only, not production qualified.**
+
+**Detailed documentation:**
+- [Every CFG6 parameter (English): effects, stock/defaults, units, limits, caveats](firmware/v3.25-cfg6-lab/PARAMETERS_EN.md)
+- [Ogni parametro CFG6 (Italiano): comportamento, valori, limiti e rischi](firmware/v3.25-cfg6-lab/PARAMETERS_IT.md)
+- [Firmware source, builder and offline tests](firmware/v3.25-cfg6-lab/)
+- [Host integration and configuration (EN)](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/docs/CFS_RUNTIME_CFG6_EN.md) · [IT](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/docs/CFS_RUNTIME_CFG6_IT.md)
+- [Latest development status, PR/issue triage (EN)](docs/CFG6_STATUS_PR_TRIAGE_20261018_EN.md) · [IT](docs/CFG6_STATUS_PR_TRIAGE_20261018_IT.md)
+
+## Firmware version history
+
+| Image | Identity / feature | Directory | Evidence and status |
 |---|---|---|---|
-| v3.12 | API7 | [`firmware/v3.12-remaining/`](firmware/v3.12-remaining/) | last release with RFID and remaining-filament validation (Bambu) |
-| v3.13 | API1 | [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/) | rollback base; six stock speeds writable |
-| v3.19 | `0xF7` | [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md) | RAM bench; no ID connected to a stock callsite |
-| v3.20 | `0xB7` | [`firmware/v3.20-timing-hooks/`](firmware/v3.20-timing-hooks/README.md) | timing hooks IDs 7 and 8 |
-| v3.21 | `0x97` | [`firmware/v3.21-busy-guard/`](firmware/v3.21-busy-guard/README.md) | adds the `BOX_STATE` write guard; image rebuilt from source |
-| **v3.22** | **`0xD7`** | [`firmware/v3.22-readonly-state-probes/`](firmware/v3.22-readonly-state-probes/README.md) | **installed**; adds four read-only diagnostic GET IDs; BIN published |
+| **CFG6 v3.25 — latest** | **`v323-cfg6 / 0xE3`** | **[`firmware/v3.25-cfg6-lab/`](firmware/v3.25-cfg6-lab/)** | **Installed; 23/23 SET/GET verified; still experimental** |
+| CFG5T v3.24 | `v323-cfg5t / 0xE5` | [`firmware/v3.24-cfg5t/`](firmware/v3.24-cfg5t/) | 8 writable IDs + gated type-4 task; rollback |
+| CFG4 v3.23 | `v323-cfg4 / 0xD7` | [`firmware/v3.23-k2oh/`](firmware/v3.23-k2oh/) | 6 effective writable IDs; historical |
+| v3.22 | `0xD7` | [`firmware/v3.22-readonly-state-probes/`](firmware/v3.22-readonly-state-probes/README.md) | Previously field-tested load/unload and prints; rollback |
+| v3.21 | `0x97` | [`firmware/v3.21-busy-guard/`](firmware/v3.21-busy-guard/README.md) | Historical incomplete MCU busy-guard |
+| v3.20 | `0xB7` | [`firmware/v3.20-timing-hooks/`](firmware/v3.20-timing-hooks/README.md) | Timing hook experiments |
+| v3.19 | `0xF7` | [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md) | Volatile RAM bench |
+| v3.12 | API7 | [`firmware/v3.12-remaining/`](firmware/v3.12-remaining/) | Historical hardware-validated RFID interoperability and Bambu remaining percentage |
 
-What v3.22 has done on the reference printer:
-- **Bench, 2026-10-10:** boot, 28 GET values and a physical load/unload without heating.
-- **2026-10-14/15 and 2026-10-16/17:** two complete 30 h PETG-CF prints. Each spool ran out mid-print, and the automatic runout swap loaded the next same-material slot in about 43 s and 46 s. The swaps were handled by Kalico through the stock load path. RS-485 had no CRC errors.
-- **Runtime parameters:** never applied during the prints. Kalico skips auto-apply on every experimental signature. Since kalico-k2pro #80 it also refuses a manual SET of any ID without a stock callsite: on v3.20-v3.22 only IDs 7 and 8 are settable, and on v3.19 none.
-- **Still experimental:** v3.22 is not a production release. The MCU-side motor-activity guard is still open ([#9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9)), and the four diagnostic IDs are not a motor-busy indicator.
-
-Live remaining-filament accounting during prints (type 4) is being prepared as v3.23, in the open `v3.23` pull requests. Stock 153 runs the usage task only on boards with the FM15L013 secure element, and it never writes RFID tags.
-
-## Current experimental v3.23 CFG4 runtime (2026-10-18)
-
-A source-reproducible, SHA256-pinned experimental v3.23 firmware
-is available in [firmware/v3.23-k2oh](firmware/v3.23-k2oh).
-**Only the corresponding modified firmware distributed in this repository
-is compatible with its CFG-only startup parameter writes.**
-Stock Creality and third-party binaries are not compatible.
-OpenCFS is recognized separately using its OCFS identity, but must not
-receive the K2OH patched-stock parameter SET opcodes.
-The CFG4 implementation exposes six effective writable IDs only
-(1, 2, 3, 5, 7, 8); other IDs remain read-only.
-See [all 28 parameters](docs/CFS_V323_PARAMETER_GUIDE_IT.md)
-and [compatibility](docs/CFS_FIRMWARE_COMPATIBILITY.md).
-
-**Not yet hardware-qualified.** Keep the v3.22 recovery route.
+**Historical validation is distinct from CFG6 qualification:** v3.12 has independently tested RFID captures, while v3.22 has prior prints/load-unload results; these do not automatically establish CFG6's dynamic behavior.
 
 ## Historical experimental v3.19 CFS runtime-parameter firmware (2026-10-10)
 
 A **separate, NOT production-ready** v3.19 volatile-RAM bench image is now published under [`firmware/v3.19-volatile-ram/`](firmware/v3.19-volatile-ram/README.md). On an actual K2 Pro CFS the 28 default GET values and feature marker `0xF7` passed; one manual SET/GET/RESET of advanced ID 18 also passed. All other advanced writes and any movement effects remain unvalidated. Advanced motor/RFID movement hooks are disabled. Do not use the v3.19 image for regular CFS operations.
 
-The directory contains a reproducible patched-v3.13 base, the full v3.19 assembly and builder, offline tests, exact SHA-256 and rollback guidance. The companion [Kalico extra](https://github.com/MzTechnology97/kalico-k2pro) and [installer helper manifest](https://github.com/MzTechnology97/k2-openhost-installer-helper) are updated separately. **v3.12 remains the most recently independently validated RFID/motion release.**
+The directory contains a reproducible patched-v3.13 base, the full v3.19 assembly and builder, offline tests, exact SHA-256 and rollback guidance. The companion [Kalico extra](https://github.com/MzTechnology97/kalico-k2pro) and [installer helper manifest](https://github.com/MzTechnology97/k2-openhost-installer-helper) are updated separately. **The v3.12 RFID implementation retains separate historical material-tag validation; the installed CFG6 has verified startup configuration/readback, but is not yet mechanically or RFID-qualified.**
 
-## Validated firmware target
+## Historical v3.12 validated firmware target
 
 I built and tested this release only against:
 
@@ -149,6 +167,12 @@ An earlier scan of the same Creality spool had returned 38%, which is consistent
 
 ```text
 firmware/
+  v3.25-cfg6-lab/              # current experimental CFG6 firmware and tests
+    cfs0_050_G32-cfs0_000_153-runtime-config-v3_25-K2OH-CFG6-EXPERIMENTAL.bin
+    PARAMETERS_EN.md / PARAMETERS_IT.md
+  v3.24-cfg5t/                 # earlier experimental version / rollback
+  v3.23-k2oh/                  # CFG4 historical build
+
   v3.12-remaining/
     cfs0_050_G32-cfs0_000_153-rfid-remaining-v3_12.bin
     handler-v3_12.S
@@ -213,8 +237,10 @@ The known stock MIFARE write routine at `0x0801970E` and EEPROM write routine at
 
 This is my independent interoperability/reverse-engineering work and is not affiliated with Creality, Bambu Lab or QIDI.
 
-## Italiano — firmware K2-OpenHost CFG4
+## Italiano — ultima versione CFG6 v3.25
 
-La v3.23 CFG4 è sperimentale. La scrittura dei parametri è compatibile **esclusivamente con i firmware modificati di questa repository**; non con Creality originale o altri firmware. Kalico rileva OpenCFS come famiglia OCFS separata. Sono regolabili solo ID 1/2/3/5/7/8; gli altri non sono implementati come SET operativi.
+La versione più recente è **K2OH CFG6 v3.25** (`v323-cfg6`, API2, feature `0xE3`) per CFS G32/APP153. Sono disponibili **28 ID in lettura** e **23 parametri realmente modificabili**: velocità hub, temporizzazioni, ricerca RFID, pretensione e reverse de-tooth. Gli ID 0, 4, 10, 25 e 26 sono solo GET.
 
-[Guida IT](docs/CFS_V323_PARAMETER_GUIDE_IT.md) | [Guide EN](docs/CFS_V323_PARAMETER_GUIDE_EN.md) | [Compatibilità IT](docs/CFS_FIRMWARE_COMPATIBILITY_IT.md) | [Compatibility EN](docs/CFS_FIRMWARE_COMPATIBILITY.md)
+Sul CM5 è stata verificata l'applicazione di **23/23 parametri** e la lettura di **28/28 ID** con `auto_apply: True`. Non sono ancora stati qualificati il comportamento fisico di caricamento/scaricamento, il movimento RFID, l'affidabilità RS-485 prolungata e il residuo live durante una stampa. **Il problema di sicurezza [#9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9) resta aperto**: non modificare parametri mentre i motori sono in funzione.
+
+**[README italiano completo](README.it.md)** · [Firmware e BIN CFG6](firmware/v3.25-cfg6-lab/README.it.md) · [Guida di tutti i 28 parametri](firmware/v3.25-cfg6-lab/PARAMETERS_IT.md) · [Helper](https://github.com/MzTechnology97/k2-openhost-installer-helper)
