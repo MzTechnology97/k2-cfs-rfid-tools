@@ -43,7 +43,7 @@ Identita / Identity: K2OH v323-cfg6, API v2, features 0xE3, 28 ID; 23 SET effect
 - ID6: private RAM sidecar (byte50, bit21) gates the actual stock reverse de-tooth branch without touching unknown stock state.
 - ID17: correct original 400ms RFID pre-read delay callsite 0x08012A60; a separate 10ms call is untouched.
 - ID27: the actual pretension retry loop at 0x08012616, with original loop and exit targets preserved.
-- IDs10/25/26: excluded because stock paths are unreachable. IDs0/4: on/off feeder motors, no proportional speed.
+- IDs10/25/26: GET-only because **CFG6 does not patch those constants**; some OEM routines (including ID26-related sensor polling) do exist, but are not configurable with this build. IDs0/4: ON/OFF feeder motors with no proportional speed.
 - All overrides are volatile RAM, written only from paired Klipper CFG on startup with deliberate auto_apply.
 - This firmware is available from the Helper experimental CFS menu. Keep CFG5T and v3.22 for rollback.
 
