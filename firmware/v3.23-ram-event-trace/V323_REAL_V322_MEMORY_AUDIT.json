@@ -1,0 +1,34 @@
+{
+  "tool": "CFS offline memory audit",
+  "mutates_cfs_or_binary": false,
+  "empirical_limit_not_bootloader_proof": "0x803b800",
+  "currently_tested_v322_end": "0x803b7dc",
+  "sidecar_span": [
+    "0x20006ee8",
+    "0x20006f28"
+  ],
+  "ring_proposed_UNVERIFIED_span": [
+    "0x20006f28",
+    "0x20007128"
+  ],
+  "ring_reservation_proven_safe": false,
+  "bootloader_map_proven_safe": false,
+  "release_approval": false,
+  "app": {
+    "passes_conservative_empirical_size_limit": true,
+    "size_bytes": 178140,
+    "app_base": "0x8010000",
+    "app_end": "0x803b7dc",
+    "empirical_limit_UNVERIFIED": "0x803b800",
+    "remaining_bytes_to_empirical_limit": 36,
+    "initial_sp": "0x20006ee8",
+    "reset_vector": "0x801a969",
+    "header_length": 178140,
+    "header_length_consistent": true,
+    "initial_sp_within_64kb_sram": true,
+    "reset_is_thumb_and_within_image": true,
+    "sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+    "flash_boundary_authoritatively_verified": false,
+    "safe_to_flash": false
+  }
+}

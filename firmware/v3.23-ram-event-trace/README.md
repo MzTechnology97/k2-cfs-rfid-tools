@@ -1,0 +1,257 @@
+# v3.23 — MCU RAM event ring feasibility (source-only)
+
+**Offline model and static firmware audit ONLY. Not a flashable CFS image.**
+
+The reference printer remains on tested firmware v3.22 (feature 0xD7), with the motion/write safety guards unchanged. This proposal does not introduce hooks into its motor routines or alter any firmware bits.
+
+## Storage format
+
+The stand-alone ring consumes **512 bytes RAM**: 32-byte header plus 30 chronological 16-byte records. Each record stores a supplied 32-bit tick, a 16-bit sequence, an 8-bit event code, flags and four raw 16-bit diagnostic words. The buffer overwrites its oldest event when full and has a saturating overwrite counter. Freezing denies any further writes and permits oldest-first readback. No EEPROM, filesystem, heap allocation or hardware motor control exists in the model.
+
+The implementation is deliberately **single-writer only**. It has not been proven safe when called from multiple tasks or IRQs, and the reader must not access it before a proven synchronization/freeze handshake. A genuine MCU monotonic clock source also remains to be identified.
+
+## Firmware audit
+
+The function at **0x0801E0CC** is a candidate motor command/PWM duty setter. Its exact 4-byte Thumb2 prologue is **2de9f041** (push.w of r4-r8 and lr). The associated forward routine at 0x0801E164 and reverse routine at 0x0801E17E lead into the setter. Static scanning found **33 forward** and **17 reverse** direct BL callsites. These references do **not** prove full coverage of all feeder/hub/buffer motors, a safe hook ABI, or minimal impact on the task.
+
+The v3.22 application contains 178140 bytes and ends at **0x0803B7DC**. Only **36 bytes** remain before the *inferred, unverified* boundary **0x0803B800**. The standalone event buffer functions already require **320 bytes of ARM Thumb code** at -O2, excluding all hook trampolines, timestamps and GET-only readout. Therefore it would be unsafe to append a v3.23 firmware image without validating or reorganizing flash placement.
+
+A 512-byte candidate RAM reservation from **0x20006F28 to 0x20007127** would require relocating the heap head to 0x20007128. Its safety has **not** been verified against dynamic allocations, task stacks, DMA and MCU interrupt contexts. The existing runtime override area 0x20006EE8..0x20006F27 must remain untouched.
+
+## Run model tests
+
+Run `sh ./run_offline.sh` from this directory. Optionally provide the exact tested v3.22 firmware binary as its first argument for a Capstone static callsite/ROM/RAM audit. Requires native GCC and arm-none-eabi-gcc; the optional audit additionally requires Capstone for Python.
+
+Test coverage: deterministic ring wrap, chronological readback, freeze, size assertions, memory guard canaries, generation reset, host ASan/UBSan and Cortex-M3 cross compilation. It produces **no flashable binary**.
+
+## Preconditions before a deployable v3.23
+
+1. Confirm the **actual** application flash partition and updater size limit from bootloader/hardware, not a guessed boundary.
+2. Prove the SRAM area is unused and can be reserved without RTOS heap, stack or DMA overlap.
+3. Verify all motor start/stop sources, the exact instruction boundaries, preserved registers/FPU/flags, task concurrency and interrupt latency.
+4. Identify a safe tick source; prove a bounded writer and reader snapshot/freeze handshake even under interrupts.
+5. Implement a GET-only event drain usable **after** movement with no configuration-write permission granted by these diagnostic bytes.
+6. Run complete ARM differential emulation and rollback checks; only then consider controlled hardware tests.
+
+## 2026-10-11 verified offline follow-up
+
+- The synthetic Thumb trampoline's **30 differential ARM ABI test cases passed** locally and in GitHub Actions. Original registers, CPSR, SP and currently live stack bytes matched after rejoining the stock function. The trampoline leaves freed scratch stack bytes modified because it temporarily consumes **32 additional stack bytes**. The test uses a mock register-clobbering callback, *not* the real RAM logger. See [TRAMPOLINE_ABI_STATIC_REVIEW.md](TRAMPOLINE_ABI_STATIC_REVIEW.md) and [ABI sources](abi/).
+- Cross-compiling the independent buffer at `-Os` instead of `-O2` reduces ARM code size from **320 to 280 bytes**, without removing model features. However this remains far too large for the **36-byte** conservative image headroom; any real telemetry hook, clock and readback require still more code.
+- [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) documents why we currently treat `0x0803B800` as an **empirical** maximum: earlier oversized v3.15/v3.16 builds returned invalid advanced defaults, while compact v3.18 and currently installed v3.22 passed on-device verification.
+- No flashable v3.23 BIN has been generated. The only correct next release gate is **verified application flash bounds and RAM/stack mapping**, together with full real logger + IRQ/motor hook validation.
+
+## Connected ring/logger synthetic ARM test
+
+[abi/integrated/](abi/integrated/) goes one step beyond the dummy-register
+callback: a synthetic motor-entry trampoline calls the **actual compiled C
+ring logger** and `cfs_trace_push`, records one fixed-format 16-byte event
+in the 512-byte RAM model, then returns to the *real stock* continuation.
+
+Local Unicorn differential results (2026-10-11): **30/30 cases passed**,
+with an exact header/event record, no memory writes outside the modeled
+ring and stack, and identical caller-visible registers/CPSR/SP/live stack
+versus the stock path. The integrated code footprint is **380 ARM bytes**
+at `-Os`, including the logger and ring helpers; a 4-byte stock redirect
+is built separately. The 380 bytes are intentionally linked at a **fake**
+`0x08050000` address inside the emulator. This is **not** a new safe MCU
+code address or an application image.
+
+To repeat offline, run `sh abi/integrated/run_integrated_offline.sh`. The
+GitHub Actions workflow runs this alongside the earlier dummy callback
+and standalone ring tests.
+
+**Important:** this test does not measure worst-case task stack headroom,
+real-time motor jitter, DMA/IRQ nesting, or event hook coverage. It
+records only a synthetic command event (not independently verified motor
+activity) and uses a ring RAM address that has not been proven safe on
+real hardware. Flash partition boundaries remain unverified, so the
+v3.23 build is NOT installable.
+
+The independent MCU safety issue remains open: https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9
+## Follow-up forensics (2026-10-11)
+
+See [FLASH_BOUNDARY_FORENSICS.md](FLASH_BOUNDARY_FORENSICS.md) for the archived on-device comparison: oversized v3.15/v3.16 firmware returned 65535 for advanced parameters, whereas compact v3.18 and the currently running v3.22 read correctly. This supports a conservative effective address ceiling of `0x0803B800` but does not prove the bootloader's partition map. See [TRAMPOLINE_ABI_STATIC_REVIEW.md](TRAMPOLINE_ABI_STATIC_REVIEW.md) for the proposed motor-entry hook's limited *static* calling-convention analysis; no differential ARM emulator or real firmware hook was validated. The v3.22 linked ELF already omits disabled advanced motor hook wrappers, so removing those wrappers offers no additional image space.
+
+## New memory-map findings and hard build gate (2026-10-11)
+
+The original CFS v3.13 firmware includes a literal pair adjacent to the MCU
+RTOS initialization path at **`0x0802795C` and `0x08027960`**:
+
+- `0x0802795C` contains **`0x20010000`**, the apparent heap upper bound
+- `0x08027960` originally contains **`0x20006EE8`**, the heap start
+- The v3.22 build patches only the second literal to **`0x20006F28`**,
+  reserving `0x20006EE8..0x20006F27` (64 bytes) for volatile overrides
+- A *possible* 512-byte ring reservation would move the heap start forward
+  to **`0x20007128`** (ring `0x20006F28..0x20007127`)
+
+This suggests a structurally coherent reservation but does **not** prove
+available *peak* dynamic heap capacity (37,080 bytes currently vs 36,568
+after the proposed change), RTOS task stack high-water marks, DMA/IRQ safety,
+heap fragmentation or motor activity timing. **No heap-pointer patch for
+v3.23 has been built.**
+
+Added [`memory_gate.py`](memory_gate.py) and
+[`test_memory_gate.py`](test_memory_gate.py), executed by CI.
+`memory_gate.py` checks conservative app size, firmware declared length,
+reset vector and initial SP. Its output **always marks bootloader bounds
+and actual RAM reservation unverified and flash approval false**. It can
+optionally inspect an *already acquired* SWD flash dump and report aligned
+literal values and SHA-256 **without reproducing the raw bytes**. Literal
+occurrences are hypotheses for reverse engineering, **not proof of a
+bootloader app boundary**.
+
+Example read-only usage:
+
+```shell
+python3 memory_gate.py \
+  --app /path/to/existing/CFS-v322-PROBE-UNFLASHED.tmp \
+  --json-out memory_report.json
+
+# Optional ONLY after obtaining a flash dump by an independently vetted
+# physical SWD read-only process; this script never operates the debugger:
+python3 memory_gate.py \
+  --swd-dump /path/to/private_cfs_flash_dump.bin \
+  --dump-base 0x08000000 \
+  --json-out private_flash_literal_report.json
+```
+
+Actual on-CM5 test against the byte-exact v3.22 flash image:
+**178,140 bytes**, SHA-256
+`40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7`,
+start `0x08010000`, end `0x0803B7DC`, correct header length
+178,140, plausible SP `0x20006EE8`, Thumb reset vector
+`0x0801A969`. Remaining margin **36 bytes** to the
+**empirically motivated but not bootloader-proven** limit
+`0x0803B800`. The check passed but, correctly, reports
+`safe_to_flash=false`.
+
+Independent community protocol reconstruction documents bootloader
+commands for version, transfer-block size, erase, update and start-app,
+**not an authenticated readout of the flash partition map**:
+https://github.com/Lamar1007/CFSTool/blob/main/PROTOCOL.md .
+A bootloader probe is not a substitute for a safe image/partition readback;
+do not switch the active CFS into bootloader mode simply to infer a maximum.
+
+## 2026-10-11 — Read-only post-motion trace export proof of concept
+
+[PROPOSED_TRACE_WIRE_CONTRACT.md](PROPOSED_TRACE_WIRE_CONTRACT.md) describes
+a **future, not-yet-implemented** `0x57/0x15` command with selector
+`0xFF` for the frozen 20-byte header, and 0..29 for 16-byte event data.
+It never accepts a RAM address or changes a motor/configuration value. The
+C model in [trace_readback.c](trace_readback.c) implements explicit little
+endian serialization; it **does not** register a live firmware serial
+handler.
+
+[trace_readback_host.py](trace_readback_host.py) models a future safe host
+decoder: double-read header and reject changes in generation/count/head/
+last tick, truncated replies, inconsistent partially filled rings and
+sequence gaps. It is **not loaded in Kalico** and contains no serial or
+G-code calls. Tests are [test_trace_readback.c](test_trace_readback.c)
+(ASan/UBSan, zero source mutation, bounds, freeze, chronology, endian)
+and [test_trace_readback_host.py](test_trace_readback_host.py) (corrupted
+and torn readouts).
+
+The read-only export helper adds **204 bytes ARM `-O2` text** (248 bytes
+at `-Os`), *in addition* to the 380-byte synthetic ring-plus-hook
+prototype. Thus **at least 584 bytes** of currently modeled code would
+be needed before any real UART dispatcher, time source or synchronization,
+versus only **36 bytes** of conservative known-space headroom. The minimum
+unfunded code-space amount is **548 bytes**, and the actual requirement
+will be larger. No extra flash is assumed safe.
+
+The original v3.13/v3.22 image has a contiguous 131-byte zero region
+at `0x0803AACD..0x0803AB4F`; adjacent bytes belong to a dense static
+table, rather than a verified no-reference code cave. No independent
+reachability or data-use proof exists. **Do not overwrite this region**.
+
+## October 11: corrected wrapped sequence and verified C-to-Python readback
+
+The synthetic C motor-entry logger originally assigned the sample sequence
+from `ring.header.count`. Since this count stays at **30** once full,
+that would repeat sequence 30 indefinitely and invalidate a post-motion
+recording. This is now corrected: when the ring already contains records,
+the next sequence is derived from its previous record and incremented
+modulo 65536, including safe indexing after a 30-event wrap.
+
+A new Unicorn test, `abi/integrated/emulate_ring_wrap.py`, checks **70**
+consecutive synthetic motor-entry records (30 retained, 40 overwritten),
+plus a separate sequence wrap from `65535` to `0`. The test also enforces
+writes to the synthetic ring/stack only. There is still **no actual MCU
+clock/hook/interrupt validation**, and the ring's RAM address remains
+unproven.
+
+The existing frozen readout model now also has a full end-to-end protocol
+test: C serializes a 20-byte header + 30 chronological 16-byte records
++ repeated 20-byte header, and the Python reader reconstructs the exact
+timestamps, sequence and diagnostic words. A changed second header,
+corrupt record length, invalid ring pointer metadata or nonconsecutive
+sequence is rejected; unfrozen reads remain forbidden. The full-ring
+consistency rule checks `head == overwritten % capacity` before the
+16-bit overwritten counter saturates.
+
+GitHub Actions run
+[38126338934](https://github.com/MzTechnology97/k2-cfs-rfid-tools/actions/runs/38126338934)
+**passed** the buffer model, differential Thumb ABI tests, 70-event wrap,
+memory audit, C-to-Python wire interoperability, and the check that
+no flashable v3.23 CFS firmware has been generated.
+
+This is still a **source-only experimental prototype**. Flash/SRAM
+boundaries, stack high-water, task/interrupt concurrency and real motor
+start/stop coverage remain release blockers. The printer stays on v3.22.
+
+## 2026-10-11: sustained ARM ring stress + realistic readback footprint
+
+The integrated synthetic logger is now tested using
+[`abi/integrated/emulate_ring_stress.py`](abi/integrated/emulate_ring_stress.py).
+Unlike the initial one-event differential, it preserves **one** ring across
+**85 consecutive Thumb motor-entry callbacks**:
+
+- Exactly 30 most recent events retained in chronological order; 55 older
+  entries overwritten and correctly counted.
+- An explicitly seeded 16-bit sequence wraps **65535 → 0** without introducing
+  duplicates; earlier local pre-fix test code incorrectly reused the saturated
+  count=30 as a sequence. The source branch already had a fixed logger, now
+  protected by a repeatable regression test.
+- Frozen trace refuses further writes; malformed ring head is rejected.
+- Caller registers, APSR, SP and live original stack bytes stay identical at
+  each synthetic motor continuation, with writes confined to the 512-byte
+  ring and synthetic stack. Sidecar and post-ring canaries are not modified.
+- **Peak extra synthetic stack depth = 52 bytes**, compared with the original
+  entry instruction's 24-byte push. This is an emulation result, **not** a
+  measurement of available hardware RTOS task stack.
+
+With the sequence-safe ring logger, the linked ARM Thumb motor hook, logger
+and ring occupy **432 bytes at -Os**, rather than the earlier 380-byte
+pre-fix prototype. Including the frozen GET-only readback serializer increases
+the linked test image to **692 bytes**, still **excluding** the actual MCU UART
+protocol command dispatch, a verified monotonic tick source, stop-event
+coverage, stack/heap guards and flash metadata.
+
+The current v3.22 ends at `0x0803B7DC` and has **36 bytes** left to the
+conservative, *unverified* cap `0x0803B800`; at least **656 additional
+bytes** would need to be reclaimed for the 692-byte prototype **alone**.
+The complete deployable feature would require more. Neither the 432-byte
+nor 692-byte synthetic image is flashable on the CFS; both are linked at a
+**fake emulator-only executable address**.
+
+All tests remain offline; no MCU flash, motor task modification or power
+cycling was performed. The real-time and independent motor-active safety
+questions remain open.
+
+## 2026-10-11 source-level space recovery: 20 bytes, hardware unchanged
+
+A [new disposable offline rebuild test](sizeopt/README.md) now reproduces
+the byte-exact v3.22 binary, modifies **only temporary copies** of the
+existing handler to share SET/GET response serialization and let the
+assembler shorten eligible Thumb branches, then reruns the full v3.22 ARM
+behavioral regression. It saves **20 bytes** (178140 → 178120) with the
+same 28 parameters, 21 advanced SET/GET/RESET operations, 42 bounds tests,
+two original timing callsites and all BUSY guards in simulation. GitHub
+Actions includes this test and destroys its temporary binaries.
+
+The candidate still has **no safe-to-flash approval**. Conservative
+flash headroom increases only from 36 to **56 bytes**; the smallest
+previous synthetic C ring+hook requires 380 bytes, leaving at least
+**324 bytes** still missing before a real GET-only drain, task timing
+or stack-safety mechanisms. A larger application partition has *not*
+been established. The installed v3.22 remains untouched.
