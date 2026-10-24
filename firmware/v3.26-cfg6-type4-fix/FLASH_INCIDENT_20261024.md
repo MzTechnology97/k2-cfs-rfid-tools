@@ -42,3 +42,9 @@ The user's downgrade used the original CFG6 v3.25 image. On 24 October at 10:39:
 5. Keep the original type-4 accounting issue open: the Unicorn reproduction of the rescan-reset defect remains valid, but the transport failure is a distinct problem.
 
 **Important:** This report does not claim that any hardware was permanently damaged. The CFS was restored successfully by the user's downgrade.
+
+## Follow-up — 25 October 2026 (local staging only)
+
+The **24 October quarantine** described above is a historical record of the containment decision. On **25 October**, the operator expressly asked to re-enable the v3.26 candidate as **entry 4 on the CM5's local Helper manifest** to consider a second **manual** attempt after printing ends. The existing 178,980-byte BIN was SHA-256-verified against `7b45e5152fdd124a50fd29877a1a9ed595769107ba9fc009b2ba7d7388dbaceb`; the manifest was atomically restored using its pre-quarantine backup, preserving the other three candidates. The prior three-entry manifest was backed up to `~/cfs-v323-build/helper-manifest-pre-restage-20261025.json`. Helper menu and T113 custom CFS tests passed; no flash, restart or CFS command was sent. Kalico and `box.cfg` were unchanged.
+
+**This re-staging does not resolve or waive the previous failure.** The candidate remains unmerged/not hardware-qualified and is not part of the public Helper manifest. The original loader/transport root cause and failed request offset remain unknown. Do not interpret the current selectable menu entry as a declaration that the image is safe. Any future supervised hardware trial must be a separate operator action, with fully idle printer/heaters, verified prior v3.25 rollback, exclusive transport ownership, full acknowledgment and stop-on-error behavior. A repeat failure requires investigation, not repeated flash attempts.
