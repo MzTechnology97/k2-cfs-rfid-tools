@@ -31,7 +31,9 @@ File: CFG6-TYPE4-RESCAN-FIX-NOT-FOR-FLASH.bin
 
 SHA-256: 7b45e5152fdd124a50fd29877a1a9ed595769107ba9fc009b2ba7d7388dbaceb
 
-Il file NON è inserito nel manifest Helper. La CFG6 in uso resta invariata; mantenere CFG6 precedente e CFG5T per recupero. Prima di provare su hardware, occorre completare la stampa in corso e un protocollo di test controllato dei tag RFID.
+**Cronologia aggiornata (25/10):** il BIN è stato rimosso dal manifest locale dopo il trasferimento fallito del 24/10 e **reinserito sul CM5 il 25/10 su esplicita richiesta dell'utente** per un'eventuale seconda prova manuale. La voce è la **n. 4** dell'Helper locale, **non** del manifest pubblico. La precedente CFG6 v3.25 resta funzionante e disponibile per il rollback. Non è stato effettuato un secondo flash durante il ripristino della voce. **Il re-staging non equivale a qualificazione hardware:** la causa del timeout sul bus RS-485 non è stata identificata. Usare esclusivamente Helper con stampante ferma e riscaldatori spenti; non aggirare controlli di sicurezza, mantenere il rollback verificato e non continuare con tentativi ripetuti se il trasferimento fallisce. Nessuna modifica a Kalico o `box.cfg`.
+
+[Incidente 24/10](FLASH_INCIDENT_20261024.md) · [audit RS-485](FLASH_FAILURE_AUDIT_20261024_IT.md) · [PR #60 chiusa senza merge](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/60).
 
 Importante: il comando diagnostico Kalico BOX_RFID_DIAG_REMAIN_STATE è per API7 e non può interrogare il runtime interno di CFG6/API2. Nessun comando è stato inviato alla CFS durante lo sviluppo.
 
