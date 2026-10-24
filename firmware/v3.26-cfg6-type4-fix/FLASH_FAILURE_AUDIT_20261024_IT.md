@@ -41,9 +41,17 @@ La precedente interpretazione della capacità buffer 255 come dimensione fissa d
 | CRC16 Creality | `0x571e`, valido | `0x2f88`, valido |
 | Lunghezza dichiarata nel contenitore | Uguale al file | Uguale al file |
 | Identificativo applicazione | `cfs0_000_153` | `cfs0_000_153` |
-| Fine applicazione | `0x0803BB17` | `0x0803BB23` |
+| Ultimo byte applicazione (indirizzo fisico) | `0x0802EB17` | `0x0802EB23` |
 
 I due file sono identici nei primi **524 byte**. Il primo byte differente è a offset `0x20C`, nel CRC16. Se, *ipoteticamente*, il bootloader richiedesse sempre il massimo di 252 byte, entrambi richiederebbero 711 gruppi; ma questa **non è un'osservazione del trasferimento reale**. Per richieste piccole il numero di segmenti può variare. La differenza nel numero di parole a quattro byte è di tre.
+
+### Chiarimento da audit precedenti degli altri agenti: APP fisica vs origine nominale
+
+La ricerca del 15–16 ottobre sul loader Creality ha verificato il **vero APP_BASE fisico `0x08003000`** nel bootloader storico e nei controlli dell'updater T113; il builder CFG6 usa invece l'origine nominale `0x08010000` per gli offset dei simboli/callsite. Il delta è **`0xD000`**. **Non modificare direttamente l'origine del builder:** tutte le patch e i branch sono codificati relativamente a quel layout nominale, e cambiarla senza rilinkare integralmente romperebbe l'immagine.
+
+Per entrambi i BIN, l'indirizzo fisico dell'ultimo byte è rispettivamente `0x0802EB17` e `0x0802EB23`, entro la **stessa pagina da 2 KiB**. Il precedente elenco con `0x0803BB17`/`0x0803BB23` rappresentava l'origine nominale, non il vero indirizzo fisico di flash. La validazione statica `test_transport_contract.py` ora applica il controllo del reset vector/limite fisico contro `0x08003000` e non contro `0x08010000`.
+
+Fonti interne rilevanti: `docs/CFS_2025_PUBLIC_FULL_FLASH_LOADER_APP_SPLIT_20261015.md`, `docs/CFS_2025_PUBLIC_LOADER_UPDATE_FMC_AND_RECOVERY_20261015.md` dal ramo `docs/cfs-v323-stock-loader-recovery-20261016`, e `k2-openhost-t113-bootstrap/tests/test_k2oh_mcu_fw.py` già integrato nel ramo principale. I primi due audit sono basati su un dump pubblico storico: non certificano che il bootloader installato sia byte-identico.
 
 Entrambe le immagini superano CRC16, integrità SHA256, length, identità applicazione, vettori Cortex-M e limite flash precedente alla pagina parametri. Questo elimina gli errori statici più immediati, **non** dimostra che il bootloader accetti ogni payload.
 
