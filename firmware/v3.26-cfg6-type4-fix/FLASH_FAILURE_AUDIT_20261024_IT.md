@@ -15,31 +15,35 @@
 
 **Limite dei log:** il firmware updater non stampa l'indice dell'ultimo blocco accettato, né il numero di byte trasferiti prima del timeout. Non è possibile attribuire il fallimento a un blocco specifico, né dimostrare che l'applicazione modificata sia stata eseguita o abbia causato un crash.
 
-## Analisi statica dell'updater Creality originale
+## Analisi statica dell'updater Creality originale — correzione del 24 ottobre
 
-L'eseguibile originale T113 `/usr/bin/mcu_util_485` (ELF32 ARM EABI, 38.444 byte, solo analizzato localmente, non distribuito) contiene:
+L'eseguibile originale T113 `/usr/bin/mcu_util_485` (ELF32 ARM EABI, 38.444 byte, analizzato localmente senza distribuirlo) **non usa blocchi di dimensione fissa da 255 byte**. La seconda analisi del flusso ARM ha permesso di identificare la vera richiesta di lettura:
 
-- `0x0001521c..0x0001522c`: lettura di un massimo di **255 byte** dal file firmware (`__read_chk`);
-- `0x00015244..0x00015260`: invio dati con timeout di **500 ms**, usando la routine interna del protocollo;
-- `0x000152cc`: riferimento al messaggio di errore `send fw data to slave`;
-- tre retry prima dell'abbandono, come nei log.
+- `0x00012278..0x0001227C`: salva nel campo `+40` della struttura del device il byte 9 di una risposta ricevuta;
+- `0x00015208`: legge tale byte come valore **signed**, da cui dipende la quantità richiesta;
+- `0x000154FC..0x00015508`: per valori negativi calcola `requested_bytes = (-signed_value) * 4` tramite aritmetica modulo 256;
+- `0x0001521C..0x0001522C`: chiama `__read_chk(fd, buffer, requested_bytes, 255)`. Il quarto argomento **255 indica soltanto la capacità del buffer**, non il numero di byte da leggere;
+- `0x00015244..0x00015260`: invio attraverso la routine protocollo, timeout **500 ms** e fino a tre tentativi, come visibile nel log;
+- `0x000152CC`: riferimento al messaggio di errore `send fw data to slave`.
 
-Il valore **240** osservato in alcuni registri è un parametro della routine di invio/ricezione, **non** la granularità di lettura dal file. I payload da 255 byte sono quindi il riferimento documentabile per il confronto offline. Le differenze tra dimensioni 16/32 byte erano ipotesi prima di analizzare l'ELF.
+Per i valori ricevuti da -1 a -63 si ottengono **4–252 byte**, sempre multipli di quattro. **La lunghezza delle richieste è determinata dalle risposte del dispositivo, non soltanto dalla dimensione dell'immagine.** Il log storico non riporta tali byte di risposta né l'indice del blocco fallito; perciò il numero effettivo dei blocchi trasferiti non è ricostruibile.
+
+La precedente interpretazione della capacità buffer 255 come dimensione fissa del payload, e il conseguente totale **702 blocchi**, erano **errati**: questa sezione li sostituisce esplicitamente.
 
 ## Confronto esatto delle due immagini
 
-| Parametro | CFG6 v3.25 installata e funzionante | Fix type 4 della PR #60 |
+| Parametro | CFG6 v3.25 funzionante | Fix type 4 PR #60 |
 |---|---|---|
 | SHA256 | `6579eb55…0acc6cc6` | `7b45e515…88dbaceb` |
 | Dimensione | 178.968 byte | 178.980 byte |
-| Pacchetti dati da massimo 255 byte | **702** | **702** |
-| Ultimo pacchetto | 213 byte | 225 byte |
-| CRC16 Creality | `0x571e`, verificato | `0x2f88`, verificato |
-| Length nel contenitore | Uguale al file | Uguale al file |
+| Allineamento su parole a 4 byte | **Valido** | **Valido** |
+| Numero reale di trasferimenti | **Non noto** | **Non noto** |
+| CRC16 Creality | `0x571e`, valido | `0x2f88`, valido |
+| Lunghezza dichiarata nel contenitore | Uguale al file | Uguale al file |
 | Identificativo applicazione | `cfs0_000_153` | `cfs0_000_153` |
 | Fine applicazione | `0x0803BB17` | `0x0803BB23` |
 
-I **primi due payload da 255 byte sono identici**. Il primo byte differente è l'offset `0x20C` (CRC16) nel terzo pacchetto. In totale 31 pacchetti hanno contenuti differenti, senza cambiare il numero di pacchetti.
+I due file sono identici nei primi **524 byte**. Il primo byte differente è a offset `0x20C`, nel CRC16. Se, *ipoteticamente*, il bootloader richiedesse sempre il massimo di 252 byte, entrambi richiederebbero 711 gruppi; ma questa **non è un'osservazione del trasferimento reale**. Per richieste piccole il numero di segmenti può variare. La differenza nel numero di parole a quattro byte è di tre.
 
 Entrambe le immagini superano CRC16, integrità SHA256, length, identità applicazione, vettori Cortex-M e limite flash precedente alla pagina parametri. Questo elimina gli errori statici più immediati, **non** dimostra che il bootloader accetti ogni payload.
 
