@@ -62,6 +62,23 @@ def main():
     assert requested_bytes(0xFF)==4
     assert requested_bytes(0xC1)==252
     assert requested_bytes(0xFE)==8
+    # The independently documented historical CFS loader F0/03 replies
+    # with token 0xE0 (signed -32), so 128 bytes per request. This is not
+    # a captured trace from the currently installed bootloader revision.
+    historical_token = 0xE0
+    historical_chunk = requested_bytes(historical_token)
+    assert historical_chunk == 128
+    historical_chunk_counts = {
+       "baseline": (len(a)+historical_chunk-1)//historical_chunk,
+       "candidate": (len(b)+historical_chunk-1)//historical_chunk,
+       "baseline_last": len(a)%historical_chunk,
+       "candidate_last": len(b)%historical_chunk
+    }
+    assert historical_chunk_counts == {
+      "baseline":1399,"candidate":1399,
+      "baseline_last":24,"candidate_last":36
+    }
+    assert a[:512] == b[:512]
     first=next(i for i,(x,y) in enumerate(zip(a,b)) if x!=y)
     assert first==CRC_OFF
     # Packet lengths below are what-if examples ONLY, not observed wire data.
@@ -76,7 +93,11 @@ def main():
       "phys_app_base":hex(PHYSICAL_APP_BASE),
       "builder_nominal_origin":hex(NOMINAL_BUILDER_ORIGIN),
       "device_requested_data_bytes":{"min":4,"max":252,"multiple_of":4},
-      "actual_number_of_chunks":"unknown: device requests variable-length data",
+      "documented_historical_loader_f0_03_token":"0xE0",
+      "documented_historical_loader_request_bytes":historical_chunk,
+      "hypothetical_if_same_loader":historical_chunk_counts,
+      "first_changed_historical_128byte_chunk_one_based":5,
+      "actual_number_of_chunks":"unknown without installed-loader token trace",
       "actual_failed_chunk_index":"unknown: log does not include it",
       "hypothetical_chunk_counts_not_observed":hypothetical
     },indent=2))
