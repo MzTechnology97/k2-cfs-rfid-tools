@@ -55,6 +55,14 @@ Fonti interne rilevanti: `docs/CFS_2025_PUBLIC_FULL_FLASH_LOADER_APP_SPLIT_20261
 
 Entrambe le immagini superano CRC16, integrità SHA256, length, identità applicazione, vettori Cortex-M e limite flash precedente alla pagina parametri. Questo elimina gli errori statici più immediati, **non** dimostra che il bootloader accetti ogni payload.
 
+### Incrocio con la documentazione del loader e le PR chiuse (25 ottobre)
+
+La specifica [OpenCFS loader §3/§6](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/08-loader-and-recovery.md) aggiunge un'evidenza fondamentale rispetto alla sola disassemblazione del programma host: il comando `F0/03` del **loader archiviato** risponde `0xE0` (signed `-32`), che nell'updater Creality produce esattamente **128 byte per richiesta**. Se il loader installato usa lo stesso token, la CFG6 v3.25 e la candidata con fix richiedono **entrambe 1399 blocchi**, con ultimo blocco di 24 e 36 byte, rispettivamente. I primi quattro blocchi sono identici e il quinto contiene la prima differenza (CRC16 all'offset `0x20C`). Il valore del token **non è stato catturato nel flash del 24 ottobre**; pertanto non affermiamo che 1399 richieste siano state effettivamente scambiate.
+
+Precedenti chiusi/mergiati: [T113 Bootstrap #9](https://github.com/MzTechnology97/k2-openhost-t113-bootstrap/pull/9) e [#11](https://github.com/MzTechnology97/k2-openhost-t113-bootstrap/pull/11), [Helper #13](https://github.com/MzTechnology97/k2-openhost-installer-helper/pull/13) e [#14](https://github.com/MzTechnology97/k2-openhost-installer-helper/pull/14) documentano il fallimento **differente** di ottobre 6 (`START_APP NACK` da CRC/length obsoleti), già corretto negli strumenti correnti. La sezione §5 OpenCFS documenta un secondo guasto del 17 ottobre causato da MSP `0x20010000` al limite SRAM, non applicabile alla CFG6 con MSP `0x20006EE8`.
+
+[Ricognizione completa PR chiuse e documenti](CLOSED_PRS_DOCS_CROSSCHECK_20261025_IT.md). Anche la verifica offline con token storico è ora compresa in `test_transport_contract.py` (10 suite passate). La causa reale del timeout `send fw data` resta sconosciuta.
+
 ## Risultato tecnico e prossima evidenza necessaria
 
 **Causa esatta non ancora identificata.** L'immagine modificata non risulta sovradimensionata, e il frammento ARM type 4 viene eseguito solo all'interno dell'applicazione: non può essere chiamato dal bootloader durante l'invio firmware. L'errore osservato è invece un mancato ACK sul canale di aggiornamento. Il fatto che siano falliti anche messaggi di startup a motori 85/86 è compatibile con un problema di ricezione/serializzazione RS-485, ma non lo dimostra.
