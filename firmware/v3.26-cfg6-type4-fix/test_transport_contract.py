@@ -19,7 +19,11 @@ OLD = ROOT.parent / "v3.25-cfg6-lab" / "CFG6-ALL-ADVANCED-LAB-NOT-FOR-FLASH.bin"
 NEW = ROOT / "CFG6-TYPE4-RESCAN-FIX-NOT-FOR-FLASH.bin"
 OLD_SHA = "6579eb552210d6b2b84fbbbdf2749bc8d310b324ffb095cf9662e7cd0acc6cc6"
 NEW_SHA = "7b45e5152fdd124a50fd29877a1a9ed595769107ba9fc009b2ba7d7388dbaceb"
-APP = 0x08010000
+# Physical load address verified by historical original-loader ARM audit and
+# the active T113 updater's custom CFS validator. Firmware builder uses a
+# *nominal* 0x08010000 PC origin for source offsets: do NOT change the builder.
+PHYSICAL_APP_BASE = 0x08003000
+NOMINAL_BUILDER_ORIGIN = 0x08010000
 PARAM_PAGE = 0x0807F800
 CRC_OFF, LEN_OFF, META_END = 0x20C, 0x20E, 0x212
 
@@ -41,11 +45,11 @@ def inspect(p, sha):
     assert crc16(check) == crc
     sp,rv=struct.unpack_from("<II",b)
     assert 0x20000000 <= sp < 0x20080000 and sp % 8 == 0
-    assert rv&1 and APP <= rv&~1 < APP+len(b)
-    assert APP+len(b) < PARAM_PAGE
+    assert (rv & 1) and PHYSICAL_APP_BASE <= (rv & ~1) < PHYSICAL_APP_BASE+len(b)
+    assert PHYSICAL_APP_BASE+len(b) < PARAM_PAGE
     assert len(b)%4 == 0
     return b, {"size":len(b), "sha256":sha,"crc16":hex(crc),
-               "length":declared,"end":hex(APP+len(b)-1),"word_aligned":True}
+               "length":declared,"physical_image_end":hex(PHYSICAL_APP_BASE+len(b)-1),"builder_nominal_end":hex(NOMINAL_BUILDER_ORIGIN+len(b)-1),"word_aligned":True}
 
 def requested_bytes(reply_byte):
     # Decompiled from the updater's ARM assembly, not a verified bus capture.
@@ -69,6 +73,8 @@ def main():
       "original":aa,"candidate":bb,"first_difference_offset":hex(first),
       "identical_initial_bytes":first,
       "updater_read_buffer_capacity":255,
+      "phys_app_base":hex(PHYSICAL_APP_BASE),
+      "builder_nominal_origin":hex(NOMINAL_BUILDER_ORIGIN),
       "device_requested_data_bytes":{"min":4,"max":252,"multiple_of":4},
       "actual_number_of_chunks":"unknown: device requests variable-length data",
       "actual_failed_chunk_index":"unknown: log does not include it",
