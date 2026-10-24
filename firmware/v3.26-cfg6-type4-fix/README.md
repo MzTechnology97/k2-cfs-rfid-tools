@@ -30,7 +30,9 @@ File: CFG6-TYPE4-RESCAN-FIX-NOT-FOR-FLASH.bin
 
 SHA-256: 7b45e5152fdd124a50fd29877a1a9ed595769107ba9fc009b2ba7d7388dbaceb
 
-The image is NOT in the Helper manifest. The printer's current CFG6 and Kalico remain untouched. Do not attempt hardware validation until the current print has ended and a controlled RFID plan is agreed; retain CFG6 and CFG5T rollback images.
+**Status update (25 Oct):** the image was quarantined after the 24 Oct failed RS-485 upload and **re-added to one CM5's local Helper manifest at the operator's explicit request** for a possible supervised second attempt. It is **entry 4 on that CM5 only**, not an official/public Helper release. The working CFG6 v3.25 remains installed and available for rollback. Re-staging did **not** cause another flash. **Menu availability does not imply hardware qualification:** the root cause of the transport timeout remains unknown. Any operator-supervised retry must use Helper's safety gate with the printer idle and heaters off, a verified rollback and no bypasses; stop on a repeat failure. Kalico and `box.cfg` were not modified.
+
+[24 Oct incident](FLASH_INCIDENT_20261024.md) · [RS-485 forensics](FLASH_FAILURE_AUDIT_20261024_IT.md) · [PR #60 closed without merge](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/60).
 
 The Kalico BOX_RFID_DIAG_REMAIN_STATE command requires API7 and cannot inspect CFG6/API2 internal runtime. No CFS commands were issued during this firmware work.
 
