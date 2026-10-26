@@ -1,0 +1,58 @@
+{
+  "status": "OFFLINE DESIGN ONLY \u2014 NOT A FLASHABLE BUILD",
+  "firmware_sha256": "40dbaad88de7b6f9435592fa03b081e9b96663a9e84896b1ad8021a8f13cf8c7",
+  "firmware_bytes": 178140,
+  "end_address": "0x803b7dc",
+  "inferred_unverified_flash_limit": "0x803b800",
+  "remaining_bytes_to_inferred_limit": 36,
+  "ring_model_bytes": 512,
+  "ring_record_bytes": 16,
+  "ring_max_records": 30,
+  "ram_initial_sp": "0x20006ee8",
+  "current_heap_start": "0x20006f28",
+  "proposed_ring_span_uncommitted": [
+    "0x20006f28",
+    "0x20007128"
+  ],
+  "candidate_new_heap_start_uncommitted": "0x20007128",
+  "heap_end_hypothesis": "0x20010000 \u2014 NOT VERIFIED WITH DYNAMIC ALLOCATIONS",
+  "ring_ram_reservation_verified": false,
+  "central_pwm_setter_candidate": "0x801e0cc",
+  "original_4byte_prologue": "2de9f041",
+  "first_instructions": [
+    [
+      "0x801e0cc",
+      "push.w",
+      "{r4, r5, r6, r7, r8, lr}"
+    ],
+    [
+      "0x801e0d0",
+      "mov",
+      "r5, r0"
+    ]
+  ],
+  "direct_bl_callers_pwm": [
+    "0x801e366",
+    "0x801e536"
+  ],
+  "direct_bl_callers_forward": 33,
+  "direct_bl_callers_reverse": 17,
+  "observed_paths": "0x0801E164 (forward) and 0x0801E17E (reverse) call/tail-branch to 0x0801E0CC; verify all motors and return semantics before hook",
+  "motor_hook_abi_proven": false,
+  "hook_covers_all_cfs_motors": false,
+  "original_task_clock_identified": false,
+  "arm_tracer_compiled_text_bytes": 320,
+  "arm_hook_trampoline_estimated_bytes": "nonzero \u2014 not implemented",
+  "arm_readback_dispatch_estimated_bytes": "nonzero \u2014 not implemented",
+  "flash_capacity_confirmed": false,
+  "safe_to_flash": false,
+  "release_blockers": [
+    "MCU application partition maximum and bootloader page map unverified",
+    "Even 320-byte ring core > 36-byte headroom to unverified flash limit",
+    "RAM range 0x20006F28..0x20007127 must be proven unused and heap head moved only after review",
+    "True task single-writer + IRQ context not established, no atomicity guarantee",
+    "Motor command entry hook ABI and return/clock correctness not validated",
+    "Firmware read-only dump transport not implemented or emulated",
+    "No independent motor-active guard or atomic SET/RESET authorisation implemented"
+  ]
+}
