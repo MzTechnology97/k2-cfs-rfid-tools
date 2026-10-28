@@ -1,37 +1,47 @@
-# CFG6 SGF1 — family geometry firmware candidate
+# CFG6 SGF1 + RH1 — vendor geometry and single-cycle RFID candidate
 
-**Firmware-only candidate. Not a replacement for the hardware-verified [RDG2 release](../cfg6-rdg2/README.md).** Kalico integration and real Bambu geometry calibration are deferred. No live printer or Helper catalog is changed.
+**Candidate firmware. Hardware validation and real Bambu geometry calibration are pending.** The hardware-verified [RDG2 release](../cfg6-rdg2/README.md) remains the maintained installable image. This source does not change the live Helper catalog.
 
-The exact candidate is described by [manifest.json](manifest.json). Its BIN is generated under `work/build/` and is not another installable image tracked in the release tree.
+The exact build is identified by [manifest.json](manifest.json), including its SHA and size. The generated BIN stays under `work/build/`; it is not a second binary tracked in the release tree.
 
 ## Behavior
 
-- Four boot-cleared RAM geometry profiles, selected by opaque IDs. Host convention may assign profile1 to an original Bambu spool.
-- Raw rotation length captured **before** the OEM core clamp, with slot, UID, generation and quality.
-- An explicit host declaration binds a decoded tag UID and measured generation to a profile/revision. The CFS cannot infer a manufacturer from UID, ATQA, SAK, keys or the mere fact that API7 succeeded.
-- The first binding recalculates the cached measurement without another RF operation.
-- Each subsequent trustworthy idle scan of that same UID recalculates the geometric anchor. A partly used spool stays partly used; no automatic “new spool =100%” action exists.
-- Active printing/retracting counters remain protected. Unreliable scans do not replace an existing calibrated runtime.
-- With no configured/bound profile, the existing geometry and type4 accounting remain the fallback.
+- Four boot-cleared RAM geometry profiles selected by vendor, independently of material or color.
+- A UID-keyed nominal length for each of four slots. The host uploads vendor geometries with total zero, then supplies the spool's nominal length before binding.
+- Raw rotation length captured before the OEM core clamp, with UID, generation and measurement quality.
+- After successful host decoding, BIND recalculates the saved measurement without another RF operation or motor movement.
+- Later trustworthy idle scans of the same UID reuse the geometry and slot length. Partly used spools remain partly used; there is no automatic full-spool reset.
+- Printing/retracting counters remain protected, and unreliable scans preserve an already calibrated runtime.
+- RH1 lets the original RFID worker wait briefly for host keys after OEM authentication fails, while the spool is already stationary. It authenticates at the same measured position before OEM reposition/retry, avoiding a second complete scan on the successful handoff path.
+- Manual START acknowledges immediately and enqueues the original preload worker. Automatic insertions use that same worker. All motion remains OEM-controlled.
+- RH1 is disabled at boot and requires a configured session and live host lease. Missing or late host responses end the bounded wait and return control to OEM recovery.
 
-Existing API7 authenticated reads, CFG6 API2 settings, ordinary remaining command0x03 and RDG2 snapshot0x15 remain available. A future host must declare the family after its decoder succeeds; loading the catalog alone does not classify tags.
+The vendor is declared only after the host decoder accepts the tag data. UID or successful generic API7 authentication alone does not classify a spool as Bambu.
 
-## Identification and quality
+## Compatibility and mechanical preconditions
 
-The new BIND command checks current UID, measurement generation and catalog revision atomically. Generic API7 tags never become “Bambu” automatically. Different UIDs cannot inherit the prior slot's binding.
+CFG6 identity remains K2OH/v323-cfg6, feature 0xE3, preserving the installed Kalico startup/runtime contract. SGF1 and RH1 are discovered separately. Existing API7, CFG6 API2, ordinary remaining command 0x03 and RDG2 snapshot 0x15 remain available.
 
-A usable rotation requires the original UID comparison to agree. Existing API7 may suppress a mismatch to finish tag identification; SGF1 exposes that discrepancy and refuses to use the measurement for calibration/binding. Fresh authenticated results are tracked per attempt. Old CAP masks or the K2RL latch alone do not establish a fresh successful read. Clearing keys after decoding preserves the completed measurement needed for BIND.
+RH1 targets the legacy MIFARE backend with four-byte UID and SAK 8. START requires idle state, no armed override, idle usage modes, a present target and an already empty hub. It does not silently free an occupied hub. Host operations must serialize scans against load/unload/printing; other clients must not issue stock force-read commands during an async job.
 
-## Validation and limits
+A first tag search may need a substantial rotation depending on the starting angle; a short movement cannot guarantee detection. The physical measurement still requires the next passage of the same UID. Geometry is needed for final arithmetic, not to acquire this measurement.
 
-The ARM tests use synthetic geometry, deterministic RF replies, modeled IRQ interleavings and the actual message-validation-to-geometry tail. They cover stale UID/generation/revision, malformed requests, partial/stale authentication, UID mismatches, read retries, used-spool rereads, active-print protection, boot clearing and ABI preservation. They are not a physical Bambu calibration or a latency/stack qualification on the MCU.
+## Cache, quality and restart
 
-RAM reservation adds320 bytes above the existing CFG6 sidecar and moves the heap start to0x20007068. No tag or nonvolatile write is added. Catalog values and bindings disappear on CFS restart.
+Kalico can retain a spool's remaining amount and subtract odometer use after the CFS loses RAM, without forcing a new scan. The integration keeps that estimate until a trustworthy, correctly bound CFS anchor is available. Reloading the catalog alone does not restore a binding or prove a fresh measurement.
 
-See [build and checks](BUILD.md) and the [wire protocol](../../docs/SGF1_CANDIDATE_PROTOCOL.md).
+The original UID-pair comparison must match. Authenticated reads carry a fresh attempt epoch. Existing mismatch suppression may complete tag identification but cannot make a mismatched revolution calibratable. CLEAR after decoding preserves committed proof; handoff changes keys without discarding the current UID-pair proof.
+
+## Validation boundary
+
+New ARM tests execute the original message validator, three API7 wrappers and command handlers, with RF replies and RTOS scheduling modeled. They verify stale session/token/UID rejection, key retry, no motor entry inside handoff, timeout/decline, async cleanup, per-slot length, boot clearing and ABI/IRQ behavior. Inherited regressions remain part of the runner.
+
+RAM reservation is 448 bytes above the existing CFG6 sidecar; heap starts at 0x200070E8. No tag or nonvolatile write is added. The nominal policy stop is 0x0803D800 (physical 0x08030800), a build bound rather than a newly certified limit of the installed loader.
+
+See [build and checks](BUILD.md), [SGF1 protocol](../../docs/SGF1_CANDIDATE_PROTOCOL.md) and [RH1 contract and original-code evidence](RH1-CONTRACT.md).
 
 ## Stato in italiano
 
-Questa versione prepara **solo il firmware CFS**: catalogo geometrie in RAM, misura grezza con qualità e associazione esplicita UID→profilo dopo la decodifica host. La lettura RFID non identifica autonomamente il produttore. Il collegamento Kalico verrà sviluppato nella fase successiva.
+Il candidato separa la geometria per vendor dalla lunghezza nominale della bobina. RH1 permette di ricevere le chiavi da Kalico durante lo stesso ciclo, prima del recupero meccanico dopo un errore di autenticazione. La geometria può essere applicata alla misura già raccolta senza ripetere il giro.
 
-La bobina PETG HF nuova dello slot2 ha fornito il riferimento reale85%/0mm sulla RDG2, ma non abbiamo ancora misurato e validato i parametri fisici Bambu. I valori dei test sono simulati. Il firmware funzionante RDG2 e il manifest Helper restano invariati.
+I coefficienti Bambu devono ancora essere calibrati; le geometrie dei test sono sintetiche. Firmware, integrazione host e tempi reali richiedono la prova coordinata sulla macchina prima di promuovere il candidato.

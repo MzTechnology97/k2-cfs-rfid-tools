@@ -1,4 +1,4 @@
-name: CFG6 SGF1 firmware candidate
+name: CFG6 SGF1 RH1 firmware candidate
 on:
   pull_request:
 permissions:
@@ -31,5 +31,7 @@ jobs:
             work/build/preflight.json
             work/build/static-validation.json
             work/build/sgf-test-results.json
+            work/build/slot-length-results.json
+            work/build/rfid-handoff-results.json
             firmware/cfg6-spool-profiles/manifest.json
             work/test-results/sgf-*

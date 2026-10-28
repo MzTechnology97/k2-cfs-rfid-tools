@@ -4,6 +4,7 @@
 #include <stddef.h>
 #define ROWS ((volatile Slot *)0x20006F28u)
 #define CATALOG ((volatile Geometry *)0x20007028u)
+#define LENGTHS ((volatile Length *)0x20007068u)
 #define INTERNAL ((volatile uint8_t *)0x20004460u)
 #define RUNTIME ((volatile uint8_t *)0x20004590u)
 #define PERCENT ((volatile uint8_t *)0x20003974u)
@@ -18,7 +19,8 @@ typedef struct {
     uint32_t applied_generation, epoch;
 } Slot;
 typedef struct { uint32_t revision; uint16_t core10, full10; uint32_t total, reserved; } Geometry;
-_Static_assert(sizeof(Slot)==64 && sizeof(Geometry)==16, "reserved SRAM layout");
+typedef struct { uint32_t uid, total; } Length;
+_Static_assert(sizeof(Slot)==64 && sizeof(Geometry)==16 && sizeof(Length)==8, "reserved SRAM layout");
 static inline uint32_t lock(void) {
     uint32_t m; __asm__ volatile("mrs %0, primask\n cpsid i":"=r"(m)::"memory"); return m;
 }
@@ -44,6 +46,13 @@ static void transient(volatile Slot *p) {
 /* These hooks use integer operations only and must preserve every VFP register. */
 void sgf_begin(unsigned s) {
     if(s>=4)return;uint32_t m=lock();transient(ROWS+s);ROWS[s].flags=0;unlock(m);
+}
+/* Handoff changes authentication keys within the same measured revolution.
+ * Keep the original UID-pair proof while rejecting callbacks from older keys. */
+void sgf_prepare_handoff(unsigned s) {
+    if(s>=4)return;uint32_t m=lock();volatile Slot *p=ROWS+s;
+    p->epoch=next_epoch(p->epoch);p->auth_uid=p->auth_ok=p->auth_fail=0;
+    unlock(m);
 }
 void sgf_cancel_transients(void) {
     uint32_t m=lock();for(unsigned s=0;s<4;++s)transient(ROWS+s);unlock(m);
@@ -87,6 +96,7 @@ void sgf_capture(uint32_t bits,unsigned s,unsigned result,unsigned native_valid)
     (void)native_valid; /* R9 is also set by the API7 success override. */
     if(s>=4)return;uint32_t m=lock();volatile Slot *p=ROWS+s;uint32_t u=uid(s);
     if(p->bound_uid!=u){p->bound_uid=0;p->profile=0;p->revision=0;p->applied_generation=0;}
+    if(LENGTHS[s].uid!=u)LENGTHS[s].uid=LENGTHS[s].total=0;
     p->generation=next_epoch(p->generation);p->uid=u;p->raw_bits=bits;p->tick=TICK;
     int same=p->compare_status==1 && u && p->compare_a==u && p->compare_b==u;
     uint32_t flags=(same?16u:0u)|(p->compare_status==2?4u:0u)|(result?8u:0u);
@@ -113,6 +123,9 @@ static unsigned percent(uint32_t bits,volatile Geometry *g) {
     unsigned p=(unsigned)(100.0f*(c*c-core*core)/(full*full-core*core)+0.5f);
     return p<1?1:p>100?100:p;
 }
+static uint32_t selected_total(unsigned s,volatile Geometry *g) {
+    volatile Length *l=LENGTHS+s;return l->uid==uid(s) && l->total?l->total:g->total;
+}
 /* Called within the existing geometry atomic section. No counters reset here.
  * On an idle reread the OEM initializer is given a fresh calibrated anchor. */
 unsigned sgf_geometry_percent(unsigned s,unsigned fallback) {
@@ -120,7 +133,7 @@ unsigned sgf_geometry_percent(unsigned s,unsigned fallback) {
     if(sgf_preserve_runtime(s))return PERCENT[s];
     if(runtime(s)[22]!=0)return fallback;volatile Slot *p=ROWS+s;
     if(!bound(s,p) || !usable(s,p))return fallback;
-    volatile Geometry *g=CATALOG+p->profile-1;if(!g->revision)return fallback;
+    volatile Geometry *g=CATALOG+p->profile-1;if(!g->revision || !selected_total(s,g))return fallback;
     unsigned value=percent(p->raw_bits,g);p->revision=g->revision;
     p->applied_generation=p->generation;return value;
 }
@@ -128,7 +141,7 @@ uint32_t sgf_total(unsigned s) {
     if(s>=4)return 0;volatile Slot *p=ROWS+s;
     if(!bound(s,p) || !usable(s,p) || p->applied_generation!=p->generation)return 0;
     volatile Geometry *g=CATALOG+p->profile-1;
-    return g->revision && g->revision==p->revision ? g->total:0;
+    return g->revision && g->revision==p->revision ? selected_total(s,g):0;
 }
 static int idle(void) {
     if(BOX || MANAGER[0]!=1 || (STATE[0]&0x80))return 0;
@@ -157,6 +170,11 @@ static void snapshot(unsigned s,uint8_t *o) {
     }
     put32(o+56,TICK);o[60]=1;o[61]=HW;o[62]=MANAGER[0];o[63]=BOX;
 }
+static void length_snapshot(unsigned s,uint8_t *o) {
+    uint32_t u=uid(s);volatile Length *l=LENGTHS+s;
+    put32(o,0x314c4753u);o[4]=s;o[5]=u && l->uid==u && l->total;
+    put16(o+6,0);put32(o+8,u);put32(o+12,o[5]?l->total:0);
+}
 static void catalog(unsigned id,uint8_t *o) {
     volatile Geometry *g=CATALOG+id-1;put32(o,0x31434753u);
     o[4]=id;o[5]=g->revision!=0;put16(o+6,g->core10);put16(o+8,g->full10);
@@ -166,21 +184,30 @@ static void catalog(unsigned id,uint8_t *o) {
 int sgf_command(const uint8_t *f,uint8_t *o) {
     unsigned sub=f[4];
     if(sub==0x16) {
-        if(f[1]!=4)return -1;put32(o,0x31464753u);o[4]=1;o[5]=4;o[6]=4;o[7]=15;
+        if(f[1]!=4)return -1;put32(o,0x31464753u);o[4]=1;o[5]=4;o[6]=4;o[7]=31;
         put16(o+8,64);put16(o+10,20);return 12;
     }
     if((sub==0x17 && f[1]!=5)||(sub==0x18 && f[1]!=19)||
-       (sub==0x19 && f[1]!=5)||(sub==0x1a && f[1]!=19)||sub<0x17||sub>0x1a)return -1;
-    unsigned n=f[5];if((sub==0x17||sub==0x1a)?n>=4:(n<1||n>4))return -1;
+       (sub==0x19 && f[1]!=5)||(sub==0x1a && f[1]!=19)||
+       (sub==0x1b && f[1]!=5)||(sub==0x1c && f[1]!=15)||sub<0x17||sub>0x1c)return -1;
+    unsigned n=f[5];if((sub==0x18||sub==0x19)?(n<1||n>4):n>=4)return -1;
     uint32_t m=lock();int rc=-1;
     if(sub==0x17){snapshot(n,o);rc=64;goto done;}
     if(sub==0x19){catalog(n,o);rc=20;goto done;}
+    if(sub==0x1b){length_snapshot(n,o);rc=16;goto done;}
     if(!idle()){rc=-7;goto done;}
+    if(sub==0x1c) {
+        uint32_t u=uid(n),total=get32(f+12);volatile uint8_t *r=runtime(n);
+        if(f[6]||f[7]||!u||get32(f+8)!=u||(total && (total<10000||total>2000000)))goto done;
+        if(valid_runtime(r) && get32(r) && get32(r+4)!=total){rc=-7;goto done;}
+        LENGTHS[n].uid=total?u:0;LENGTHS[n].total=total;
+        length_snapshot(n,o);rc=16;goto done;
+    }
     if(sub==0x18) {
         uint32_t rev=get32(f+8),core=get16(f+12),full=get16(f+14),total=get32(f+16);
         if(f[6]||f[7])goto done;
         if(!rev){if(core||full||total)goto done;}
-        else if(core<500||core>10000||full<core+100||full>15000||total<10000||total>2000000)goto done;
+        else if(core<500||core>10000||full<core+100||full>15000||(total && (total<10000||total>2000000)))goto done;
         volatile Geometry *g=CATALOG+n-1;
         /* Preserve the high-water revision through disable: no ABA reuse. */
         int same=rev && rev==g->revision && core==g->core10 && full==g->full10 && total==g->total;
@@ -195,14 +222,15 @@ int sgf_command(const uint8_t *f,uint8_t *o) {
     if(!id){if(get32(f+16))goto done;p->bound_uid=p->profile=p->revision=p->applied_generation=0;snapshot(n,o);rc=64;goto done;}
     volatile Geometry *g=CATALOG+id-1;
     if(!g->revision||get32(f+16)!=g->revision||!usable(n,p)||!valid_runtime(r))goto done;
-    if(p->bound_uid==u && p->profile==id && p->applied_generation==p->generation && p->revision==g->revision) {
+    uint32_t total=selected_total(n,g);if(!total)goto done;
+    if(p->bound_uid==u && p->profile==id && p->applied_generation==p->generation && p->revision==g->revision && get32(r+4)==total) {
         snapshot(n,o);rc=64;goto done; /* Lost ACK cannot reset newer consumption. */
     }
     if(get32(r)){rc=-7;goto done;}
     unsigned value=percent(p->raw_bits,g);
     p->bound_uid=u;p->profile=id;p->revision=g->revision;p->applied_generation=p->generation;
     for(unsigned i=0;i<24;++i)r[i]=0;
-    put32(r+4,g->total);r[20]=value;r[23]=1;r[99]=4;PERCENT[n]=value;
+    put32(r+4,total);r[20]=value;r[23]=1;r[99]=4;PERCENT[n]=value;
     if(STATE[2]==n)STATE[3]=value;
     snapshot(n,o);rc=64;
 done:unlock(m);return rc;

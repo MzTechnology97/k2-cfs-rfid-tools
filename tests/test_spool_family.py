@@ -133,14 +133,14 @@ def expect_readonly_rejection(a,payload,wanted=1):
 
 def boot_and_abi():
     b=FamilyArm();b.heap_mode=True
-    b.u.mem_write(0x20006ee4,b'BEFR'+b'\xa5'*384+b'AFTR')
+    b.u.mem_write(0x20006ee4,b'BEFR'+b'\xa5'*512+b'AFTR')
     b.call(SYMS['heap_init_sidecar_wrapper'])
-    assert b.heap_seen==[(0x20007068,0x20010000)],b.heap_seen
+    assert b.heap_seen==[(0x200070e8,0x20010000)],b.heap_seen
     assert bytes(b.u.mem_read(0x20006ee4,4))==b'BEFR'
-    assert bytes(b.u.mem_read(0x20007068,4))==b'AFTR'
+    assert bytes(b.u.mem_read(0x200070e8,4))==b'AFTR'
     assert bytes(b.u.mem_read(0x20006ee8,8))==bytes(8)
     assert bytes(b.u.mem_read(0x20006ef0,56))==b'\xa5'*56
-    assert bytes(b.u.mem_read(SLOT_RAM,320))==bytes(320)
+    assert bytes(b.u.mem_read(SLOT_RAM,448))==bytes(448)
     count=0;maximum_stack=0
     for s in range(4):
         for mask in [0,1]:
@@ -205,7 +205,7 @@ def protocol_interleavings():
 
 def main():
     results={};cases=0
-    a=FamilyArm();info=a.command(b'\x16');assert info==(0,b'SGF1\x01\x04\x04\x0f\x40\x00\x14\x00')
+    a=FamilyArm();info=a.command(b'\x16');assert info==(0,b'SGF1\x01\x04\x04\x1f\x40\x00\x14\x00')
     assert a.catalog()[0]==0
     q=a.scan();assert q['flags']==19 and q['profile']==0 and q['initial']==85 and q['used']==0,q
     assert a.bind()[0]==0

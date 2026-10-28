@@ -5,11 +5,15 @@ APP_BASE=0x08010000
 # Conservative build-policy bound, NOT a bootloader-certified application end.
 # First 256 KiB of 512 KiB main Flash have fast instruction fetch. The rest
 # can also be fetched as code at higher latency; loader's app bound is unknown.
+# RH1: policy extended to nominal 0x0803D800 (physical 0x08030800).
+# Local cfs-firmware-re docs/01:19-25,50-54 and docs/08:69-95 document
+# 512 KiB flash and the parameter page; no scatter/data section is moved.
+# This build policy is not readback qualification of the installed loader.
 # v3.23: policy limit raised from nominal 0x0803B800 (real 0x0802E800) to
 # nominal 0x0803D000 (real 0x08030000). The only stock data area above the
 # application is the parameter page at real 0x0807F800 (cfs-firmware-re
 # docs/01 and 08); the loader has no upper length limit below it.
-UNVERIFIED_BUILD_LIMIT=0x0803D000
+UNVERIFIED_BUILD_LIMIT=0x0803D800
 HANDLER_ADDR=0x0803AE38
 CRC_OFF=0x20C
 LEN_OFF=0x20E
@@ -88,7 +92,9 @@ def main():
     run('arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',obj,here/'handler.S')
     cobj=build/'spool_family.o'
     run('arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=softfp','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-fstack-usage','-nostdlib','-o',cobj,here/'spool_family.c')
-    run('arm-none-eabi-ld','-T',here/'link.ld','-o',elf,obj,cobj)
+    rhobj=build/'rfid_handoff.o'
+    run('arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfloat-abi=soft','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-fstack-usage','-nostdlib','-o',rhobj,here/'rfid_handoff.c')
+    run('arm-none-eabi-ld','-T',here/'link.ld','-o',elf,obj,cobj,rhobj)
     run('arm-none-eabi-objcopy','-O','binary',elf,raw)
     handler=bytearray(raw.read_bytes()); syms=symbols(elf)
     (build/'symbols.json').write_text(json.dumps(syms,indent=2)+'\n')
@@ -171,14 +177,14 @@ def main():
         report.append((callsite,name,target,before.hex(),patch.hex()))
 
     assert struct.unpack_from('<I',image,0x08027960-APP_BASE)[0] == 0x20006EE8
-    struct.pack_into('<I',image,0x08027960-APP_BASE,0x20007068)
+    struct.pack_into('<I',image,0x08027960-APP_BASE,0x200070E8)
     struct.pack_into('<I',image,LEN_OFF,len(image))
     check=bytearray(image); check[CRC_OFF:META_END]=b'\0'*(META_END-CRC_OFF)
     crc=crc16_bypass(check)
     struct.pack_into('<H',image,CRC_OFF,crc)
     struct.pack_into('<I',image,LEN_OFF,len(image))
     if APP_BASE+len(image)>UNVERIFIED_BUILD_LIMIT:
-        raise SystemExit('OVERFLOW: image exceeds the v3.23 policy boundary 0x0803D000 (real 0x08030000); not built')
+        raise SystemExit('OVERFLOW: image exceeds the RH1 policy boundary 0x0803D800 (physical 0x08030800); not built')
     pathlib.Path(args.out).write_bytes(image)
 
     allowed=set(range(CRC_OFF,META_END))
@@ -198,7 +204,8 @@ def main():
       'handler_addr':'0x%08X'%HANDLER_ADDR,
       'nominal_total_mm':330000,
       'spool_family_protocol':'SGF1',
-      'spool_family_ram':{'slots':4,'profiles':4,'base':'0x20006F28','bytes':320,'heap_start':'0x20007068','boot_cleared':True},
+      'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False},
+      'spool_family_ram':{'slots':4,'profiles':4,'base':'0x20006F28','bytes':448,'heap_start':'0x200070E8','boot_cleared':True},
       'initial_percent_source':'SGF1 bound family and trustworthy raw measure; stock fallback without binding; active runtime preserved',
       'runtime_type':4,
       'runtime_config_api':{
@@ -274,8 +281,8 @@ def main():
       'v322_hook_addresses': ['0x08011116','0x080112CA'],
       'v322_advanced_volatile_only': True,
       'v322_other_motion_hooks_enabled': True,
-      'v319_heap_start': '0x20007068',
-      'v322_flash_end_limit': '0x0803D000 policy only',
+      'v319_heap_start': '0x200070E8',
+      'v322_flash_end_limit': '0x0803D800 policy only',
       'v322_flash_end_limit_bootloader_verified': False,
       'fast_fetch_flash_end': '0x08040000 (performance boundary, NOT app limit)',
       'total_main_flash_end': '0x08080000 (silicon capacity, NOT loader-authorised)',

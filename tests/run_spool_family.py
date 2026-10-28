@@ -15,6 +15,8 @@ def run(name,args):
 run('base',[ROOT/'scripts/prepare_base.py'])
 run('build',[ROOT/'firmware/cfg6-spool-profiles/build.py','--base',ROOT/'work/base-pinned.bin','--out',CANDIDATE_IMAGE,'--build-dir',BUILD])
 run('family',[ROOT/'tests/test_spool_family.py'])
+run('slot_lengths',[ROOT/'tests/test_spool_lengths.py'])
+run('rfid_handoff',[ROOT/'tests/test_rfid_handoff.py'])
 run('accounting',[ROOT/'tests/test_accounting.py','--out',RESULTS/'sgf-accounting.json'])
 # Boundary comparisons are shared; only the stable-image hook-count assertion
 # is replaced by the candidate's own structural check below.

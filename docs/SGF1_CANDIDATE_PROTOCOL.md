@@ -1,8 +1,8 @@
-# SGF1 firmware-only candidate protocol
+# SGF1 vendor-geometry candidate protocol
 
-Status: candidate source and offline evidence; no Kalico integration or real geometry calibration yet. [Overview](../firmware/cfg6-spool-profiles/README.md) · [Manifest](../firmware/cfg6-spool-profiles/manifest.json).
+Status: candidate source and offline evidence; coordinated Kalico integration is prepared separately, and real geometry calibration is pending. [Overview](../firmware/cfg6-spool-profiles/README.md) · [Manifest](../firmware/cfg6-spool-profiles/manifest.json).
 
-SGF1 extends the existing0x57 envelope. Integers are little-endian. Old API7, CFG6 API2 and RDG2 are retained. The0x7A identity remains K2OH/v323-cfg6 with CFG6 feature0xE3, because installed Kalico uses that exact contract for startup settings and live remaining. SGF1 is discovered independently through sub0x16; filename and SHA identify the build. Exact body length is checked; invalid/unsupported/stale requests return status1, busy requests return7, success0. No command initiates RF, motion or a tag/EEPROM write.
+SGF1 extends the existing0x57 envelope. Integers are little-endian. Old API7, CFG6 API2 and RDG2 are retained. The0x7A identity remains K2OH/v323-cfg6 with CFG6 feature0xE3, because installed Kalico uses that exact contract for startup settings and live remaining. SGF1 is discovered independently through sub0x16; filename and SHA identify the build. Exact body length is checked; invalid/unsupported/stale requests return status1, busy requests return7, success0. SGF1 geometry commands do not initiate RF or motion, or write tags/EEPROM. The separate [RH1 extension](../firmware/cfg6-spool-profiles/RH1-CONTRACT.md) adds asynchronous scheduling of the original RFID worker.
 
 ## Boot catalog and classification
 
@@ -10,27 +10,37 @@ The host loads up to4 geometry profiles into volatile RAM at CFS startup. IDs1..
 
 The first BIND can use the already completed raw measurement. Later same-UID idle scans use the binding automatically. Different UIDs invalidate it. Printing/retracting keeps the active counter; a normal idle rescan obtains a new geometric anchor for a new or used spool. Neither a new UID nor a new scan automatically means100%.
 
-The applied full reference must match the intended spool/content calibration; matching RFID manufacturer alone does not prove a refill is on its original physical support. The total is a profile parameter, not a decoded material property in this firmware-only phase.
+The applied full reference must match the intended spool/content calibration; matching RFID manufacturer alone does not prove a refill is on its original physical support. Geometry is selected by vendor. Nominal length belongs to the individual spool/slot; a nonzero catalog total is retained only as a legacy fallback.
 
 ## Commands
 
 | Subcommand | Payload including subcommand | Reply |
 |---|---|---|
-|0x16 INFO|sub|12 bytes: SGF1, version1, slots4, profiles4, features15, snapshot_size u16=64, catalog_size u16=20|
+|0x16 INFO|sub|12 bytes: SGF1, version1, slots4, profiles4, features31, snapshot_size u16=64, catalog_size u16=20|
 |0x17 READ|sub, local_slot0..3|64-byte SGD1 snapshot|
 |0x18 SET_CATALOG|sub,id,reserved0,reserved0,revision u32,core_c10 u16,full_c10 u16,total_mm u32|20-byte SGC1 catalog entry|
 |0x19 GET_CATALOG|sub,id1..4|20-byte SGC1 catalog entry|
 |0x1A BIND|sub,slot,id0..4,reserved0,expectedUID4,expected_generation u32,expected_revision u32|64-byte SGD1 snapshot|
+|0x1B GET_LENGTH|sub,slot0..3|16-byte SGL1 slot-length reply|
+|0x1C SET_LENGTH|sub,slot,reserved0,reserved0,expectedUID4,total_mm u32|16-byte SGL1 slot-length reply|
 
-SET_CATALOG and BIND both have16 payload bytes (body length19). INFO body length4, READ/GET_CATALOG5. The normal frame/CRC remains the existing one.
+SET_CATALOG and BIND both have16 payload bytes (body length19). INFO body length4, READ/GET_CATALOG/GET_LENGTH5, SET_LENGTH15. The normal frame/CRC remains the existing one.
 
-Core/full are circumferences in tenths of a millimeter: core500..10000, full at least core+100 and at most15000. Total10000..2000000mm. Geometry uses `round(100*(C²-core²)/(full²-core²))`, clamped1..100. The raw C must be finite, positive and50..2000mm.
+Core/full are circumferences in tenths of a millimeter: core500..10000, full at least core+100 and at most15000. A catalog total may be zero (vendor geometry without shared length) or10000..2000000mm. The effective slot total must be10000..2000000mm. Geometry uses `round(100*(C²-core²)/(full²-core²))`, clamped1..100. The raw C must be finite, positive and50..2000mm.
 
 A new enabled catalog revision must be greater than that entry's previously accepted revision. Exact replays of the current enabled revision and values are idempotent. Revision0 with zero parameters disables an entry but retains its revision high-water mark. This prevents disable/re-enable ABA reuse within the boot session.
 
-BIND ID0 removes the binding only (expected_revision0), without immediately changing the current counter. Nonzero BIND requires an enabled matching revision, current UID, measured UID, generation, fresh complete API7 proof and trustworthy same-UID rotation. It also requires a valid legacy type4 runtime. Same binding/generation/revision is idempotent even when consumption has advanced; a stale re-anchor with nonzero consumption is refused.
+BIND ID0 removes the binding only (expected_revision0), without immediately changing the current counter. Nonzero BIND requires an enabled matching revision, current UID, measured UID, generation, fresh complete API7 proof and trustworthy same-UID rotation. It also requires a valid legacy type4 runtime. Same binding/generation/revision/effective total is idempotent even when consumption has advanced; a stale re-anchor with nonzero consumption is refused.
 
-Mutations require BOX_STATE=IDLE, RFID manager idle, no armed override and all four runtime modes idle. A future host must also serialize against its own load/unload workflow; BOX_STATE alone does not prove that no early motion is pending.
+Mutations require BOX_STATE=IDLE, RFID manager idle, no armed override and all four runtime modes idle. The host must also serialize against its own load/unload workflow; BOX_STATE alone does not prove that no early motion is pending.
+
+## Slot nominal length
+
+INFO feature bit4 advertises the slot-length extension. SET_LENGTH checks the current four-byte UID and stores a separate UID/total pair for that slot; total0 clears it. It does not reset runtime or apply a geometric anchor. While used_mm is nonzero, a different total is refused. Normal idle/override/mode guards apply. A newly measured different UID invalidates the prior override.
+
+The SGL1 reply has magic[4], slot u8, configured u8, reserved u16=0, currentUID[4], configured_total_mm u32. An absent or nonmatching UID override returns configured0 and total0.
+
+BIND and future idle scans select the matching slot override first, then a nonzero legacy catalog total. If neither exists, a new geometric anchor cannot be applied. PLA/PETG and other materials can share one vendor geometry while retaining different nominal lengths.
 
 ## SGC1 catalog reply20
 
@@ -86,11 +96,11 @@ The OEM terminal logger retains its original area value for ABI compatibility; S
 
 The cache is invalidated on measurement begin; auth results carry the attempt epoch sampled before the RF call. ARM/CLEAR invalidates transient auth/compare state, while CLEAR after decoding retains a completed measurement. A non-four-byte comparison invalidates a prior matching comparison without reading beyond the buffers.
 
-Generation is boot-local. The protocol asserts consistency with current cached data, not physical occupancy, tag uniqueness across clones or manufacturer authenticity independent of the trusted host decoder. Empty/changed slots, connection resets and session changes must be reconciled by the future host.
+Generation is boot-local. The protocol asserts consistency with current cached data, not physical occupancy, tag uniqueness across clones or manufacturer authenticity independent of the trusted host decoder. Empty/changed slots, connection resets and session changes must be reconciled by the host.
 
 ## Memory and validation boundary
 
-The unchanged CFG6 sidecar occupies0x20006EE8..0x20006F28. New4×64 slot records occupy0x20006F28..0x20007028;4×16 catalog entries occupy0x20007028..0x20007068. The heap lower-bound literal is relocated to0x20007068. The new320 bytes are explicitly zeroed after original heap initialization; they are not assumed to be BSS.
+The unchanged CFG6 sidecar occupies0x20006EE8..0x20006F28. New4×64 slot records occupy0x20006F28..0x20007028;4×16 catalog entries occupy0x20007028..0x20007068. UID-keyed nominal lengths occupy0x20007068..0x20007088; RH1 state occupies0x20007088..0x200070E8. The heap lower-bound literal is relocated to0x200070E8. All448 new bytes are explicitly zeroed after original heap initialization; they are not assumed to be BSS.
 
 Raw/auth/UID hooks use integer operations only. The geometry hook preserves general registers, S0..S31/FPSCR expectations and PRIMASK around bounded computation. IRQ tests are modeled; they do not establish wall-clock latency, NMI/DMA behavior or actual RTOS stack margins.
 

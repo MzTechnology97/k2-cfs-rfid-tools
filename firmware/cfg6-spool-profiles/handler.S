@@ -113,7 +113,11 @@ handler_start:
     beq.w   op_diag2_read
     cmp     r5, #0x16
     blo.w   status_bad
-    cmp     r5, #0x1A
+    cmp     r5, #0x1C
+    bls.w   op_family
+    cmp     r5, #0x20
+    blo.w   status_bad
+    cmp     r5, #0x25
     bls.w   op_family
     b       status_bad
 
@@ -677,6 +681,10 @@ op_arm3:
     bl      internal_tag_valid
     cmp     r0, #0
     beq.w   status_no_tag
+    bl      rfh_key_guard
+    cmn     r0, #1
+    beq.w   status_busy
+    str     r0, [sp, #4]
 
     mov     r0, r7
     bl      clear_full
@@ -724,6 +732,8 @@ copy_key12:
     add.w   r2, r7, #62
     movs    r3, #4
     movs    r1, #0
+    ldr     r0, [sp, #4]
+    msr     PRIMASK, r0
     b       send
 
 op_clear:
@@ -732,8 +742,15 @@ op_clear:
     bne     status_bad
     bl      validate_slot
     bl      internal_ptr
-    mov     r0, r2
+    mov     r6, r2
+    bl      rfh_key_guard
+    cmn     r0, #1
+    beq.w   status_busy
+    str     r0, [sp, #4]
+    mov     r0, r6
     bl      clear_full
+    ldr     r0, [sp, #4]
+    msr     PRIMASK, r0
     movs    r1, #0
     movs    r2, #0
     movs    r3, #0
@@ -1116,55 +1133,9 @@ uidcmp_accept:
 @ -----------------------------------------------------------------------
 .thumb_func
 msg_validate_wrapper:
-    push    {r4-r7, lr}
-    sub     sp, #4
-    bl      STOCK_MSG_VALIDATE
-    str     r0, [sp]
-    cbz     r0, msgval_return
-
-    ldr     r4, state_base
-    ldrb    r5, [r4, #2]           @ active logical slot
-    cmp     r5, #4
-    bcs     msgval_return
-
-    ldr     r6, internal_base
-    movs    r7, #RECORD_SIZE
-    muls    r5, r7
-    adds    r6, r6, r5
-
-    ldrb    r0, [r6, #9]
-    cmp     r0, #7
-    bne     msgval_return
-    ldrb    r0, [r6, #10]
-    cmp     r0, #7
-    bne     msgval_return
-    ldrb    r0, [r6, #11]
-    cmp     r0, #0
-    bne     msgval_return
-
-    mov     r0, r6
-    bl      neighbor_ptr
-    mov     r0, r1
-    bl      neighbor_ptr            @ active+2 = CAP1
-    ldr     r0, [r1, #4]
-    ldr     r2, cap1_magic_word
-    cmp     r0, r2
-    bne     msgval_return
-    mov     r0, r1
-    bl      neighbor_ptr            @ active+3 = CAP2
-    ldr     r0, [r1, #4]
-    ldr     r2, cap2_magic_word
-    cmp     r0, r2
-    bne     msgval_return
-
-    movs    r0, #0                 @ API7 capture is terminal success
-    add     sp, #4
-    pop     {r4-r7, pc}
-
-msgval_return:
-    ldr     r0, [sp]
-    add     sp, #4
-    pop     {r4-r7, pc}
+    @ RH1 C tail preserves AAPCS callee registers, including OEM S16/S17.
+    @ The validator and bounded RTOS yield execute only in the OEM RF thread.
+    b.w     rfh_validate
 
 @ -----------------------------------------------------------------------
 @ Remaining helpers for a completed third-party API7 capture.
@@ -1705,7 +1676,7 @@ heap_init_sidecar_wrapper:
     str     r1, [r0, #4]
     movw    r0, #0x6F28
     movt    r0, #0x2000
-    movw    r2, #320
+    movw    r2, #448
 sgf_boot_clear:
     str     r1, [r0], #4
     subs    r2, r2, #4
@@ -1828,6 +1799,7 @@ geometry_store_finish:
 type4_usage_gate_wrapper:
     push.w  {r1-r7, lr}
     sub     sp, #8
+    bl      rfh_tick
     mrs     r0, PRIMASK
     str     r0, [sp]
     cpsid   i
@@ -2053,6 +2025,8 @@ rfid_pre_measure_settle_call_wrapper:
     str     r0, [sp]
     mov     r0, r8
     bl      sgf_begin
+    mov     r0, r8
+    bl      rfh_begin
     ldr     r0, [sp]
     msr     APSR_nzcvq, r0
     add     sp, #8
@@ -2275,7 +2249,13 @@ op_family:
     sub     sp, #64
     mov     r0, r4
     mov     r1, sp
+    cmp     r5, #0x20
+    bhs     rh_command
     bl      sgf_command
+    b       family_result
+rh_command:
+    bl      rfh_command
+family_result:
     cmp     r0, #0
     bmi     sgf_error
     mov     r3, r0
