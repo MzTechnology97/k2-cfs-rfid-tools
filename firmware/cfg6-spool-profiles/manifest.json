@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "status": "candidate-offline-validated-hardware-pending",
+  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-CANDIDATE.bin",
+  "sha256": "0206d7d85f7e37ba956f1e9bc45775fe3c38199e16cd4fd7df844d5aa90d7d8b",
+  "size": 183064,
+  "revision": "v323-cfg6",
+  "protocol": "SGF1",
+  "slot_count": 4,
+  "profile_count": 4,
+  "heap_start": "0x20007068",
+  "new_reserved_ram_bytes": 320,
+  "raw_measurement_before_oem_clamp": true,
+  "manufacturer_identified_in_firmware": false,
+  "classification_source": "explicit host decoder UID/generation/profile/revision binding",
+  "bambu_geometry_calibrated": false,
+  "host_integration_included": false,
+  "hardware_verified": false,
+  "automatic_flash": false,
+  "stable_rdg2_sha256": "7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f",
+  "cfg6_contract_preserved": true,
+  "qualified_toolchain": {
+    "gcc": "12.2.1 20221205",
+    "gcc_debian_package": "15:12.2.rel1-1",
+    "binutils_debian_package": "2.40-2+18+b1"
+  }
+}

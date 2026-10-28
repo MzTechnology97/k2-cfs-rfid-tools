@@ -2,9 +2,9 @@
 import hashlib,json,struct
 from paths import CURRENT_IMAGE, CANDIDATE_IMAGE, BUILD, RESULTS
 SHA256 = '7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f'
-def inspect(path):
+def inspect(path, expected_sha=SHA256, expected_size=179976):
     data = path.read_bytes()
-    assert len(data) == 179976 and hashlib.sha256(data).hexdigest() == SHA256
+    assert len(data) == expected_size and hashlib.sha256(data).hexdigest() == expected_sha
     crc, size = struct.unpack_from('<HI', data, 0x20c)
     assert size == len(data) and data[0x200:0x20c] == b'cfs0_000_153'
     check = bytearray(data); check[0x20c:0x212] = bytes(6); value = 0
@@ -17,7 +17,7 @@ def inspect(path):
     assert sp == 0x20006ee8 and reset & 1
     assert 0x08003000 <= (reset & ~1) < 0x08003000 + len(data)
     assert 0x08003000 + len(data) < 0x0807f800
-    return {'sha256': SHA256, 'size': len(data), 'crc16': hex(crc),
+    return {'sha256': expected_sha, 'size': len(data), 'crc16': hex(crc),
             'physical_end_exclusive': hex(0x08003000 + len(data)),
             'nominal_end_exclusive': hex(0x08010000 + len(data))}
 if __name__ == '__main__':
