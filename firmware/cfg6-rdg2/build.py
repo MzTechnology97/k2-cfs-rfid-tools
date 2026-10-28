@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+import argparse, hashlib, pathlib, struct, subprocess, tempfile, json
+
+APP_BASE=0x08010000
+# Conservative build-policy bound, NOT a bootloader-certified application end.
+# First 256 KiB of 512 KiB main Flash have fast instruction fetch. The rest
+# can also be fetched as code at higher latency; loader's app bound is unknown.
+# v3.23: policy limit raised from nominal 0x0803B800 (real 0x0802E800) to
+# nominal 0x0803D000 (real 0x08030000). The only stock data area above the
+# application is the parameter page at real 0x0807F800 (cfs-firmware-re
+# docs/01 and 08); the loader has no upper length limit below it.
+UNVERIFIED_BUILD_LIMIT=0x0803D000
+HANDLER_ADDR=0x0803AE38
+CRC_OFF=0x20C
+LEN_OFF=0x20E
+META_END=0x212
+ENABLE_ADVANCED_HOOKS = True   # CFG6 LAB: only exact verified candidate callsites
+TIMING_HOOKS = [(0x08011116, 'cfg7_r0_wrapper'), (0x080112CA, 'cfg8_r1_wrapper'), (0x08032C72,'cfg20_r7_wrapper'), (0x08032CEC,'cfg22_cmp_wrapper'), (0x08013684,'type4_usage_gate_wrapper')]
+ORIGINAL_TIMING_MOVW = {
+    0x08011116: bytes.fromhex('4ff44860'), # mov.w r0, #3200
+    0x080112CA: bytes.fromhex('4ff42f71'), # mov.w r1, #700
+    0x08032C72: bytes.fromhex('40f2e247'), # movw r7, #1250
+    0x08013684: bytes.fromhex('fcf72dfe'), # BL stock secure-element gate
+    0x08032CEC: bytes.fromhex('6d1c192d'), # adds r5,#1; cmp r5,#25
+}
+EXPECTED_BASE_SHA='9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff'
+
+def run(*a): subprocess.check_call(list(map(str,a)))
+def output(*a): return subprocess.check_output(list(map(str,a)),text=True)
+def crc16_bypass(data):
+    crc=0
+    for value in data:
+        crc ^= value<<8
+        for _ in range(8):
+            crc=(((crc<<1)^0x8005)&0xffff) if crc&0x8000 else ((crc<<1)&0xffff)
+    return crc
+def symbols(elf):
+    d={}
+    for line in output('arm-none-eabi-nm','-n',elf).splitlines():
+        p=line.split()
+        if len(p)==3:
+            try:d[p[2]]=int(p[0],16)
+            except ValueError:pass
+    return d
+def thumb_bl(src,dst):
+    with tempfile.TemporaryDirectory() as td:
+        td=pathlib.Path(td)
+        (td/'x.S').write_text('.syntax unified\n.thumb\n.cpu cortex-m3\n.section .text,"ax",%%progbits\n.global x\n.thumb_func\nx:\n bl 0x%08x\n'%dst)
+        (td/'x.ld').write_text('SECTIONS { . = 0x%08x; .text : { *(.text) } }\n'%src)
+        run('arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',td/'x.o',td/'x.S')
+        run('arm-none-eabi-ld','-T',td/'x.ld','-o',td/'x.elf',td/'x.o')
+        run('arm-none-eabi-objcopy','-O','binary',td/'x.elf',td/'x.bin')
+        b=(td/'x.bin').read_bytes()
+        if len(b)!=4: raise RuntimeError('bad BL size')
+        return b
+
+def thumb_b(src,dst):
+    with tempfile.TemporaryDirectory() as td:
+        td=pathlib.Path(td)
+        (td/'b.S').write_text(
+            '.syntax unified\n.thumb\n.cpu cortex-m3\n.section .text,"ax",%%progbits\n'
+            '.global x\n.thumb_func\nx:\n b.w 0x%08x\n'%dst)
+        (td/'b.ld').write_text('SECTIONS { . = 0x%08x; .text : { *(.text) } }\n'%src)
+        run('arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',td/'b.o',td/'b.S')
+        run('arm-none-eabi-ld','-T',td/'b.ld','-o',td/'b.elf',td/'b.o')
+        run('arm-none-eabi-objcopy','-O','binary',td/'b.elf',td/'b.bin')
+        data=(td/'b.bin').read_bytes()
+        assert len(data)==4
+        return data
+
+def main():
+    ap=argparse.ArgumentParser()
+    ap.add_argument('--base',required=True)
+    ap.add_argument('--out',required=True)
+    ap.add_argument('--build-dir',default=str(pathlib.Path(__file__).resolve().parents[2]/'work/build'))
+    args=ap.parse_args()
+    here=pathlib.Path(__file__).resolve().parent
+    build=pathlib.Path(args.build_dir).resolve(); build.mkdir(parents=True,exist_ok=True)
+    approval=subprocess.run(['python3',str(here/'preflight.py'),'--base',args.base,'--out',str(build/'preflight.json')],capture_output=True,text=True)
+    if approval.returncode:
+        raise SystemExit('BUILD PRECHECK FAILED; no BIN generated.\n'+approval.stdout+approval.stderr)
+    base=pathlib.Path(args.base).read_bytes()
+    if hashlib.sha256(base).hexdigest()!=EXPECTED_BASE_SHA:
+        raise SystemExit('unexpected v3.13 base')
+    off=HANDLER_ADDR-APP_BASE
+
+    obj=build/'handler.o'; elf=build/'handler.elf'; raw=build/'handler.bin'
+    run('arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',obj,here/'handler.S')
+    run('arm-none-eabi-ld','-T',here/'link.ld','-o',elf,obj)
+    run('arm-none-eabi-objcopy','-O','binary',elf,raw)
+    handler=bytearray(raw.read_bytes()); syms=symbols(elf)
+    (build/'symbols.json').write_text(json.dumps(syms,indent=2)+'\n')
+    # 0x7A identity: the Creality version string of the base image (+0x200).
+    ver_off=syms['identity_creality_version']-HANDLER_ADDR
+    assert handler[ver_off:ver_off+12]==bytes(12)
+    handler[ver_off:ver_off+12]=base[0x200:0x20C]
+    handler=bytes(handler)
+    image=bytearray(base[:off]+handler)
+
+    core_patches=[
+      (0x0801A4CC,'legacy_read0_wrapper'),
+      (0x0801A52C,'legacy_read1_wrapper'),
+      (0x0801A590,'legacy_read2_wrapper'),
+      (0x080225D0,'alt_read_wrapper'),
+      (0x08022604,'alt_read_wrapper'),
+      (0x08022638,'alt_read_wrapper'),
+      (0x08012DDC,'uid_compare_wrapper'),
+      (0x08012E62,'msg_validate_wrapper'),
+      (0x0801337C,'geometry_percent_store_wrapper'),
+      (0x08013380,'remaining_gate_wrapper'),
+      (0x08013394,'remaining_init_wrapper'),
+      (0x0801BF9E,'remaining_valid_wrapper'),
+
+    ]
+    # Advanced hooks are intentionally excluded from the read-only baseline.
+    # Do not enable these until writable storage and all hook flows are proven.
+    advanced_patches=[
+      (0x08011CB6,'cfg9_r1_wrapper'),
+      (0x08012A9E,'rfid_seek_speed_call_wrapper'),
+      (0x08012AC0,'rfid_measure_speed_call_wrapper'),
+      (0x08012E8A,'rfid_reposition_speed_call_wrapper'),
+      (0x08012A76,'cfg14_r5_wrapper'),
+      (0x08012AAE,'rfid_seek_settle_call_wrapper'),
+      (0x08012E7A,'rfid_post_auth_wait_call_wrapper'),
+      (0x08012A60,'rfid_pre_measure_settle_call_wrapper'),
+      (0x0801304A,'cfg18_r7_wrapper'),
+      (0x08013078,'rfid_neighbor_settle_call_wrapper'),
+      (0x08032D46,'cfg21_r1_wrapper'),
+      (0x08032DAC,'cfg21_r1_wrapper'),
+      (0x0801307C,'rfid_neighbor_retry_cmp_wrapper'),
+      (0x080108F0,'reverse_detooth_timeout_cmp_wrapper'),
+      (0x08012616,'cfg27_load_retry_cmp_wrapper'),
+    ]
+    patches = core_patches + TIMING_HOOKS + (advanced_patches if ENABLE_ADVANCED_HOOKS else []) + [(0x0802A5F2,'heap_init_sidecar_wrapper')]
+    assert len(patches)==33 and len(set(x[0] for x in patches))==33
+    assert base[0x0801337C-APP_BASE:0x08013380-APP_BASE] == bytes.fromhex('8bf85840')
+    for callsite, name in TIMING_HOOKS:
+        expected=ORIGINAL_TIMING_MOVW[callsite]
+        assert base[callsite-APP_BASE:callsite-APP_BASE+4]==expected, (hex(callsite), name)
+    original_cfg6 = {
+      0x08011CB6: bytes.fromhex('41f28831'),
+      0x08012A9E: bytes.fromhex('0bf061fb'),
+      0x08012AC0: bytes.fromhex('0bf050fb'),
+      0x08012E8A: bytes.fromhex('0bf06bf9'),
+      0x08012A76: bytes.fromhex('4ff44875'),
+      0x08012AAE: bytes.fromhex('1cf0bbf9'),
+      0x08012E7A: bytes.fromhex('1bf0d5ff'),
+      0x08012A60: bytes.fromhex('1cf0e2f9'),
+      0x0801304A: bytes.fromhex('4ff4c877'),
+      0x08013078: bytes.fromhex('1bf0d6fe'),
+      0x08032D46: bytes.fromhex('40f6b831'),
+      0x08032DAC: bytes.fromhex('40f6b831'),
+      0x0801307C: bytes.fromhex('641c032c'),
+      0x080108F0: bytes.fromhex('b5f57a7f'),
+      0x08012616: bytes.fromhex('032ccdd3'),
+    }
+    for callsite,name in advanced_patches:
+        expected=original_cfg6[callsite]
+        assert base[callsite-APP_BASE:callsite-APP_BASE+4]==expected, ('CFG6 callsite mismatch',hex(callsite),name)
+    report=[]
+    for callsite,name in patches:
+        target=syms[name]
+        pos=callsite-APP_BASE
+        before=bytes(image[pos:pos+4])
+        patch=thumb_b(callsite,target) if name=='cfg27_load_retry_cmp_wrapper' else thumb_bl(callsite,target)
+        image[pos:pos+4]=patch
+        report.append((callsite,name,target,before.hex(),patch.hex()))
+
+    assert struct.unpack_from('<I',image,0x08027960-APP_BASE)[0] == 0x20006EE8
+    struct.pack_into('<I',image,0x08027960-APP_BASE,0x20006F28)
+    struct.pack_into('<I',image,LEN_OFF,len(image))
+    check=bytearray(image); check[CRC_OFF:META_END]=b'\0'*(META_END-CRC_OFF)
+    crc=crc16_bypass(check)
+    struct.pack_into('<H',image,CRC_OFF,crc)
+    struct.pack_into('<I',image,LEN_OFF,len(image))
+    if APP_BASE+len(image)>UNVERIFIED_BUILD_LIMIT:
+        raise SystemExit('OVERFLOW: image exceeds the v3.23 policy boundary 0x0803D000 (real 0x08030000); not built')
+    pathlib.Path(args.out).write_bytes(image)
+
+    allowed=set(range(CRC_OFF,META_END))
+    allowed.update(range(0x08027960-APP_BASE,0x08027964-APP_BASE))
+    for a,_,_,_,_ in report:
+        allowed.update(range(a-APP_BASE,a-APP_BASE+4))
+    allowed.update(range(off,max(len(base),len(image))))
+    changed=[i for i in range(min(len(base),len(image))) if base[i]!=image[i]]
+    unexpected=[i for i in changed if i not in allowed]
+    if unexpected:
+        raise SystemExit('unexpected changes: '+','.join(hex(APP_BASE+i) for i in unexpected[:16]))
+
+    v={
+      'base_v313_sha256':hashlib.sha256(base).hexdigest(),
+      'sha256':hashlib.sha256(image).hexdigest(),
+      'size':len(image),'handler_size':len(handler),'crc16':'0x%04X'%crc,
+      'handler_addr':'0x%08X'%HANDLER_ADDR,
+      'nominal_total_mm':330000,
+      'initial_percent_source':'stock area_percent; K2RL pre-geometry latch + gate override at 0x08013380 + recover 0x20003974+slot when r9 passes 0xFF',
+      'runtime_type':4,
+      'runtime_config_api':{
+        'opcode':'0x57',
+        'legacy_v1_subcommands':{'info':'0x0D','set':'0x0E','reset':'0x0F'},
+        'legacy_v1_subcommands_dispatched': False,
+        'v2_subcommands':{
+          'info':'0x10','get':'0x11','set':'0x12',
+          'reset':'0x13','describe':'0x14',
+        },
+        'layout_version':2,
+        'catalog_revision':1,
+        'v2_describe_0x14_dispatched': False,
+        'effective_advanced_runtime_parameter_ids': [7,8,9,11,12,13,14,15,16,17,18,19,20,21,22,23,24,27],
+        'allowed_v2_write_ids': [1,2,3,5,6,7,8,9,11,12,13,14,15,16,17,18,19,20,21,22,23,24,27],
+        'readonly_advanced_ids': [10,25,26],
+        'dead_code_readonly_ids': [10,25,26],
+        'advanced_ids_9_through_27_storage_only': False,
+        'advanced_ids_9_through_27_readonly_until_hooked': False,
+        'parameter_count':28,
+        'capability_mask': '0xE3',
+        'mode': 'CFG6_EXPERIMENTAL_FULL_ADVANCED_STARTUP_CONFIG',
+        'v2_writes_enabled': True,
+        'v2_write_scope':'CFG6 LAB startup only; 0/4/10/25/26 denied',
+        'id8_wire_units':'milliseconds, multiple of 10; stock callsite receives 10ms polls',
+        'requires_paired_kalico_id8_units_update':True,
+        'v1_speed_writes_enabled': False,
+        'v2_ram_hub_speed_write_ids': [1,2,3,5],
+        'advanced_hook_patches_enabled': ENABLE_ADVANCED_HOOKS,
+        'advanced_storage': '64-byte boot-cleared RAM sidecar; advanced 7-27 except 10/25/26 writable, ID6 byte50 bit21; no nonvolatile writes',
+        'parameters':[
+          {'id':0,'name':'feeder_forward_speed','type':'raw_u8','default':255,'min':1,'max':255,'flags':['safe']},
+          {'id':1,'name':'hub_forward_speed','type':'raw_u8','default':100,'min':1,'max':255,'flags':['safe']},
+          {'id':2,'name':'hub_transition_speed','type':'raw_u8','default':200,'min':1,'max':255,'flags':['safe']},
+          {'id':3,'name':'hub_insert_speed','type':'raw_u8','default':155,'min':1,'max':255,'flags':['safe']},
+          {'id':4,'name':'feeder_reverse_speed','type':'raw_u8','default':255,'min':1,'max':255,'flags':['safe']},
+          {'id':5,'name':'hub_reverse_speed','type':'raw_u8','default':80,'min':1,'max':255,'flags':['safe']},
+          {'id':6,'name':'reverse_detooth_enable','type':'bool','default':1,'min':0,'max':1,'flags':['advanced']},
+          {'id':7,'name':'hub_transition_wait_ms','type':'milliseconds_u16','default':3200,'min':100,'max':10000,'flags':['advanced','safety-limit']},
+          {'id':8,'name':'insert_sensor_timeout_ms','type':'milliseconds_u16','default':7000,'min':1000,'max':50000,'flags':['advanced','safety-limit']},
+          {'id':9,'name':'hub_pullback_timeout_ms','type':'milliseconds_u16','default':5000,'min':500,'max':15000,'flags':['advanced','safety-limit']},
+          {'id':10,'name':'unload_sensor_timeout_ms','type':'milliseconds_u16','default':1000,'min':100,'max':5000,'flags':['advanced','safety-limit']},
+          {'id':11,'name':'rfid_seek_speed','type':'raw_u8','default':160,'min':1,'max':255,'flags':['advanced','rfid-sensitive']},
+          {'id':12,'name':'rfid_measure_speed','type':'raw_u8','default':120,'min':1,'max':255,'flags':['advanced','rfid-sensitive']},
+          {'id':13,'name':'rfid_reposition_speed','type':'raw_u8','default':100,'min':1,'max':255,'flags':['advanced','rfid-sensitive']},
+          {'id':14,'name':'rfid_seek_move_ms','type':'milliseconds_u16','default':800,'min':100,'max':5000,'flags':['advanced','rfid-sensitive']},
+          {'id':15,'name':'rfid_seek_settle_ms','type':'milliseconds_u16','default':200,'min':10,'max':2000,'flags':['advanced','rfid-sensitive']},
+          {'id':16,'name':'rfid_post_auth_wait_ms','type':'milliseconds_u16','default':1000,'min':100,'max':5000,'flags':['advanced','rfid-sensitive']},
+          {'id':17,'name':'rfid_pre_measure_settle_ms','type':'milliseconds_u16','default':400,'min':1,'max':2000,'flags':['advanced','rfid-sensitive']},
+          {'id':18,'name':'rfid_neighbor_detect_delay_ms','type':'milliseconds_u16','default':400,'min':50,'max':2000,'flags':['advanced','rfid-sensitive']},
+          {'id':19,'name':'rfid_neighbor_settle_ms','type':'milliseconds_u16','default':100,'min':10,'max':1000,'flags':['advanced','rfid-sensitive']},
+          {'id':20,'name':'feed_total_timeout_ms','type':'milliseconds_u16','default':25000,'min':5000,'max':60000,'flags':['advanced','safety-limit']},
+          {'id':21,'name':'feed_recovery_timeout_ms','type':'milliseconds_u16','default':3000,'min':500,'max':10000,'flags':['advanced','safety-limit']},
+          {'id':22,'name':'odometer_stall_timeout_ms','type':'milliseconds_u16','default':500,'min':100,'max':2000,'flags':['advanced','safety-limit']},
+          {'id':23,'name':'rfid_neighbor_retry_count','type':'count_u16','default':3,'min':1,'max':10,'flags':['advanced','rfid-sensitive']},
+          {'id':24,'name':'reverse_detooth_timeout_ms','type':'milliseconds_u16','default':1000,'min':100,'max':10000,'flags':['advanced','safety-limit']},
+          {'id':25,'name':'buffer_fill_timeout_ms','type':'milliseconds_u16','default':30000,'min':1000,'max':60000,'flags':['advanced','safety-limit']},
+          {'id':26,'name':'transition_detect_timeout_ms','type':'milliseconds_u16','default':300,'min':50,'max':5000,'flags':['advanced','safety-limit']},
+          {'id':27,'name':'load_retry_count','type':'count_u16','default':3,'min':1,'max':10,'flags':['advanced','safety-limit']},
+        ],
+        'stock_table_offsets':[1,2,3,5,6,7],
+        'expected_stock_table_ptr':'0x200037E2',
+        'idle_guard':'EXPERIMENTAL: stock BOX_STATE == 0; known unsafe as a complete motor-active guard',
+      },
+      'patches':[{'callsite':'0x%08X'%a,'symbol':n,'target':'0x%08X'%t,'before':bef,'after':aft} for a,n,t,bef,aft in report],
+      'unexpected_changed_bytes':len(unexpected),
+      'tag_writes_added':False,
+      'release_gate_required':True,
+      'production_release_approved':False,
+      'experimental_test_only':True,
+      'cfs_runtime_diag_read_only': False,
+      'v322_timing_hooks': [7,8,9,14,15,16,17,18,19,20,21,22,23,24,27],
+      'v322_hook_addresses': ['0x08011116','0x080112CA'],
+      'v322_advanced_volatile_only': True,
+      'v322_other_motion_hooks_enabled': True,
+      'v319_heap_start': '0x20006F28',
+      'v322_flash_end_limit': '0x0803D000 policy only',
+      'v322_flash_end_limit_bootloader_verified': False,
+      'fast_fetch_flash_end': '0x08040000 (performance boundary, NOT app limit)',
+      'total_main_flash_end': '0x08080000 (silicon capacity, NOT loader-authorised)',
+      'beyond_first_256k_code_fetch_slower': True,
+      'flash_above_unverified_policy_approved_for_use': False,
+      'v322_diag': 'CFG6 lab: 23 effective IDs including 15 newly enabled; feeder 0/4 and dead-stock 10/25/26 GET-only; start-up use only',
+      'active_advanced_motion_hooks': [6,7,8,9,11,12,13,14,15,16,17,18,19,20,21,22,23,24,27],
+      'never_flash_automatically':True,
+      'eeprom_writes_added':False,
+      'host_extra_for_runtime_config':'klippy/extras/box_cfs_runtime.py',
+    }
+    (build/'static-validation.json').write_text(json.dumps(v,indent=2)+'\n')
+    print(json.dumps(v,indent=2))
+
+if __name__=='__main__': main()

@@ -1,67 +1,246 @@
-# CFS v3.23 CFG4 — All 28 runtime parameters (English)
+# CFG6 RDG2 — What all 28 CFS settings actually do (EN)
 
-**Strict compatibility:** this configuration is supported only by matching K2-OpenHost modified firmware distributed in the k2-cfs-rfid-tools repository. Stock Creality and arbitrary third-party images are not compatible. OpenCFS is detected as a separate OCFS firmware family, but is NOT compatible with the K2OH CFG4 SET opcode.
+> Current byte-identical RDG2 image verified on 28 October 2026. The CFG6 parameter semantics below are unchanged from the v3.25 catalogue; historical readback values are explicitly dated and are not recommendations. See [current validation](CFG6_RDG2_VALIDATION.md).
 
-**W = writable, effective stock callsite; R = read-only/no proven effect.** All writes come exclusively from the CFG during Klipper startup, not the console.
+> **Scope:** experimental K2OH `v323-cfg6` firmware, feature `0xE3`, API2, G32/APP153 board. 23 effective writable settings and 5 GET-only. **Behavior is mapped from stock ARM callsites and Kalico code**; actual CFS SET/GET was verified on 18 October 2026. Physical RFID and movement effects have not all been measured during a print.
 
-| ID | Config key | Original default | Purpose | Bounds | CFG4 |
-|---:|---|---|---|---|:---:|
-| 0 | feeder_forward_speed | 255 | Feeder forward speed; read-only, the feeders are on/off.  Feeders use binary GPIO on/off, not variable proportional speed. | 1–255 | R |
-| 1 | hub_forward_speed | 100 | Hub forward speed; stock 100.  | 1–255 | W |
-| 2 | hub_transition_speed | 200 | Hub transition speed; stock 200.  | 1–255 | W |
-| 3 | hub_insert_speed | 155 | Hub insert speed; stock 155.  | 1–255 | W |
-| 4 | feeder_reverse_speed | 255 | Feeder reverse speed; read-only, the feeders are on/off.  Feeders use binary GPIO on/off, not variable proportional speed. | 1–255 | R |
-| 5 | hub_reverse_speed | 80 | Hub reverse speed; stock 80.  | 1–255 | W |
-| 6 | reverse_detooth_enable | 1 | Reverse de-tooth switch; stock on.  | 0–1 | R |
-| 7 | hub_transition_wait_ms | 3200 | Wait after the hub push before the buffer path, ms; stock 3200.  | 100–10000 | W |
-| 8 | insert_sensor_timeout_ms | 7000 ms | Time allowed for the hub sensor during insertion, ms; stock 7000. Stock 700 polls of 10ms equals 7000ms; values must be multiples of 10ms. | 1000–50000ms, multiples of 10ms | W |
-| 9 | hub_pullback_timeout_ms | 5000 | Buffer wait while unloading, ms; stock 5000.  | 500–15000 | R |
-| 10 | unload_sensor_timeout_ms | 1000 | Read-only: stock code never executed. Unreachable stock path; original units are 10ms polls. No writable hook in this build. | 100–5000 | R |
-| 11 | rfid_seek_speed | 160 | Hub speed while locating the tag; stock 160.  | 1–255 | R |
-| 12 | rfid_measure_speed | 120 | Hub speed while measuring the spool; stock 120.  | 1–255 | R |
-| 13 | rfid_reposition_speed | 100 | Hub speed while repositioning for a read; stock 100.  | 1–255 | R |
-| 14 | rfid_seek_move_ms | 800 | Tag locate move, ms; stock 800.  | 100–5000 | R |
-| 15 | rfid_seek_settle_ms | 200 | Pause after a locate move, ms; stock 200.  | 10–2000 | R |
-| 16 | rfid_post_auth_wait_ms | 1000 | Reverse between read attempts, ms; stock 1000.  | 100–5000 | R |
-| 17 | rfid_pre_measure_settle_ms | 400 ms | Pause before reading the tag, ms; stock 400. Corrected true stock default: 400ms, not 10ms. | 1–2000 | R |
-| 18 | rfid_neighbor_detect_delay_ms | 400 | Neighbour spool move, ms; stock 400.  | 50–2000 | R |
-| 19 | rfid_neighbor_settle_ms | 100 | Pause after the neighbour move, ms; stock 100.  | 10–1000 | R |
-| 20 | feed_total_timeout_ms | 1250 × 20ms = 25s | Stage-4 feed time limit, ms; stock 25000. Original stock raw count: 1250 ticks of 20ms equals 25000ms. | 5000–60000 | R |
-| 21 | feed_recovery_timeout_ms | 3000 | Stage-4 recovery time limit, ms; stock 3000.  | 500–10000 | R |
-| 22 | odometer_stall_timeout_ms | 25 × 20ms = 0.5s | Odometer stall limit, ms; stock 500. Original stock raw count: 25 ticks of 20ms equals 500ms. | 100–2000 | R |
-| 23 | rfid_neighbor_retry_count | 3 | Tag locate attempts; stock 3.  | 1–10 | R |
-| 24 | reverse_detooth_timeout_ms | 1000 | Reverse de-tooth delay, ms; stock 1000.  | 100–10000 | R |
-| 25 | buffer_fill_timeout_ms | 30000 | Read-only: stock code never executed.  No writable hook in this build. | 1000–60000 | R |
-| 26 | transition_detect_timeout_ms | 300 × 10ms = 3s | Read-only: stock code never executed. Original stock raw count: 300 ticks of 10ms equals 3000ms; independent retry sites remain. No writable hook in this build. | 50–5000 | R |
-| 27 | load_retry_count | 3 | Pretension in/out cycles; stock 3.  | 1–10 | R |
+## How to interpret the settings
 
-## Firmware detection and startup flow
+- Motor speeds `1–255 raw` are command values for the hub motor; **no proven mm/s or RPM conversion exists**. Spool feeders are ON/OFF. Do not interpret `220` as 220mm/s.
+- `ms` means actual milliseconds in the host config; ID8 must be divisible by 10, IDs20/22 divisible by 20, because the OEM firmware uses internal ticks.
+- A **timeout** affects failure/recovery deadlines, not speed. A **delay** changes waiting time; a **count** changes loop repetitions.
+- Overrides live in **volatile CFS RAM** and are re-applied on Kalico startup only after firmware identity verification and `auto_apply: True`. Do not change values during a print.
+- The "CM5" values reflect the **18 Oct 2026** readback, not recommendations. "Stock" indicates OEM defaults.
+- IDs **0, 4, 10, 25, 26** are GET-only: 10/25/26 have **no effective CFG6 patch**, which does not prove that every original OEM path is unreachable; feeders 0/4 have no proportional speed control.
 
-1. Query 0x7A after CFS enumeration. Require K2OH / format 1 / variant 4 / revision v323-cfg4 / version cfs0_000_153.
-2. Also require 0x57 INFO API2, count 28, features 0xD7. v3.22 reports the same 0xD7: features alone are not proof of v3.23.
-3. Apply only IDs 1, 2, 3, 5, 7 and 8 at the next completed CFS enumeration, verify with GET. Unsupported IDs are explicitly skipped.
-4. The configuration is RAM-only, so it is lost on CFS power cycle.
-5. If identity is OCFS, display its version and variant but never send K2OH CFG4 SET to OpenCFS.
+## Complete catalogue
 
-## Configuration example
+| ID | `box.cfg` parameter | Stock | Range / unit | CM5 | Writable |
+|---:|---|---:|---|---:|:---:|
+| 0 | `feeder_forward_speed` | 255 | 1–255 (catalogue only) | non operativo | No |
+| 1 | `hub_forward_speed` | 100 | 1–255 raw | 100 | Yes |
+| 2 | `hub_transition_speed` | 200 | 1–255 raw | 220 | Yes |
+| 3 | `hub_insert_speed` | 155 | 1–255 raw | 100 | Yes |
+| 4 | `feeder_reverse_speed` | 255 | 1–255 (catalogue only) | non operativo | No |
+| 5 | `hub_reverse_speed` | 80 | 1–255 raw | 150 | Yes |
+| 6 | `reverse_detooth_enable` | 1 | 0/1 boolean | True | Yes |
+| 7 | `hub_transition_wait_ms` | 3200 | 100–10000 ms | 3200 | Yes |
+| 8 | `insert_sensor_timeout_ms` | 7000 | 1000–50000 ms, step 10 | 7000 | Yes |
+| 9 | `hub_pullback_timeout_ms` | 5000 | 500–15000 ms | 5000 | Yes |
+| 10 | `unload_sensor_timeout_ms` | 1000 | 100–5000 ms | GET-only | No |
+| 11 | `rfid_seek_speed` | 160 | 1–255 raw | 160 | Yes |
+| 12 | `rfid_measure_speed` | 120 | 1–255 raw | 150 | Yes |
+| 13 | `rfid_reposition_speed` | 100 | 1–255 raw | 100 | Yes |
+| 14 | `rfid_seek_move_ms` | 800 | 100–5000 ms | 800 | Yes |
+| 15 | `rfid_seek_settle_ms` | 200 | 10–2000 ms | 200 | Yes |
+| 16 | `rfid_post_auth_wait_ms` | 1000 | 100–5000 ms | 1000 | Yes |
+| 17 | `rfid_pre_measure_settle_ms` | 400 | 1–2000 ms | 400 | Yes |
+| 18 | `rfid_neighbor_detect_delay_ms` | 400 | 50–2000 ms | 400 | Yes |
+| 19 | `rfid_neighbor_settle_ms` | 100 | 10–1000 ms | 100 | Yes |
+| 20 | `feed_total_timeout_ms` | 25000 | 5000–60000 ms, step 20 | 25000 | Yes |
+| 21 | `feed_recovery_timeout_ms` | 3000 | 500–10000 ms | 3000 | Yes |
+| 22 | `odometer_stall_timeout_ms` | 500 | 100–2000 ms, step 20 | 500 | Yes |
+| 23 | `rfid_neighbor_retry_count` | 3 | 1–10 attempts | 1 | Yes |
+| 24 | `reverse_detooth_timeout_ms` | 1000 | 100–10000 ms | 1000 | Yes |
+| 25 | `buffer_fill_timeout_ms` | 30000 | 1000–60000 ms | GET-only | No |
+| 26 | `transition_detect_timeout_ms` | 300 | 50–5000 ms | GET-only | No |
+| 27 | `load_retry_count` | 3 | 1–10 cycles | 1 | Yes |
 
-    [box_cfs_runtime]
-    auto_apply: true
-    hub_transition_speed: 220
-    hub_insert_speed: 100
-    hub_reverse_speed: 150
-    #insert_sensor_timeout_ms: 7000
+## Runtime behavior, one parameter at a time
 
-**Experimental image:** hardware/RS485 qualification incomplete; retain v3.22 rollback. Do not treat software BOX_STATE as independent motor-stop feedback.
+The descriptions below refer specifically to **G32/APP153 v3.25 CFG6**, not arbitrary Creality firmware or OpenCFS.
 
-[Guida italiana](CFS_V323_PARAMETER_GUIDE_IT.md) | [English compatibility](CFS_FIRMWARE_COMPATIBILITY.md) | [Compatibilità italiana](CFS_FIRMWARE_COMPATIBILITY_IT.md)
+### ID 00 — `feeder_forward_speed`
 
-## Live type-4 filament remaining during printing
+The spool feeder is commanded ON/OFF; the catalogue value 255 does not select a speed or accelerate loading.
 
-v3.23 CFG4 **inherits from v3.12/v3.22** the `remaining_gate_wrapper`, `remaining_init_wrapper` and `remaining_valid_wrapper` hooks. For supported third-party spools, these initialize the stock **type-4** runtime using the geometric percentage and a nominal 330,000 mm reference. Opcode `0x03` can read the initial value without writing to the RFID tag.
+**Boundaries and evidence:** No proportional-speed hook; GET-only. Stock: **255**; accepted range: **1–255 (catalogue only)**; CM5 value: **non operativo**; SET: **no**.
 
-**This does not imply live consumption tracking during printing.** OpenCFS analysis of stock APP153 shows that the `rfid_mgr_fila_task`, which accumulates odometer millimeters and updates the percentage, is gated by the FM15L013 secure-element presence flag. On boards without that chip, the task is skipped even for type 4, so the CFS percentage can remain at its loading-time value while Kalico estimates G-code consumption.
+### ID 01 — `hub_forward_speed`
 
-v3.23 CFG4 **does not bypass this hardware gate** and does not add an independent odometer task. Live type-4 consumption tracking requires a later patch and dedicated hardware tests. IDs 20 and 22 are recognized and readable catalogue parameters, but have no effective SET hooks in the current CFG4 image.
+Commands hub speed during the initial forward push from the CFS. Increasing it may shorten this phase but raise mechanical stress; it does not change toolhead extruder speed.
 
-[OpenCFS technical analysis](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/05-preload-rfid.md) | [Italiano](CFS_V323_PARAMETER_GUIDE_IT.md)
+**Boundaries and evidence:** Speed byte in the stock configuration used by the hub motor. (hook: `stock configuration speed byte`.) Stock: **100**; accepted range: **1–255 raw**; CM5 value: **100**; SET: **yes**.
+
+### ID 02 — `hub_transition_speed`
+
+Selects hub speed for the filament transfer along the route toward the buffer and toolhead. This is the most relevant CFS transfer-speed setting, not a direct mm/s value.
+
+**Boundaries and evidence:** May affect PTFE drag and transfer time; not the final insertion phase or toolhead extruder. (hook: `stock configuration speed byte`.) Stock: **200**; accepted range: **1–255 raw**; CM5 value: **220**; SET: **yes**.
+
+### ID 03 — `hub_insert_speed`
+
+Controls hub motion during sensor-guided final insertion. It is not the rate at which the toolhead extruder gears feed the filament into the hotend.
+
+**Boundaries and evidence:** Increasing it can aggravate binding if the path resists insertion. (hook: `stock configuration speed byte`.) Stock: **155**; accepted range: **1–255 raw**; CM5 value: **100**; SET: **yes**.
+
+### ID 04 — `feeder_reverse_speed`
+
+The spool feeder reverses via ON/OFF control rather than proportional speed. ID4 cannot speed up unloading.
+
+**Boundaries and evidence:** GET-only; do not confuse with ID5. Stock: **255**; accepted range: **1–255 (catalogue only)**; CM5 value: **non operativo**; SET: **no**.
+
+### ID 05 — `hub_reverse_speed`
+
+Regulates hub motor speed while the CFS pulls filament back toward its spool during unloading. It does not directly change the toolhead extruder's retract rate.
+
+**Boundaries and evidence:** High settings can raise tension or slipping; verify with brittle filament. (hook: `stock configuration speed byte`.) Stock: **80**; accepted range: **1–255 raw**; CM5 value: **150**; SET: **yes**.
+
+### ID 06 — `reverse_detooth_enable`
+
+Enables/disables the actual reverse de-tooth action (gear release/repositioning during reverse movement). False skips that branch; it does not disable all normal reverse motion.
+
+**Boundaries and evidence:** Separate RAM sidecar bit21/byte50, gated at ID24 hook; disabling it may break unloading or recovery. (hook: `0x080108F0`.) Stock: **1**; accepted range: **0/1 boolean**; CM5 value: **True**; SET: **yes**.
+
+### ID 07 — `hub_transition_wait_ms`
+
+Pause after the hub push, before continuing along the buffer path. Shortening it saves waiting time but may start the next state too early.
+
+**Boundaries and evidence:** Calls stock delay; it is not a total loading timeout. (hook: `0x08011116`.) Stock: **3200**; accepted range: **100–10000 ms**; CM5 value: **3200**; SET: **yes**.
+
+### ID 08 — `insert_sensor_timeout_ms`
+
+Maximum sensor/insert-path waiting window during a loading stage. Expiry follows the stock failure/recovery path; it does not raise movement speed. **This CFG6 hook covers one 700-poll stock callsite, not every other OEM path with the same constant.**
+
+**Boundaries and evidence:** CFG in milliseconds; firmware converts to 10ms ticks. (hook: `0x080112CA`.) Stock: **7000**; accepted range: **1000–50000 ms, step 10**; CM5 value: **7000**; SET: **yes**.
+
+### ID 09 — `hub_pullback_timeout_ms`
+
+Time limit for the pullback/buffer stage during unloading. Too short a value may trigger a timeout before retraction finishes.
+
+**Boundaries and evidence:** Wrapper replaces a stock stage timeout, not reverse speed. (hook: `0x08011CB6`.) Stock: **5000**; accepted range: **500–15000 ms**; CM5 value: **5000**; SET: **yes**.
+
+### ID 10 — `unload_sensor_timeout_ms`
+
+CFG6 catalogue-only entry with no active patch. An OEM sensor path counts 1000 polls of 10 ms each (about 10 seconds), so the catalogue `_ms` label is misleading for this raw stock constant. CFG6 cannot change that timeout.
+
+**Boundaries and evidence:** SET/RESET blocked. Stock: **1000**; accepted range: **100–5000 ms**; CM5 value: **GET-only**; SET: **no**.
+
+### ID 11 — `rfid_seek_speed`
+
+Hub speed while moving the spool to locate its RFID tag; it does not control transfer toward the toolhead.
+
+**Boundaries and evidence:** Feeds the stock hub-speed call `0x0801E164` during tag search. (hook: `0x08012A9E`.) Stock: **160**; accepted range: **1–255 raw**; CM5 value: **160**; SET: **yes**.
+
+### ID 12 — `rfid_measure_speed`
+
+Speed used while the spool is moved during RFID measurement. It changes reading-stage motor motion, not hotend extrusion flow.
+
+**Boundaries and evidence:** RFID reading quality at higher speed requires real-tag testing. (hook: `0x08012AC0`.) Stock: **120**; accepted range: **1–255 raw**; CM5 value: **150**; SET: **yes**.
+
+### ID 13 — `rfid_reposition_speed`
+
+Hub speed while repositioning the spool between RFID steps, for example after an inconclusive measurement.
+
+**Boundaries and evidence:** Does not control final filament insertion. (hook: `0x08012E8A`.) Stock: **100**; accepted range: **1–255 raw**; CM5 value: **100**; SET: **yes**.
+
+### ID 14 — `rfid_seek_move_ms`
+
+Duration of the tag-search movement in the stock RFID loop. Increasing it lengthens the search movement, not its speed.
+
+**Boundaries and evidence:** Replaces the duration constant at `0x08012A76`; watch for spool travel limits. (hook: `0x08012A76`.) Stock: **800**; accepted range: **100–5000 ms**; CM5 value: **800**; SET: **yes**.
+
+### ID 15 — `rfid_seek_settle_ms`
+
+Pause after RFID-seek movement before the next step. Reducing it can speed the sequence but remove settling time.
+
+**Boundaries and evidence:** Delay, not speed or retry count. (hook: `0x08012AAE`.) Stock: **200**; accepted range: **10–2000 ms**; CM5 value: **200**; SET: **yes**.
+
+### ID 16 — `rfid_post_auth_wait_ms`
+
+Stock waiting interval around the post-authentication/reverse RFID transition before subsequent actions. Changes a delay, not reversal speed.
+
+**Boundaries and evidence:** Hook replaces delay call at `0x08012E7A`; physical necessity needs real RFID tests. (hook: `0x08012E7A`.) Stock: **1000**; accepted range: **100–5000 ms**; CM5 value: **1000**; SET: **yes**.
+
+### ID 17 — `rfid_pre_measure_settle_ms`
+
+The actual 400ms stock pause preceding RFID reading/measurement. Shortening it may save time but read while the spool is still moving.
+
+**Boundaries and evidence:** Correct hook at `0x08012A60`, not the separate 10ms stock delay. (hook: `0x08012A60`.) Stock: **400**; accepted range: **1–2000 ms**; CM5 value: **400**; SET: **yes**.
+
+### ID 18 — `rfid_neighbor_detect_delay_ms`
+
+Timing constant for the motion/positioning step used when detecting an adjacent spool's RFID tag; not a filament loading timeout.
+
+**Boundaries and evidence:** Although named 'delay', it feeds the movement sequence; do not assume it is a purely stationary wait. (hook: `0x0801304A`.) Stock: **400**; accepted range: **50–2000 ms**; CM5 value: **400**; SET: **yes**.
+
+### ID 19 — `rfid_neighbor_settle_ms`
+
+The specific 100ms OEM pause after neighbouring spool/slot motion, allowing settling before continuing or retrying. A different stock 500ms delay is unaffected by ID19.
+
+**Boundaries and evidence:** Hook in delay call `0x08013078`. (hook: `0x08013078`.) Stock: **100**; accepted range: **10–1000 ms**; CM5 value: **100**; SET: **yes**.
+
+### ID 20 — `feed_total_timeout_ms`
+
+Overall timeout for stage-4 feeding toward the toolhead path. Longer values allow more time for a slow transfer; they do not increase speed.
+
+**Boundaries and evidence:** Firmware converts milliseconds to 20ms ticks; hook `0x08032C72`. (hook: `0x08032C72`.) Stock: **25000**; accepted range: **5000–60000 ms, step 20**; CM5 value: **25000**; SET: **yes**.
+
+### ID 21 — `feed_recovery_timeout_ms`
+
+Maximum time allowed for a recovery operation after a stage-4 feeding difficulty. Changes the recovery failure/retry deadline, not forward speed.
+
+**Boundaries and evidence:** Two stock branches use this parameter (`0x08032D46`, `0x08032DAC`). (hook: `0x08032D46 + 0x08032DAC`.) Stock: **3000**; accepted range: **500–10000 ms**; CM5 value: **3000**; SET: **yes**.
+
+### ID 22 — `odometer_stall_timeout_ms`
+
+How long the odometer may show no progress during feed before the motion is judged stalled. Low values may give false stalls; high values delay fault detection.
+
+**Boundaries and evidence:** Does not change distance accounting; only the 20ms-tick stall threshold. (hook: `0x08032CEC`.) Stock: **500**; accepted range: **100–2000 ms, step 20**; CM5 value: **500**; SET: **yes**.
+
+### ID 23 — `rfid_neighbor_retry_count`
+
+Number of iterations/attempts in the neighbouring-spool RFID search loop. Reducing it to 1 shortens the sequence but may miss harder-to-read tags.
+
+**Boundaries and evidence:** Stock `r4` comparison at `0x0801307C`; not a global retry count for all CFS errors. (hook: `0x0801307C`.) Stock: **3**; accepted range: **1–10 attempts**; CM5 value: **1**; SET: **yes**.
+
+### ID 24 — `reverse_detooth_timeout_ms`
+
+Time threshold for the reverse de-tooth branch. It gates when that gear-release action is performed; not unload speed.
+
+**Boundaries and evidence:** Interacts with ID6: disabling ID6 forces the branch to be skipped; hook `0x080108F0`. (hook: `0x080108F0`.) Stock: **1000**; accepted range: **100–10000 ms**; CM5 value: **1000**; SET: **yes**.
+
+### ID 25 — `buffer_fill_timeout_ms`
+
+Catalogue buffer-fill timeout but with no reachable hooked stock code. It does not control physical filling time in CFG6.
+
+**Boundaries and evidence:** Not exposed to SET/RESET. Stock: **30000**; accepted range: **1000–60000 ms**; CM5 value: **GET-only**; SET: **no**.
+
+### ID 26 — `transition_detect_timeout_ms`
+
+A catalogue-only field not hooked by CFG6. The OEM code includes one 300-count sensor wait in 10ms polls (about 3 seconds), plus a separate retry path. Raw 300 does not mean 300 ms; neither path is configurable in CFG6.
+
+**Boundaries and evidence:** Not exposed to SET/RESET. Stock: **300**; accepted range: **50–5000 ms**; CM5 value: **GET-only**; SET: **no**.
+
+### ID 27 — `load_retry_count`
+
+Number of forward/backward pretension cycles in the loading path. It is not the number of complete retry attempts following every spool-load failure.
+
+**Boundaries and evidence:** Hook changes the real loop compare at `0x08012616`; value 1 reduces stock repetitions from 3 to 1. (hook: `0x08012616`.) Stock: **3**; accepted range: **1–10 cycles**; CM5 value: **1**; SET: **yes**.
+
+## Loading/unloading speed: CFS versus the toolhead
+
+**The CFS hub motor** primarily uses ID2 (`hub_transition_speed`) for transfer toward the toolhead, ID3 (`hub_insert_speed`) for final insertion, ID1 (`hub_forward_speed`) for initial push and ID5 (`hub_reverse_speed`) for unloading. IDs11–13 are *RFID motion controls*, not standard filament transport speed.
+
+**The toolhead extruder** is instead governed by Kalico's `[box]` settings, not these 28 IDs: `hotend_feed_speed` is volumetric mm³/s; `retract_velocity` and `external_feed_velocity` are feedrates in mm/min. They operate a different motor system from CFS feeders/hub.
+
+## Evidence and remaining validation
+
+- Source-verified: Kalico catalogue, stock defaults, limits and original ARM addresses; Unicorn differential ABI/flag and type-4 tests.
+- Hardware-confirmed: `v323-cfg6` identity, 23 startup SET operations, 28 readable IDs, and a 23/23 GET match. **No** Z homing, axis movement, loading/unloading or RFID movement took place in that validation.
+- Still unverified physically: dynamic behavior of the 15 advanced hooks, tag reliability, extended RS-485 stability and type-4 remaining values during real printing.
+- **Conservative testing:** preserve a CFG5T rollback and change advanced RFID/timeouts individually, with observed results.
+
+## Code references
+
+[builder](../firmware/cfg6-rdg2/build.py) · [ARM wrappers](../firmware/cfg6-rdg2/handler.S) · [automated tests](../tests/run_offline.py)
+
+[Kalico integration guide](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/docs/CFS_RUNTIME_CFG6_EN.md) · [Versione italiana](CFS_V323_PARAMETER_GUIDE_IT.md)
+
+## GET-only unit caveat
+
+IDs **10 and 26** are GET-only and retain historical `_ms` names, but some OEM sensor routines run in **10ms polls**: 1000 polls ≈ **10s** for the ID10-related site; 300 polls ≈ **3s** for one ID26 candidate. These are **not tunable CFG6 timeouts**. Writable ID8 uses real host milliseconds converted by `/10` inside the firmware, but affects only the patched OEM callsite. Source: [OEM ROM source audit of polling units and GPIO feeders](https://github.com/MzTechnology97/k2-cfs-rfid-tools/pull/53).
+
+## Safety: unresolved MCU issue (18 October 2026)
+
+[Firmware issue #9](https://github.com/MzTechnology97/k2-cfs-rfid-tools/issues/9) **remains unresolved**: a prior physical test saw MCU `BOX_STATE=IDLE` while `box.operation.active=true` during `feeding_to_buffer`. CFG6 SET/GET was validated **only with the printer idle**. Exact identity, `auto_apply: True` at startup and 23/23 readback **do not establish an atomic MCU motor-stop interlock**. Never send direct SET/RESET during loading, unloading, or movement; keep Kalico's host safeguards and a known-good rollback. Physical task/motor-state and RTOS-race qualification is still needed.

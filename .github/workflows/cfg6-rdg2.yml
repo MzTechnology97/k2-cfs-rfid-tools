@@ -1,0 +1,37 @@
+name: CFG6 RDG2 verified artifact
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          repository: MzTechnology97/kalico-k2pro
+          ref: 1d7673da14a4860aa188e9b0ef563c5d97d80428
+          path: work/kalico
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install offline build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi
+          python -m pip install -r requirements-test.txt
+      - name: Rebuild exact image and run current regressions
+        run: python tests/run_offline.py --kalico work/kalico
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD: '1'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cfg6-rdg2-offline-results
+          path: work/test-results/

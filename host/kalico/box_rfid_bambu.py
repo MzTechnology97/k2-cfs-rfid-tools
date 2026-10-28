@@ -15,8 +15,10 @@ from dataclasses import dataclass
 import hashlib
 import hmac
 import struct
+import time
 
 from extras import box_rfid_diag as diag
+from extras import box_rfid_fallback
 from extras import box_protocol
 from extras.box_rfid_diag import RfidDiagDriver, TagInfoReply, MemoryReply
 
@@ -29,6 +31,10 @@ BAMBU_REQUIRED_BLOCKS = (1, 2, 4, 5, 6, 14)
 BAMBU_CAPTURE1_MAGIC = b"K2C3"
 BAMBU_CAPTURE2_MAGIC = b"K2D3"
 BAMBU_STOCK_MASK = 0x07
+# Right after an insertion or a reread the stock CFS RFID task is still
+# retrying the tag (it cannot read a Bambu tag with Creality keys): wait for it.
+STOCK_IDLE_TIMEOUT = 15.0
+STOCK_IDLE_POLL = 0.5
 
 
 class BambuRfidError(RuntimeError):
@@ -37,6 +43,14 @@ class BambuRfidError(RuntimeError):
 
 class BambuRfidUnsupported(BambuRfidError):
     pass
+
+
+class BambuTagNotRecognised(BambuRfidError):
+    """The stock read ran, but the tag is not a Bambu tag."""
+
+
+class BambuStockBusy(BambuRfidError):
+    """The stock CFS RFID task is still busy on a slot."""
 
 
 def _decoded_tag_message(tag, source):
@@ -284,7 +298,7 @@ def parse_bambu_stock_capture(slot, target_reply, cap1_reply, cap2_reply):
     hitmask, okmask, failmask = target[9], target[10], target[11]
     if (hitmask, okmask, failmask) != (
             BAMBU_STOCK_MASK, BAMBU_STOCK_MASK, 0):
-        raise BambuRfidError(
+        raise BambuTagNotRecognised(
             "stock capture incomplete: hit=0x%02X ok=0x%02X fail=0x%02X"
             % (hitmask, okmask, failmask))
     if cap1[4:8] != BAMBU_CAPTURE1_MAGIC:
@@ -305,7 +319,7 @@ def parse_bambu_stock_capture(slot, target_reply, cap1_reply, cap2_reply):
     detail = _ascii(block4)
     material = normalize_material("", detail)
     if not detail or not material:
-        raise BambuRfidError("captured Bambu material detail is empty")
+        raise BambuTagNotRecognised("captured Bambu material detail is empty")
 
     return BambuStockTagData(
         slot=slot, uid=uid, atqa=atqa, sak=sak,
@@ -335,11 +349,19 @@ class BoxRfidBambu:
             "BOX_RFID_BAMBU_DERIVE", self.cmd_derive,
             desc="Passively derive Bambu candidate Key A values from CFS cache")
         self.gcode.register_command(
-            "BOX_RFID_BAMBU_READ", self.cmd_read,
+            "BOX_RFID_BAMBU_READ", self._claimed("BOX_RFID_BAMBU_READ", self.cmd_read),
             desc="Read and decode a Bambu tag using capability-gated Key A auth")
         self.gcode.register_command(
-            "BOX_RFID_BAMBU_PROBE_READ", self.cmd_probe_read,
+            "BOX_RFID_BAMBU_PROBE_READ",
+            self._claimed("BOX_RFID_BAMBU_PROBE_READ", self.cmd_probe_read),
             desc="Diagnostic read-only Bambu auth/read using an explicit known UID")
+
+    def _claimed(self, name, handler):
+        # Manual reads drive the CFS RFID task: share Box's read claim.
+        def claimed(gcmd):
+            with diag.box_rfid_read_guard(self.printer, gcmd, name):
+                return handler(gcmd)
+        return claimed
 
     def _serial_ready(self, *args):
         self.serial = self.printer.lookup_object("serial_485 %s" % self.serial_name)
@@ -400,11 +422,30 @@ class BoxRfidBambu:
         except Exception:
             pass
 
-    def _read_tag_stock_capture(self, global_slot, address=None):
-        """Use API7 to run Bambu Key A through Creality's original RFID task."""
-        auto_addr, local_slot = self._slot_address(global_slot)
-        address = auto_addr if address is None else address
+    def _wait(self, delay):
+        # serial_485's rule: pause the reactor greenlet, sleep in other threads.
+        import greenlet
 
+        if hasattr(greenlet.getcurrent(), "timer"):
+            reactor = self.printer.get_reactor()
+            reactor.pause(reactor.monotonic() + delay)
+        else:
+            time.sleep(delay)
+
+    def _arm_when_stock_idle(self, global_slot, address, local_slot):
+        # Each try is its own RS-485 session, so the bus stays free between
+        # polls (motor control and the CFS share it).
+        reactor = self.printer.get_reactor()
+        deadline = reactor.monotonic() + STOCK_IDLE_TIMEOUT
+        while True:
+            try:
+                return self._arm_stock_capture(global_slot, address, local_slot)
+            except BambuStockBusy:
+                if reactor.monotonic() >= deadline:
+                    raise
+                self._wait(STOCK_IDLE_POLL)
+
+    def _arm_stock_capture(self, global_slot, address, local_slot):
         with self._transport().request_session() as transport:
             driver = RfidDiagDriver(transport, address)
             info = driver.info(timeout=1.0)
@@ -429,7 +470,7 @@ class BoxRfidBambu:
             if state is None:
                 raise BambuRfidError("CFS RFID STOCK_STATE timed out")
             if state.busy:
-                raise BambuRfidError(
+                raise BambuStockBusy(
                     "CFS stock RFID manager is busy on logical slot %d"
                     % state.active_slot)
             target = driver.internal_record(local_slot, timeout=1.0)
@@ -445,6 +486,12 @@ class BoxRfidBambu:
                     "CFS API7 ARM_KEYS failed: %s" % status)
             self.last_candidate = BambuCandidate(
                 global_slot, uid, atqa, sak, keys)
+
+    def _read_tag_stock_capture(self, global_slot, address=None):
+        """Use API7 to run Bambu Key A through Creality's original RFID task."""
+        auto_addr, local_slot = self._slot_address(global_slot)
+        address = auto_addr if address is None else address
+        self._arm_when_stock_idle(global_slot, address, local_slot)
 
         box = self.printer.lookup_object("box", None)
         box_driver = None if box is None else getattr(box, "drivers", {}).get(address)
@@ -522,24 +569,36 @@ class BoxRfidBambu:
             self.gcode.respond_info(_decoded_tag_message(tagdata, "api3-direct"))
             return tagdata
 
-    def try_auto_read(self, global_slot):
-        """Automatic fallback is intentionally API7 stock-task capture only."""
+    # --- Box RFID fallback decoder (see box_rfid_fallback.py) -------------
+    # Box checks the API7 firmware once and passes the tag identity read from
+    # the stock record. A Bambu try is one stock reread with the derived keys.
+
+    RFID_DECODER_NAME = "BAMBU"
+    RFID_DECODER_PRIORITY = 10
+    RFID_DECODER_KIND = "bambu"
+
+    def rfid_decoder_version(self):
+        # Bump when a change can decode tags an older version could not.
+        return "1"
+
+    def rfid_decoder_candidate(self, identity, automatic):
+        return identity.mifare_classic_1k
+
+    def rfid_decoder_cost(self, identity, automatic):
+        return 1
+
+    def rfid_decoder_read(self, slot, identity, max_reads, automatic):
+        if max_reads < 1:
+            return None, 0
         try:
-            address, _local = self._slot_address(global_slot)
-            with self._transport().request_session() as transport:
-                info = RfidDiagDriver(transport, address).info(timeout=1.0)
-            if info is None:
-                raise BambuRfidError("CFS RFID INFO timed out")
-            if info.api_version != diag.API_STOCK_CAPTURE:
-                raise BambuRfidUnsupported(
-                    "automatic Bambu fallback requires API7 stock capture")
-            return self._read_tag_stock_capture(global_slot, address=address)
-        except BambuRfidUnsupported as exc:
-            self.last_unsupported = str(exc)
-            return None
-        except Exception as exc:
+            tag = self._read_tag_stock_capture(slot)
+        except BambuTagNotRecognised as exc:
             self.last_error = str(exc)
-            return None
+            return None, 1
+        except BambuRfidError as exc:
+            self.last_error = str(exc)
+            raise
+        return tag, 1
 
     def cmd_derive(self, gcmd):
         slot, address, _local = self._manual_slot(gcmd)
@@ -613,6 +672,7 @@ class BoxRfidBambu:
             raise gcmd.error(str(exc))
         except BambuRfidError as exc:
             raise gcmd.error(str(exc))
+        box_rfid_fallback.remember_manual_read(self.printer, self, tag)
         data = tag.as_dict()
         detail = [
             "Bambu RFID slot=%d" % slot,

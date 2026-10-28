@@ -1,0 +1,15 @@
+{
+  "name": "K2OH CFG6 RDG2",
+  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-RDG2.bin",
+  "sha256": "7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f",
+  "size": 179976,
+  "hardware": "cfs0_050_G32",
+  "application": "cfs0_000_153",
+  "revision": "v323-cfg6",
+  "config_features": "0xE3",
+  "validation_date": "2026-10-28",
+  "status": "working on the reference K2 Pro CFS G32 configuration",
+  "base_commit": "0ad22669248cc845a3c8d22dd613500c4b95feb3",
+  "base_sha256": "9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff",
+  "host_reader_sha256": "2b9810456f6bb7ae0f2ebbf82cdf1f293dab84867a9db2799fb3035cb7aef867"
+}

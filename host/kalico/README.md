@@ -1,25 +1,20 @@
-# Kalico host extras
+# Kalico host extras — CFG6 RDG2
 
-These are the exact host-side extras I use in my K2-OpenHost/Kalico API7 implementation:
+[Current firmware](../../README.md) · [Validation and limitations](../../docs/CFG6_RDG2_VALIDATION.md) · [Compatibility](../../docs/CFS_FIRMWARE_COMPATIBILITY.md)
 
-- `box_rfid_diag.py` — opcode `0x57` transport, API7 decoding, internal-record access and key-arm/clear operations.
-- `box_rfid_bambu.py` — Bambu HKDF Key-A derivation, API7 stock-task orchestration and material/colour parsing.
-- `box_rfid_mifare.py` — generic API7 MIFARE Classic decoder registry; QIDI is the first hardware-validated provider.
+These extras integrate the K2-OpenHost/Kalico RFID path with the stock CFS worker:
 
-I publish them here both as a reference and to make porting to other Kalico/Klipper trees easier.
+| File | Role |
+| --- | --- |
+| `box_rfid_diag.py` | Opcode `0x57` transport, API7 records/key-arm operations and the read-only RDG2 snapshot |
+| `box_rfid_bambu.py` | Bambu Key A derivation, API7 stock-worker orchestration and material/colour parsing |
+| `box_rfid_mifare.py` | MIFARE Classic provider registry and vendor-specific decoding |
 
-## Dependencies
+The diagnostic reader paired with the current image has SHA-256 **`2b9810456f6bb7ae0f2ebbf82cdf1f293dab84867a9db2799fb3035cb7aef867`**. The firmware SHA is **`7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f`**.
 
-The files expect the K2 branch's existing:
+## Dependencies and configuration
 
-- `extras.serial_485.build_485_body`;
-- `extras.box_protocol`;
-- shared `serial_485` request queue/session;
-- Box driver with `force_rfid_read(mask)`.
-
-Do not open the RS-485 device independently while the printer stack owns it. Use the existing transport owner/queue.
-
-## Configuration
+The extras require the integrated K2 branch's `extras.box_protocol`, `extras.serial_485.build_485_body`, shared request queue/session and Box driver's `force_rfid_read(mask)`. They are not a standalone replacement for those components. The existing printer transport owns the RS-485 device.
 
 ```ini
 [box_rfid_diag]
@@ -37,79 +32,44 @@ serial: serial485
 address: 1
 ```
 
-In my integrated K2 branch, `[box]` also enables:
+The integrated Box driver can additionally expose `auto_bambu_rfid_fallback` and `auto_mifare_rfid_fallback`. Automatic fallback is restricted to API7. RF operations retain their existing confirmation, idle and session ownership rules. Updating source files takes effect at the next normal Klipper/Kalico restart; do not reload the printer service during a print.
 
-```ini
-auto_bambu_rfid_fallback: true
-auto_mifare_rfid_fallback: true
-```
+## Read-only RDG2 snapshot
 
-Automatic fallback is deliberately restricted to API7. Older direct-auth diagnostic APIs are not used automatically.
-
-
-## Structured tag diagnostics
-
-The Bambu extra emits the decoded values through Klipper's G-code responder so they are visible in both the console and `klippy.log`: UID, ATQA/SAK, detailed type, normalized material, expected profile name, colour/RGBA and raw captured block 4 / block 5 bytes.
-
-This is useful when a tag is decoded correctly but the local filament-library naming does not match the tag exactly.
-
-## Persistent association to an existing profile
-
-The integrated K2 branch adds:
+With the matching firmware and host reader:
 
 ```text
-_BOX_RFID_ASSOCIATE SLOT=<global-slot> FILAMENT_ID=<library-id>
+BOX_CFS_DIAG2 ADDRESS=1 SLOT=3
 ```
 
-The RFID identity is stored in the mapping layer and points to the selected library profile. The library profile remains authoritative for temperatures, pressure advance and max-flow; the live tag remains authoritative for its colour.
+`ADDRESS` selects the CFS address. `SLOT` is its **local zero-based index 0–3**: `SLOT=3` means physical slot 4. It is not the global slot numbering used by integrated tag-read commands.
 
-## Generic API7 third-party capture
+This command makes one request through `serial_485.request_session`, using opcode `0x57`, payload `15 <slot>` and the shared transport. It reads a 64-byte `RDG2` version-2 snapshot. It does not start RF activity, perform a tag read, change configuration, initialize accounting or move hardware. It is outside the active RF command list.
 
-```text
-BOX_RFID_DIAG_STOCK_CAPTURE SLOT=<0..3> KEY0=<12hex> KEY1=<12hex> KEY2=<12hex> CONFIRM=1
-```
+The response includes runtime validity/type/mode, used and total millimetres, initial/current CFS percentages, cached odometer, stock RF-manager flags/markers, tick count and PRIMASK/CONTROL/IPSR context. It exposes a boolean K2RL latch indicator, not key material. The firmware copies RAM with configurable interrupts masked and restores the incoming mask before sending the response.
 
-This diagnostic keeps RF ownership in the stock CFS worker and returns UID, capture masks, block 4 and the first four bytes of block 5. I use it to investigate additional MIFARE Classic spool formats without embedding vendor-specific parsing into the CFS firmware.
+The host validates payload length, magic, version, reserved byte and requested slot. Non-finite odometer values remain identifiable through their raw bits. On success it records `received_at_unix`; on error it clears `last_diag2_snapshot` and records the error. Reading the extra's status returns cached diagnostic data without another wire request. Check the timestamp before interpreting it.
 
+PRIMASK does not exclude NMI, faults or DMA. Snapshot hints describe that instant, not a guarantee that a subsequent remaining query sees the same state.
 
-## Generic MIFARE / QIDI workflow
+## RFID reads, cache and profiles
 
-I use `box_rfid_mifare.py` for MIFARE Classic spool formats that can reuse API7 but need vendor-specific keys or parsing.
+API7 temporarily supplies keys at the stock authentication callsites and captures successful stock reads for host decoding. Normal tag operations remain in the CFS worker. The host profile association continues to supply temperatures, pressure advance and flow settings; live RFID can supply identity and colour.
 
-For the first identification of an unknown QIDI tag:
+A restored profile or a log saying a tag is known from the RFID cache does not prove a new physical RF read or reinitialization of MCU accounting. Use the command outcome and acquisition context to distinguish them. The manual RF read in the 28 October validation was confirmed by the operator; the cache observation does not contradict that confirmation.
 
-```text
-BOX_RFID_MIFARE_READ SLOT=<global-slot>
-```
+The integrated commands `_BOX_RFID_READ_SLOT`, `_BOX_RFID_ASSOCIATE` and `BOX_RFID_MIFARE_READ` use their existing global-slot interface. They have different purposes and numbering from the local `BOX_CFS_DIAG2` snapshot.
 
-The successful decoder name is saved as a UID routing hint. Subsequent normal `_BOX_RFID_READ_SLOT` operations for that UID go directly to the known decoder instead of first trying Bambu.
+## Remaining percentage
 
-I hardware-validated this flow with a QIDI PET-CF spool:
+Kalico continues to receive the CFS percentage through normal `CMD_RFID_REMAINING (0x03)`. RDG2 is a diagnostic view of MCU RAM; it does not replace that protocol or force a percentage refresh.
 
-```text
-UID=37101573
-block4=25020100000000000000000000000000
-0x25 = PET-CF
-0x02 = Black (#060606)
-0x01 = QIDI
-identity=QIDI:PET-CF
-```
+On the verified Bambu PETG HF print, the MCU counter advanced **0 → 51 → 202 → 6,293 → 17,113 mm**, the CFS percentage moved **39 → 38 → 34**, and the final normal reply was `FFFFFF22`. The firmware proxy uses **330 m**, while the Kalico profile uses **327 m**, so the integer `rfid_reported_percent` and continuous `rfid_estimated_percent` can differ.
 
-The tag then matched my existing `90003 / Qidi PET-CF` library profile, preserving the profile's pressure advance, maximum flow and temperature while taking the live colour from RFID.
+A returned `0xFF` alone does not prove invalid runtime: the stock RF-manager prefilter can suppress the selected slot before its runtime is checked. A valid proxy runtime with a missing stock getter marker can still return zero. The current BIN preserves those stock filters. The accounting active-slot byte alone does not identify RF-worker activity.
 
+## Validation scope and history
 
-## Remaining percentage with CFS v3.12
+The current physical validation covers Bambu PETG HF, physical slot 4 and the observed print/link session. Unload/reread, full rescan, other formats/backends/slots and worst-case timing remain hardware checks. Provider support and older QIDI/Bambu evidence are recorded in the [frozen historical tree](https://github.com/MzTechnology97/k2-cfs-rfid-tools/tree/0ad22669248cc845a3c8d22dd613500c4b95feb3); they do not extend qualification of this exact image.
 
-I did **not** add a new CM5-side remaining algorithm for v3.12.
-
-The CFS firmware now initializes its own stock type-4 remaining runtime for a successful third-party API7 capture. Kalico continues to query the normal CFS `CMD_RFID_REMAINING (0x03)` path and applies any returned value in the normal `0..100` range.
-
-On my hardware validation the Bambu PETG HF slot returned `12`, and the existing object immediately exposed:
-
-```text
-rfid_reported_percent  = 12
-rfid_percent           = 12.0
-rfid_estimated_percent = 12.0
-```
-
-So I do not need an additional host protocol or cache workaround for the v3.12 remaining feature.
+See the [current validation record](../../docs/CFG6_RDG2_VALIDATION.md) for offline regressions and physical snapshot evidence.

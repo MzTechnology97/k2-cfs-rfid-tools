@@ -30,3 +30,6 @@ dumps/
 Thumbs.db
 .vscode/
 .idea/
+
+# The single hardware-verified distributable. Other generated images stay ignored.
+!firmware/cfg6-rdg2/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-RDG2.bin
