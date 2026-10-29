@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "candidate-reference-hardware-validated-provisional-bambu-calibration",
+  "status": "reference-validated-r3",
   "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin",
   "sha256": "a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8",
   "size": 185900,
@@ -44,7 +44,7 @@
   "uid_pair_missing_length_recovery": true,
   "uid_getter_scope": "Only two successful RFID-worker observation callsites; original getter result zero, legacy backend, ATQA0400/SAK08 and nonzero UID4. Copy both UID buffers, preserve byte75 and comparison rules.",
   "r2_reference_hardware_evidence": "R2 decoded PETG HF in24.54s but flags2 exposed missing UID length. R3 subsequently verified flags0x13 on physical slots2/4 and applied provisional vendor geometry without rescanning.",
-  "bambu_calibration_kind": "provisional full / nearly-empty measured references; host configuration, not compiled defaults",
+  "bambu_calibration_kind": "effective core inferred from first physical runout; host configuration, awaiting repeat validation",
   "hardware_verification_scope": {
     "date": "2026-10-29",
     "platform": "reference CFS G32 cfs0_000_153 with CM5/Kalico",
@@ -57,16 +57,28 @@
     "record_byte75": 0,
     "ram_vendor_catalog_and_uid_binding": true,
     "recalculation_without_rescan": true,
-    "R3_print_cycle_verified": false
+    "R3_print_cycle_verified": true,
+    "R3_print_cycle_scope": "slot4 consumed 19655 mm and automatic runout swap to slot2; not all lifecycle transitions"
   },
   "reference_bambu_geometry": {
-    "core_circumference_mm": 302.8,
+    "vendor": "bambu",
+    "profile_id": 1,
+    "core_outer_diameter_mm_approx": 83,
+    "core_circumference_mm": 284.7,
     "full_circumference_mm": 508.3,
     "full_reference_physical_slot": 2,
-    "near_empty_reference_physical_slot": 4,
+    "partly_used_check_physical_slot": 4,
+    "catalog_revision": null,
     "nominal_length_per_tested_uid_mm": 327000,
     "full_result_percent": 100,
-    "near_empty_result_percent": 1,
-    "geometry_is_firmware_default": false
+    "partly_used_result_percent": 6,
+    "geometry_is_firmware_default": false,
+    "coefficient_hardware_applied": false,
+    "prior_catalog_revision": 2,
+    "prior_core_circumference_mm": 260.8,
+    "prior_initial_percent": 12,
+    "prior_percent_at_runout": 6,
+    "measured_used_mm_at_runout": 19655,
+    "effective_core_not_physical_diameter": true
   }
 }

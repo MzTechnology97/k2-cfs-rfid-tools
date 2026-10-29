@@ -14,7 +14,12 @@ def run(name,args):
     checks[name]=True;print('PASS',name,flush=True)
 run('base',[ROOT/'scripts/prepare_base.py'])
 run('build',[ROOT/'firmware/cfg6-spool-profiles/build.py','--base',ROOT/'work/base-pinned.bin','--out',CANDIDATE_IMAGE,'--build-dir',BUILD])
+manifest=json.loads((ROOT/'firmware/cfg6-spool-profiles/manifest.json').read_text())
+published=ROOT/'firmware/cfg6-spool-profiles'/manifest['file']
+assert CANDIDATE_IMAGE.read_bytes()==published.read_bytes(), 'Published R3 BIN differs from rebuilt image'
+checks['published_artifact']=True
 run('family',[ROOT/'tests/test_spool_family.py'])
+run('runout_calibration',[ROOT/'tests/test_runout_calibration.py'])
 run('slot_lengths',[ROOT/'tests/test_spool_lengths.py'])
 run('rfid_handoff',[ROOT/'tests/test_rfid_handoff.py'])
 run('rfid_handoff_physical',[ROOT/'tests/test_rfid_handoff_physical.py'])

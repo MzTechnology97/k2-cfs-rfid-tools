@@ -1,3 +1,14 @@
+# R3 host integration
+
+Use the complete matching
+[Kalico k2-pro-openhost](https://github.com/MzTechnology97/kalico-k2pro/tree/k2-pro-openhost)
+for SGF1/RH1 R3, including box_spool_profiles, its Box coordinator integration,
+[configuration](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/config/k2/macros/box_spool_profiles.cfg)
+and [calibration guide](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/docs/CFS_SPOOL_CALIBRATION.md).
+Copying only the legacy extras below does not supply the R3 integration.
+The diagnostic reader below remains shared. The following section documents
+the retained RDG2 fallback and its dated consumption example.
+
 # Kalico host extras — CFG6 RDG2
 
 [Current firmware](../../README.md) · [Validation and limitations](../../docs/CFG6_RDG2_VALIDATION.md) · [Compatibility](../../docs/CFS_FIRMWARE_COMPATIBILITY.md)

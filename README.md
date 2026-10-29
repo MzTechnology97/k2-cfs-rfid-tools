@@ -1,59 +1,84 @@
-# K2 CFS RFID — CFG6 RDG2
+# K2 CFS RFID — CFG6 SGF1/RH1 R3
 
-**CFG6 RDG2: operation verified in the real case of 28 October 2026.** This branch contains one firmware image for **Creality K2 Pro CFS G32 / stock application `cfs0_000_153`**, its reproducible sources and the matching Kalico diagnostic reader.
+**R3 is the current reference image for CFS G32 / stock application cfs0_000_153.**
+It adds single-cycle host-key RFID handoff, UID measurement proof and vendor
+spool geometry in RAM, while retaining CFG6, API7 and RDG2 interfaces.
 
-[Italiano](README.it.md) · [Firmware image](firmware/cfg6-rdg2/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-RDG2.bin) · [Validation and limits](docs/CFG6_RDG2_VALIDATION.md) · [Compatibility](docs/CFS_FIRMWARE_COMPATIBILITY.md) · [Kalico integration](host/kalico/README.md)
+[Italiano](README.it.md) · [R3 BIN](firmware/cfg6-spool-profiles/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin) · [SHA-256](firmware/cfg6-spool-profiles/SHA256SUMS.txt) · [Build](firmware/cfg6-spool-profiles/BUILD.md) · [Hardware evidence](firmware/cfg6-spool-profiles/HARDWARE-R3.md) · [Calibration](docs/CFS_SPOOL_CALIBRATION.md)
 
-## Exact artifact
+## Exact image and matching host
 
 | Item | Value |
-| --- | --- |
-| Image | `cfs0_050_G32-cfs0_000_153-K2OH-CFG6-RDG2.bin` |
-| Size | **179,976 bytes** |
-| SHA-256 | `7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f` |
-| Runtime identity | `K2OH / v323-cfg6`, CONFIG API2, features `0xE3` |
-| RFID interface | API7, capabilities `0xE8` |
-| Read-only snapshot | Opcode `0x57`, subcommand `0x15`, 64-byte `RDG2` version 2 |
-| Matching host reader | `host/kalico/box_rfid_diag.py`, SHA-256 `2b9810456f6bb7ae0f2ebbf82cdf1f293dab84867a9db2799fb3035cb7aef867` |
+|---|---|
+| Image | `cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin` |
+| Size | 185900 bytes |
+| SHA-256 | `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8` |
+| Runtime identity | K2OH / v323-cfg6, CONFIG API2, features0xE3 |
+| Additional interfaces | SGF1 with slot length, RH1 version1; existing API7/RDG2 retained |
+| Host | [Kalico k2-pro-openhost](https://github.com/MzTechnology97/kalico-k2pro/tree/k2-pro-openhost) with `box_spool_profiles` |
 
-The runtime identity and the OEM version displayed by the printer do not uniquely identify this build. Check the complete image SHA-256. The CONFIG feature byte and RFID capability byte describe different interfaces.
+The runtime identity is shared by earlier images. Use the image SHA to identify
+R3. The filename retains its tested CANDIDATE suffix; its bytes are unchanged.
+The published image is checked against a rebuild with the qualified compiler.
 
-## What was verified
+## Reference results
 
-During a real print with **Bambu PETG HF in physical slot 4** (local index 3), the CFS MCU usage counter advanced through **0 → 51 → 202 → 6,293 → 17,113 mm**. The CFS percentage changed **39 → 38 → 34**, and the normal `CMD 0x03` reply independently returned 34. The operator confirmed the manual RFID read.
+Two Bambu PETG HF spools in physical slots2/4 decoded through one RH1 request
+each, in24.60s/20.47s. Both measurements returned flags0x13 with matching UID
+proof, while the original metadata byte75 remained0. R3 fills both observed
+UID buffers when the supported legacy getter lacks its length.
 
-The observed RS-485 session recorded **31,548 transmitted and received frames**, with zero recorded timeouts, CRC, length, matching, send, reader or connection errors. RDG2 measured `PRIMASK=1` during the snapshot, `CONTROL=6` and `IPSR=0` on the physical MCU.
+The reference host profile is now `bambu = 1, 284.7, 508.3`, with
+circumferences in mm. The effective core was inferred from a physical runout:
+slot4 consumed19655mm of327000mm nominal after the original12% scan estimate,
+but still reported6%. It predicts6.005% for that retained scan; slot2 remains
+full. The physical cardboard diameter about83mm gave the earlier260.8mm
+coefficient and is retained as history. The new coefficient awaits another
+physical cycle and was saved without changing RAM during printing.
 
-These observations establish this operating case. **Unload followed by a reread, other tag formats/backends and worst-case interrupt latency remain to be verified on hardware.** Offline emulation covers additional paths; it does not extend the physical qualification to them. See the [validation record](docs/CFG6_RDG2_VALIDATION.md).
+Geometry is selected from a successfully decoded RFID vendor, not from a
+filament preset's brand text. Nominal length remains per UID/slot; material
+and color do not choose a geometry. On CFS RAM loss, Kalico retains cached
+remaining and subtracts odometer use until a later valid measurement is bound.
 
-## Firmware and host behavior
+## Install and calibrate
 
-The firmware keeps the CFG6 runtime configuration interface and API7 capture path. Its type-4 accounting changes address initialization of supported legacy records, preservation of active accounting across geometry rescans, and the existing delayed unload cleanup. RAM accounting transactions and RDG2 snapshots save and restore the interrupt mask.
-
-RDG2 reads RAM and returns one diagnostic snapshot; it does not start RFID activity or initialize accounting. Kalico continues to obtain the CFS percentage through the normal `CMD 0x03` path. In the verified case the firmware proxy used **330 m**, while the Kalico filament profile used **327 m**; their estimates need not be numerically identical.
-
-The diagnostic and accounting changes add no RFID-tag or EEPROM writes. Existing CONFIG writes remain volatile and require the matching firmware and a controlled startup workflow.
+The [Installer Helper](https://github.com/MzTechnology97/k2-openhost-installer-helper)
+menu40 lists R3 first and retains RDG2 as a fallback. Flash only on an idle
+printer/CFS using its supervised acknowledgement. Then enable the paired
+[Kalico configuration](https://github.com/MzTechnology97/kalico-k2pro/blob/k2-pro-openhost/config/k2/macros/box_spool_profiles.cfg)
+and follow the [calibration procedure](docs/CFS_SPOOL_CALIBRATION.md).
+The reference coefficients are editable host settings, never compiled vendor
+constants. Measure an empty support and a known full spool for another geometry.
 
 ## Reproduce offline
 
-Required tools: Python 3, the `arm-none-eabi` assembler/linker tools, Unicorn and Capstone.
+Use the pinned compiler and dependencies in
+[BUILD.md](firmware/cfg6-spool-profiles/BUILD.md), then run:
 
 ```sh
-python3 scripts/prepare_base.py
-python3 tests/run_offline.py
+python tests/run_spool_family.py
 ```
 
-The preparation script retrieves the **intermediate, already patched v3.13 base** from frozen commit `0ad22669248cc845a3c8d22dd613500c4b95feb3`, checks SHA-256 `9a68dd8205956dda58bc3108b265fdbc03756e70974ee9a8b1ee5afc3ce46aff` and places it in ignored `work/base-pinned.bin`. It is a build input, not the current installable image or an unmodified OEM ROM.
+Tests map one image at the real application base0x08003000. They execute the
+original UID copier/getters, comparator, validator and worker finalizer with
+RF/RTOS boundaries modeled. Historical negatives reject the withdrawn native
+pointer image and reproduce R2's missing UID proof. The baseline RDG2 runner
+remains available as `python tests/run_offline.py`.
 
-Current sources are [handler.S](firmware/cfg6-rdg2/handler.S), [build.py](firmware/cfg6-rdg2/build.py), [preflight.py](firmware/cfg6-rdg2/preflight.py) and [link.ld](firmware/cfg6-rdg2/link.ld). The offline runner must reproduce the exact image hash above. These commands do not communicate with the printer.
+Hardware evidence covers RFID, UID proof, RAM geometry, per-UID length and
+catalog replacement on the reference machine. Physical auto-insertion/reconnect and direct stack high-water remain separate
+hardware checks; offline regressions do not extend physical qualification.
 
-## Documentation and history
+## Fallback and history
 
-- [Validation, interpretation of remaining percentage and known limits](docs/CFG6_RDG2_VALIDATION.md)
-- [Firmware compatibility](docs/CFS_FIRMWARE_COMPATIBILITY.md)
-- [Matching Kalico extras and RDG2 command](host/kalico/README.md)
-- [Historical 28-parameter reference (EN)](docs/CFS_V323_PARAMETER_GUIDE_EN.md) and [IT](docs/CFS_V323_PARAMETER_GUIDE_IT.md): inherited reference; use the current compatibility document for the CFG6 write set.
+[CFG6 RDG2](firmware/cfg6-rdg2/README.md) remains available as the previous
+reference: RFID and print remaining39→34 were observed on28October2026.
+It has no SGF1/RH1 vendor geometry. The unsafe b7cd RH1 build is withdrawn and
+R2 is superseded; neither is offered as an installable image here. Their exact
+source history is retained for mandatory regression controls.
 
-Older firmware images and their version-specific tests have been removed from the current branch. Their source, images and research remain accessible in the [frozen historical tree](https://github.com/MzTechnology97/k2-cfs-rfid-tools/tree/0ad22669248cc845a3c8d22dd613500c4b95feb3). Dated research documents describe their original versions and are not current installation instructions. Git history has not been rewritten.
+[Compatibility](docs/CFS_FIRMWARE_COMPATIBILITY.md) · [SGF1 wire contract](docs/SGF1_CANDIDATE_PROTOCOL.md) · [RH1 evidence](firmware/cfg6-spool-profiles/RH1-CONTRACT.md) · [RDG2 validation](docs/CFG6_RDG2_VALIDATION.md).
 
-Independent interoperability and reverse-engineering work; not affiliated with Creality, Bambu Lab or QIDI.
+Independent interoperability and reverse-engineering work; not affiliated with
+Creality, Bambu Lab or QIDI.
