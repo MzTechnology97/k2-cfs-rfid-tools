@@ -1,6 +1,6 @@
 # CFG6 SGF1 + RH1 — vendor geometry and single-cycle RFID candidate R3
 
-**Candidate firmware. Hardware validation and real Bambu geometry calibration are pending.** The hardware-verified [RDG2 release](../cfg6-rdg2/README.md) remains the maintained installable image. This source does not change the live Helper catalog.
+**Candidate firmware. RH1, UID quality and RAM geometry binding are verified on the reference CFS in slots2/4; the Bambu calibration is provisional because its lower anchor is nearly empty.** The hardware-verified [RDG2 release](../cfg6-rdg2/README.md) remains the maintained installable image. This source does not change the live Helper catalog.
 
 The exact build is identified by [manifest.json](manifest.json), including its SHA and size. The generated BIN stays under `work/build/`; it is not a second binary tracked in the release tree.
 
@@ -24,8 +24,7 @@ buffer and returns length4. Byte75, generic getter callers, the UID comparator
 and BIND quality thresholds remain unchanged. Different UID observations still
 invalidate geometry. Unsupported metadata retain the original behavior.
 
-R3 remains a candidate until separately tested on the machine. No Bambu curve
-is enabled before actual calibration.
+R3 has been tested on the reference machine: both slots returned flags0x13 and the host bound their retained measurements without another scan. See [hardware evidence and provisional calibration](HARDWARE-R3.md). The shipped example remains disabled.
 
 ## Behavior
 
@@ -67,4 +66,4 @@ See [build and checks](BUILD.md), [SGF1 protocol](../../docs/SGF1_CANDIDATE_PROT
 
 Il candidato separa la geometria per vendor dalla lunghezza nominale della bobina. RH1 permette di ricevere le chiavi da Kalico durante lo stesso ciclo, prima del recupero meccanico dopo un errore di autenticazione. La geometria può essere applicata alla misura già raccolta senza ripetere il giro.
 
-I coefficienti Bambu devono ancora essere calibrati; le geometrie dei test sono sintetiche. Firmware, integrazione host e tempi reali richiedono la prova coordinata sulla macchina prima di promuovere il candidato.
+La prova coordinata R3 ha verificato lettura RH1, misura valida e associazione della geometria in RAM sugli slot2/4. La calibrazione Bambu usa una bobina piena e una quasi vuota, quindi resta provvisoria; i coefficienti sintetici dei test non sono attivi. La prova di consumo durante una stampa R3 resta da eseguire.

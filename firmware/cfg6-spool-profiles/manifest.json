@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "status": "candidate-offline-validated-hardware-pending",
+  "status": "candidate-reference-hardware-validated-provisional-bambu-calibration",
   "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin",
   "sha256": "a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8",
   "size": 185900,
@@ -13,9 +13,9 @@
   "raw_measurement_before_oem_clamp": true,
   "manufacturer_identified_in_firmware": false,
   "classification_source": "explicit host decoder UID/generation/profile/revision binding",
-  "bambu_geometry_calibrated": false,
+  "bambu_geometry_calibrated": true,
   "host_integration_included": false,
-  "hardware_verified": false,
+  "hardware_verified": true,
   "automatic_flash": false,
   "stable_rdg2_sha256": "7d611c5845d3c248cf55f57972fdc7fab1761d0e281bcbf70030ac97e458023f",
   "cfg6_contract_preserved": true,
@@ -43,5 +43,30 @@
   "supersedes_r2_sha256": "27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046",
   "uid_pair_missing_length_recovery": true,
   "uid_getter_scope": "Only two successful RFID-worker observation callsites; original getter result zero, legacy backend, ATQA0400/SAK08 and nonzero UID4. Copy both UID buffers, preserve byte75 and comparison rules.",
-  "r2_reference_hardware_evidence": "RH1 handoff and PETG HF identification succeeded in24.54s; rawC509.916 but qualityflags2 because metadata75 was0. R3 requires separate hardware verification."
+  "r2_reference_hardware_evidence": "R2 decoded PETG HF in24.54s but flags2 exposed missing UID length. R3 subsequently verified flags0x13 on physical slots2/4 and applied provisional vendor geometry without rescanning.",
+  "bambu_calibration_kind": "provisional full / nearly-empty measured references; host configuration, not compiled defaults",
+  "hardware_verification_scope": {
+    "date": "2026-10-29",
+    "platform": "reference CFS G32 cfs0_000_153 with CM5/Kalico",
+    "physical_slots": [
+      2,
+      4
+    ],
+    "RH1_single_job_decode": true,
+    "same_uid_measurement_flags": "0x13",
+    "record_byte75": 0,
+    "ram_vendor_catalog_and_uid_binding": true,
+    "recalculation_without_rescan": true,
+    "R3_print_cycle_verified": false
+  },
+  "reference_bambu_geometry": {
+    "core_circumference_mm": 302.8,
+    "full_circumference_mm": 508.3,
+    "full_reference_physical_slot": 2,
+    "near_empty_reference_physical_slot": 4,
+    "nominal_length_per_tested_uid_mm": 327000,
+    "full_result_percent": 100,
+    "near_empty_result_percent": 1,
+    "geometry_is_firmware_default": false
+  }
 }
