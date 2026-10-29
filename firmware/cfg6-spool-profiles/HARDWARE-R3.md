@@ -48,7 +48,7 @@ material-library brand alone. All23 configured CFG6 values applied without error
 
 ## Validation limits
 
-The offline suite has15 groups, including164 UID-observation cases; Kalico includes the Box test suite and passive RDG2 reader checks. Hardware evidence covers the two manual Bambu reads, UID quality, vendor RAM upload, per-UID length and BIND recalculation. The subsequent run below establishes consumption and one automatic runout swap. Physical auto-insertion/reconnect, additional tag formats and direct stack high-water remain unverified. Their existing offline regressions remain part of the suite. The diameter is approximate; the reference coefficients can be refined with more precise physical measurements.
+The offline suite has17 checks, including the published BIN comparison, runout calibration and164 UID-observation cases; Kalico includes the Box test suite and passive RDG2 reader checks. Hardware evidence covers the two manual Bambu reads, UID quality, vendor RAM upload, per-UID length and BIND recalculation. The subsequent run below establishes consumption and one automatic runout swap. Physical auto-insertion/reconnect, additional tag formats and direct stack high-water remain unverified. Their existing offline regressions remain part of the suite. The diameter is approximate; the reference coefficients can be refined with more precise physical measurements.
 
 Evidence retained on the reference CM5: `RH1-R3-HARDWARE-SLOT2-20261029.json`, `RH1-R3-HARDWARE-SLOT4-CALIBRATION-20261029.json` and `BAMBU-VENDOR-CALIBRATION-CORE83-20261029.json`. The active configuration and previous file are backed up outside the source repository.
 

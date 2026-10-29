@@ -6,7 +6,12 @@ import hashlib,json,re
 ROOT = Path(__file__).resolve().parents[1]
 manifest = json.loads((ROOT / 'firmware/cfg6-rdg2/manifest.json').read_text())
 image = ROOT / 'firmware/cfg6-rdg2' / manifest['file']
-assert list((ROOT / 'firmware').rglob('*.bin')) == [image]
+# Maintain an exact allow-list: current R3 and the retained RDG2 fallback.
+r3_manifest = json.loads((ROOT / 'firmware/cfg6-spool-profiles/manifest.json').read_text())
+r3_image = ROOT / 'firmware/cfg6-spool-profiles' / r3_manifest['file']
+assert set((ROOT / 'firmware').rglob('*.bin')) == {image, r3_image}
+assert hashlib.sha256(r3_image.read_bytes()).hexdigest() == r3_manifest['sha256']
+assert r3_image.stat().st_size == r3_manifest['size']
 assert not list((ROOT / 'firmware').glob('v3.*'))
 assert hashlib.sha256(image.read_bytes()).hexdigest() == manifest['sha256']
 assert len(image.read_bytes()) == manifest['size']
@@ -33,5 +38,5 @@ for row in evidence['samples']:
 assert evidence['samples'][-1]['table_percent'] == 34
 assert all(value == 0 for key,value in evidence['last_session_link_deltas'].items()
            if key not in ('tx_frames', 'rx_frames'))
-print(json.dumps({'passed':True,'only_current_installable_image':True,
+print(json.dumps({'passed':True,'only_r3_and_rdg2_installable_images':True,
                   'relative_document_links_valid':True,'hardware_evidence_matches_artifact':True}))
