@@ -1,0 +1,39 @@
+name: CFG6 SGF1 RH1 firmware candidate
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  spool-family:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reproduce the qualified compiler and run firmware regressions
+        run: |
+          docker run --rm -v "${{ github.workspace }}:/src" -w /src \
+            -e PYTHONDONTWRITEBYTECODE=1 -e PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+            debian:bookworm-slim bash -euc '
+              apt-get update
+              apt-get install -y --no-install-recommends gcc-arm-none-eabi=15:12.2.rel1-1 binutils-arm-none-eabi=2.40-2+18+b1 python3 python3-venv git ca-certificates
+              git config --global --add safe.directory /src
+              python3 -m venv /tmp/sgf-env
+              /tmp/sgf-env/bin/python -m pip install -r requirements-test.txt
+              /tmp/sgf-env/bin/python tests/run_spool_family.py
+            '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cfg6-sgf1-candidate-offline
+          path: |
+            work/build/candidate.bin
+            work/build/preflight.json
+            work/build/static-validation.json
+            work/build/sgf-test-results.json
+            work/build/slot-length-results.json
+            work/build/rfid-handoff-results.json
+            work/build/rfid-handoff-physical-results.json
+            work/build/uid-observation-results.json
+            firmware/cfg6-spool-profiles/manifest.json
+            work/test-results/sgf-*

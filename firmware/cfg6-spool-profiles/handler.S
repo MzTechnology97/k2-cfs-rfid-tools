@@ -1,0 +1,2278 @@
+.syntax unified
+.thumb
+.cpu cortex-m3
+.fpu fpv4-sp-d16
+
+.equ SEND_RESPONSE,      0x0801BAF2
+.equ LEGACY_AUTH_READ,   0x0801A39E
+.equ ALT_AUTH_READ,      0x08022082
+.equ STOCK_MEMCMP,        0x0803393C
+.equ STOCK_MSG_VALIDATE,  0x0801A670
+.equ STOCK_REMAIN_INIT,   0x0801AA14
+.equ STOCK_REMAIN_VALID,  0x0801245C
+.equ STOCK_REMAIN_GATE,   0x080102E2
+.equ STOCK_TICK_NOW,      0x0802A4D2
+.equ STOCK_ODOMETER,      0x0801B730
+.equ STOCK_END_BODY,      0x0801A960
+.equ REMAIN_SET,          0x080123E4
+.equ REMAIN_RUNTIME,      0x20004590
+.equ STOCK_51,           0x0801C704
+.equ STOCK_INVALID,      0x0801C7F8
+.equ STOCK_DONE,         0x0801C808
+.equ STOCK_STATE,        0x200001F0
+.equ BOX_OPER_STATE,     0x200037D0  @ stock CMD_BOX_STATE response byte 3 = [ptr+2]
+.equ BLOCK_TABLE,        0x200001F8
+.equ HW_FLAG,            0x20000000
+.equ CONFIG_ROOT,        0x20000004
+.equ SIDECAR_BASE,      0x20006EE8
+.equ SIDECAR_SIZE,      64
+.equ SIDECAR_MAGIC,     0x35564643
+.equ STOCK_HEAP_INIT,  0x080278D4
+.equ INTERNAL_RECORD,    0x20004460
+.equ RECORD_SIZE,        76
+.equ OVERRIDE_MAGIC,     0x324F324B  @ "K2O2"
+.equ NEIGH_MAGIC,        0x324E324B  @ "K2N2"
+.equ CAP1_MAGIC,         0x3343324B  @ "K2C3"
+.equ CAP2_MAGIC,         0x3344324B  @ "K2D3"
+.equ REMAIN_LATCH_MAGIC, 0x4C52324B  @ "K2RL"
+
+@ API7
+@ 0 INFO
+@ 5 STOCK_STATE
+@ 6 INTERNAL_RECORD_76
+@ 7 ARM_KEYS3: reader,slot,key0[6],key1[6],key2[6]
+@ 8 CLEAR_KEYS: reader,slot
+@ 9 RUNTIME_INFO: hw_flag, legacy_block0, legacy_block1, legacy_block2
+@ The historical v3.13 API1 opcodes 0x0D..0x0F are NOT dispatched here.
+@ Stock hub speed IDs 1,2,3,5 are writable RAM-only (CFG at boot).
+@ Feeder pseudo-speeds 0/4 remain READ-ONLY; ID6 is a sidecar de-tooth action gate.
+@ 0x10 CONFIG_V2_INFO: version,count,catalog_revision,features
+@ 0x11 CONFIG_V2_GET: id -> id,value16
+@ 0x12 CONFIG_V2_SET: id,value16 -> id,value16 (idle only)
+@ 0x13 CONFIG_V2_RESET: id or 0xFF (idle only)
+@ CONFIG_V2_DESCRIBE 0x14 is documented but NOT implemented here.
+@
+@ No RFID operation is started from opcode 0x57. The six patched stock read
+@ callsites remain inside Creality's original RFID worker/task:
+@   legacy: 0x0801A4CC, 0x0801A52C, 0x0801A590 -> LEGACY_AUTH_READ
+@   secure: 0x080225D0, 0x08022604, 0x08022638 -> ALT_AUTH_READ
+@
+@ Scratch (only while an override is armed):
+@   target: bytes 4..19 = marker/masks/key0
+@   next:   bytes 4..19 = key1/key2/marker
+@   next+2: bytes 4..7 CAP1_MAGIC, 8..19 Bambu block4[0..11]
+@   next+3: bytes 4..7 CAP2_MAGIC, 8..11 block4[12..15],
+@           12..15 block5[0..3] (RGBA)
+@ Stock data fields at 20..75 are never modified by the override/capture path.
+
+.section .text.handler,"ax",%progbits
+.global handler_start
+.global legacy_read0_wrapper
+.global legacy_read1_wrapper
+.global legacy_read2_wrapper
+.global alt_read_wrapper
+.global uid_compare_wrapper
+.global msg_validate_wrapper
+.global remaining_init_wrapper
+.global remaining_valid_wrapper
+.global remaining_gate_wrapper
+.type handler_start,%function
+.thumb_func
+handler_start:
+    cmp     r0, #0x51
+    beq     stock_51
+    cmp     r0, #0x7A
+    beq     op_identity
+    cmp     r0, #0x57
+    bne     stock_invalid
+
+    push    {r5-r7, lr}
+    sub     sp, #8
+    ldrb    r5, [r4, #4]
+    cmp     r5, #0
+    beq     op_info
+    cmp     r5, #5
+    beq     op_state
+    cmp     r5, #6
+    beq     op_internal
+    cmp     r5, #7
+    beq     op_arm3
+    cmp     r5, #8
+    beq     op_clear
+    cmp     r5, #9
+    beq     op_runtime
+    cmp     r5, #0x10
+    beq     op_config_v2_info
+    cmp     r5, #0x11
+    beq     op_config_v2_get
+    cmp     r5, #0x12
+    beq     op_config_v2_set
+    cmp     r5, #0x13
+    beq     op_config_v2_reset
+    cmp     r5, #0x15
+    beq.w   op_diag2_read
+    cmp     r5, #0x16
+    blo.w   status_bad
+    cmp     r5, #0x1C
+    bls.w   op_family
+    cmp     r5, #0x20
+    blo.w   status_bad
+    cmp     r5, #0x25
+    bls.w   op_family
+    b       status_bad
+
+op_info:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #4
+    bne     status_bad
+    adr     r2, info_payload
+    movs    r3, #6
+    movs    r1, #0
+    b       send
+
+validate_slot:
+    ldrb    r6, [r4, #5]
+    cmp     r6, #2
+    bhs     status_bad
+    ldrb    r7, [r4, #6]
+    cmp     r7, #2
+    bhs     status_bad
+    bx      lr
+
+internal_ptr:
+    lsls    r0, r6, #1
+    adds    r0, r0, r7
+    movs    r1, #RECORD_SIZE
+    muls    r0, r1
+    ldr     r2, internal_base
+    adds    r2, r2, r0
+    bx      lr
+
+neighbor_ptr:
+    @ r0=record -> r1=next record, wrapping slot3->slot0
+    ldr     r1, internal_base
+    add.w   r2, r1, #228
+    cmp     r0, r2
+    beq     neighbor_done
+    add.w   r1, r0, #RECORD_SIZE
+neighbor_done:
+    bx      lr
+
+internal_tag_valid:
+    ldrb    r0, [r2, #60]
+    cmp     r0, #4
+    bne     internal_invalid
+    ldrb    r0, [r2, #61]
+    cmp     r0, #0
+    bne     internal_invalid
+    ldrb    r0, [r2, #74]
+    cmp     r0, #8
+    bne     internal_invalid
+    ldrb    r0, [r2, #62]
+    ldrb    r1, [r2, #63]
+    orrs    r0, r1
+    ldrb    r1, [r2, #64]
+    orrs    r0, r1
+    ldrb    r1, [r2, #65]
+    orrs    r0, r1
+    beq     internal_invalid
+    movs    r0, #1
+    bx      lr
+internal_invalid:
+    movs    r0, #0
+    bx      lr
+
+clear_full:
+    @ Global one-shot scratch: clear bytes 4..19 in all four records.
+    push    {r4-r6, lr}
+    bl      sgf_cancel_transients
+    ldr     r4, internal_base
+    movs    r5, #4
+    movs    r6, #0
+clear_full_loop:
+    str     r6, [r4, #4]
+    str     r6, [r4, #8]
+    str     r6, [r4, #12]
+    str     r6, [r4, #16]
+    add.w   r4, r4, #RECORD_SIZE
+    subs    r5, r5, #1
+    bne     clear_full_loop
+    pop     {r4-r6, pc}
+
+op_state:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #4
+    bne     status_bad
+    ldr     r2, state_base
+    movs    r3, #4
+    movs    r1, #0
+    b       send
+
+op_internal:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #6
+    bne     status_bad
+    bl      validate_slot
+    bl      internal_ptr
+    movs    r3, #76
+    movs    r1, #0
+    b       send
+
+op_runtime:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #4
+    bne     status_bad
+    ldr     r0, hw_flag_ptr
+    ldrb    r0, [r0]
+    strb    r0, [sp, #0]
+    ldr     r0, block_table_ptr
+    ldrb    r1, [r0, #0]
+    strb    r1, [sp, #1]
+    ldrb    r1, [r0, #1]
+    strb    r1, [sp, #2]
+    ldrb    r1, [r0, #2]
+    strb    r1, [sp, #3]
+    mov     r2, sp
+    movs    r3, #4
+    movs    r1, #0
+    b       send
+
+@ Runtime CFS configuration.
+@ Legacy API1 commands are NOT routed by this handler.
+@ Stock hub speed table bytes for IDs 1,2,3,5 can be set at boot.
+@ IDs 0/4 (feeder GPIO) remain read-only; ID6 is a Boolean gate.
+@ 64 bytes of sidecar SRAM store advanced overrides for bench tests.
+@ CFG6 wires execution for all requested IDs; 10/25/26 remain dead-code GET-only.
+@ Host must protect motion/write independently of BOX_STATE=IDLE.
+.equ CONFIG_V2_COUNT,       28
+
+@ CFG6 SET/RESET is wired for 6,7,8,9,11..24 (excluding dead 10),
+@ and 27. IDs10/25/26 remain GET-only with no live stock callsite.
+@ Values are volatile in the private sidecar RAM, never EEPROM.
+@ IDs 0/4 remain read-only; ID6 is sidecar-gated only in CFG6.
+@ 64 bytes at former heap start are isolated by moving heap literal +64.
+@ Magic+bitmask are cleared at RTOS heap init; volatile across resets.
+config_v2_ensure:
+config_ptr:
+    ldr     r0, config_root_ptr
+    ldr     r0, [r0, #16]
+    ldr     r1, config_expected_ptr
+    cmp     r0, r1
+    bne     config_v2_ensure_bad
+    bx      lr
+config_v2_ensure_bad:
+    movs    r0, #0
+    bx      lr
+
+config_v2_get_value:
+    @ A stock MOV/MOVW hook must not alter APSR. Preserve caller flags.
+    push    {r4-r6, lr}
+    sub     sp, #8
+    mrs     r3, APSR
+    str     r3, [sp, #0]
+    mov     r4, r0
+    cmp     r4, #CONFIG_V2_COUNT
+    bhs     config_v2_get_invalid
+    cmp     r4, #6
+    blo     config_v2_get_speed
+    beq     config_v2_get_detooth
+    @ ROM default remains authoritative unless a valid, initialized
+    @ sidecar override bit exists and the candidate is within bounds.
+    subs    r1, r4, #7
+    lsls    r1, r1, #1
+    adr.w   r5, compact_defaults_u16
+    ldrh    r0, [r5, r1]
+    ldr     r5, sidecar_address_ptr
+    ldr     r2, [r5]
+    ldr     r3, sidecar_magic_word
+    cmp     r2, r3
+    bne     config_v2_return_preserve_apsr
+    ldr     r2, [r5, #4]
+    subs    r3, r4, #7
+    lsrs    r2, r2, r3
+    lsls    r2, r2, #31
+    bpl     config_v2_return_preserve_apsr
+    add.w   r3, r1, #8
+    ldrh    r2, [r5, r3]
+    adr.w   r5, compact_bounds_u16
+    lsls    r3, r1, #1
+    ldrh    r1, [r5, r3]
+    cmp     r2, r1
+    blo     config_v2_return_preserve_apsr
+    adds    r3, #2
+    ldrh    r1, [r5, r3]
+    cmp     r2, r1
+    bhi     config_v2_return_preserve_apsr
+    mov     r0, r2
+    b       config_v2_return_preserve_apsr
+config_v2_get_speed:
+    bl      config_ptr
+    cmp     r0, #0
+    beq     config_v2_get_invalid
+    adr     r6, config_offsets
+    ldrb    r1, [r6, r4]
+    ldrb    r0, [r0, r1]
+    b       config_v2_return_preserve_apsr
+config_v2_get_detooth:
+    @ CFG6 reserved sidecar byte50 + free mask bit21: do not edit
+    @ unknown stock CONFIG_ROOT byte zero (could be a status field).
+    ldr     r5, sidecar_address_ptr
+    ldr     r0, [r5]
+    ldr     r1, sidecar_magic_word
+    cmp     r0, r1
+    bne     cfg6_detooth_default
+    ldr     r0, [r5, #4]
+    movs    r1, #1
+    lsls    r1, r1, #21
+    tst     r0, r1
+    beq     cfg6_detooth_default
+    ldrb    r0, [r5, #50]
+    b       config_v2_return_preserve_apsr
+cfg6_detooth_default:
+    movs    r0, #1
+    b       config_v2_return_preserve_apsr
+config_v2_get_invalid:
+    movw    r0, #0xFFFF
+    b       config_v2_return_preserve_apsr
+
+config_v2_return_preserve_apsr:
+    ldr     r3, [sp, #0]
+    msr     APSR_nzcvq, r3
+    add     sp, #8
+    pop     {r4-r6, pc}
+
+op_config_v2_info:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #4
+    bne.w   status_bad
+    @ INFO is GET-only: no heap allocation or global-pointer writes.
+    movs    r0, #2
+    strb    r0, [sp, #0]
+    movs    r0, #CONFIG_V2_COUNT
+    strb    r0, [sp, #1]
+    movs    r0, #1
+    strb    r0, [sp, #2]
+    movs    r0, #0xE3  @ CFG6 exact identity-gated experimental parameter contract
+    strb    r0, [sp, #3]
+    mov     r2, sp
+    movs    r3, #4
+    movs    r1, #0
+    b       send
+
+op_config_v2_get:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #5
+    bne.w   status_bad
+    ldrb    r6, [r4, #5]
+    @ Four additional diagnostic GET IDs, not part of the 28 settings.
+    @ 28..29 = raw two-byte motor-workflow candidate at 0x2000057E.
+    @ 30..31 = raw two-byte multi-task candidate at 0x20003904.
+    @ These are UNSPECIFIED internal bytes: NEVER use as a busy guard.
+    cmp     r6, #32
+    bhs.w   status_bad
+    cmp     r6, #CONFIG_V2_COUNT
+    blo     v322_normal_get
+    cmp     r6, #30
+    blo     v322_motor_probe
+    ldr     r0, v322_task_candidate_ptr
+    subs    r1, r6, #30
+    b       v322_diag_read
+v322_motor_probe:
+    ldr     r0, v322_motor_candidate_ptr
+    subs    r1, r6, #28
+v322_diag_read:
+    lsls    r1, r1, #1
+    ldrh    r0, [r0, r1]
+    b       v322_get_result
+v322_normal_get:
+    mov     r0, r6
+    bl      config_v2_get_value
+v322_get_result:
+    strb    r6, [sp, #0]
+    strb    r0, [sp, #1]
+    lsrs    r0, r0, #8
+    strb    r0, [sp, #2]
+    mov     r2, sp
+    movs    r3, #3
+    movs    r1, #0
+    b       send
+
+op_config_v2_set:
+    @ CFG-only SET: stock hub speed IDs 1/2/3/5 and verified timing IDs 7/8.
+    @ WARNING: stock BOX_STATE=IDLE is NOT proven to exclude early feeding.
+    @ Host allows SET only during Kalico boot and never registers G-code SET.
+    ldrb    r0, [r4, #1]
+    cmp     r0, #7
+    bne.w   status_bad
+    ldrb    r6, [r4, #5]
+    @ Stock uses a writable RAM speed table: hub speed IDs 1,2,3,5.
+    @ Feeder IDs 0/4 are GPIO ON/OFF, not effective speed knobs.
+    cmp     r6, #0
+    beq.w   status_bad
+    cmp     r6, #4
+    beq.w   status_bad
+    cmp     r6, #6
+    blo.w   set_stock_speed
+    beq.w   set_stock_detooth
+    cmp     r6, #CONFIG_V2_COUNT
+    bhs.w   status_bad
+    @ CFG6 excludes only 10/25/26 stock dead code.
+    cmp     r6, #10
+    beq.w   status_bad
+    cmp     r6, #25
+    beq.w   status_bad
+    cmp     r6, #26
+    beq.w   status_bad
+cfg6_set_allowed:
+    @ Real stock box-operating state, not RFID worker's remembered slot.
+    @ Original CMD_BOX_STATE (0x0A) reads [0x200037D0+2] to return
+    @ IDLE=0, PRELOAD=1, PRINT=2, RELOAD=3, ERROR=4, TEST=5.
+    @ Treat ALL states other than confirmed IDLE as busy (fail closed).
+    ldr     r0, box_operating_state_ptr
+    ldrb    r0, [r0, #2]
+    cmp     r0, #0
+    bne.w   status_busy
+    ldrb    r7, [r4, #6]
+    ldrb    r1, [r4, #7]
+    orr.w   r7, r7, r1, lsl #8
+    subs    r2, r6, #7
+    lsls    r3, r2, #2
+    adr.w   r5, compact_bounds_u16
+    ldrh    r0, [r5, r3]
+    cmp     r7, r0
+    blo.w   status_bad
+    adds    r3, #2
+    ldrh    r0, [r5, r3]
+    cmp     r7, r0
+    bhi.w   status_bad
+    @ Exact real-ms conversion to stock polling counter:
+    @ ID8: 10ms stock ticks; IDs20/22: 20ms stock ticks.
+    cmp     r6, #8
+    beq     cfg5_set_granularity10
+    cmp     r6, #20
+    beq     cfg5_set_granularity20
+    cmp     r6, #22
+    bne     set_time_units_ok
+cfg5_set_granularity20:
+    mov.w   r0, #20
+    b       cfg5_check_tick_division
+cfg5_set_granularity10:
+    mov.w   r0, #10
+cfg5_check_tick_division:
+    udiv    r1, r7, r0
+    mul     r1, r1, r0
+    cmp     r1, r7
+    bne.w   status_bad
+set_time_units_ok:
+    ldr     r5, sidecar_address_ptr
+    ldr     r0, [r5]
+    ldr     r1, sidecar_magic_word
+    cmp     r0, r1
+    beq     set_sidecar_ready
+    movs    r0, #0
+    str     r0, [r5, #4]
+    str     r1, [r5]
+set_sidecar_ready:
+    lsls    r3, r2, #1
+    adds    r3, #8
+    strh    r7, [r5, r3]
+    movs    r1, #1
+    lsl.w   r1, r1, r2
+    ldr     r0, [r5, #4]
+    orrs    r0, r1
+    str     r0, [r5, #4]
+    strb    r6, [sp]
+    strb    r7, [sp, #1]
+    lsrs    r7, r7, #8
+    strb    r7, [sp, #2]
+    mov     r2, sp
+    movs    r3, #3
+    movs    r1, #0
+    b       send
+
+set_stock_detooth:
+    ldr     r0, box_operating_state_ptr
+    ldrb    r0, [r0, #2]
+    cmp     r0, #0
+    bne.w   status_busy
+    ldrb    r7, [r4, #6]
+    ldrb    r1, [r4, #7]
+    cmp     r1, #0
+    bne.w   status_bad
+    cmp     r7, #1
+    bhi.w   status_bad
+    ldr     r5, sidecar_address_ptr
+    ldr     r0, [r5]
+    ldr     r1, sidecar_magic_word
+    cmp     r0, r1
+    beq     cfg6_detooth_ready
+    movs    r0, #0
+    str     r0, [r5, #4]
+    str     r1, [r5]
+cfg6_detooth_ready:
+    strb    r7, [r5, #50]
+    ldr     r0, [r5, #4]
+    movs    r1, #1
+    lsls    r1, r1, #21
+    orrs    r0, r1
+    str     r0, [r5, #4]
+    strb    r6, [sp]
+    strb    r7, [sp, #1]
+    movs    r0, #0
+    strb    r0, [sp, #2]
+    mov     r2, sp
+    movs    r3, #3
+    movs    r1, #0
+    b       send
+
+set_stock_speed:
+    @ Only reached for IDs 1/2/3/5. RAM table pointer must be the
+    @ verified stock one; reject if stock has not initialized it.
+    @ Caller applies these once at Klipper boot, not from console.
+    ldr     r0, box_operating_state_ptr
+    ldrb    r0, [r0, #2]
+    cmp     r0, #0
+    bne.w   status_busy
+    ldrb    r7, [r4, #6]     @ value low
+    ldrb    r1, [r4, #7]     @ value high
+    cmp     r7, #0
+    beq.w   status_bad
+    cmp     r1, #0
+    bne.w   status_bad      @ must fit stock 1..255 u8
+    bl      config_ptr
+    cmp     r0, #0
+    beq.w   status_bad
+    adr.w   r5, config_offsets
+    ldrb    r1, [r5, r6]
+    strb    r7, [r0, r1]    @ RAM only: one verified stock table byte
+    strb    r6, [sp, #0]
+    strb    r7, [sp, #1]
+    movs    r0, #0
+    strb    r0, [sp, #2]
+    mov     r2, sp
+    movs    r3, #3
+    movs    r1, #0
+    b       send
+
+op_config_v2_reset:
+    @ Clear volatile flags only, restoring ROM defaults.
+    ldrb    r0, [r4, #1]
+    cmp     r0, #5
+    bne.w   status_bad
+    @ Real stock box-operating state, not RFID worker's remembered slot.
+    @ Original CMD_BOX_STATE (0x0A) reads [0x200037D0+2] to return
+    @ IDLE=0, PRELOAD=1, PRINT=2, RELOAD=3, ERROR=4, TEST=5.
+    @ Treat ALL states other than confirmed IDLE as busy (fail closed).
+    ldr     r0, box_operating_state_ptr
+    ldrb    r0, [r0, #2]
+    cmp     r0, #0
+    bne.w   status_busy
+    ldrb    r6, [r4, #5]
+    cmp     r6, #0xFF
+    beq     reset_all_flags
+    cmp     r6, #6
+    beq.w   cfg6_reset_detooth
+    blo.w   status_bad
+    cmp     r6, #7
+    blo.w   status_bad
+    cmp     r6, #CONFIG_V2_COUNT
+    bhs.w   status_bad
+    @ CFG6 reset excludes stock dead-code IDs.
+    cmp     r6, #10
+    beq.w   status_bad
+    cmp     r6, #25
+    beq.w   status_bad
+    cmp     r6, #26
+    beq.w   status_bad
+cfg6_reset_allowed:
+    ldr     r5, sidecar_address_ptr
+    ldr     r0, [r5]
+    ldr     r1, sidecar_magic_word
+    cmp     r0, r1
+    bne     reset_done
+    subs    r2, r6, #7
+    movs    r1, #1
+    lsl.w   r1, r1, r2
+    mvns    r1, r1
+    ldr     r0, [r5, #4]
+    ands    r0, r1
+    str     r0, [r5, #4]
+    b       reset_done
+cfg6_reset_detooth:
+    ldr     r5, sidecar_address_ptr
+    ldr     r0, [r5]
+    ldr     r1, sidecar_magic_word
+    cmp     r0, r1
+    bne     reset_done
+    ldr     r0, [r5, #4]
+    movs    r1, #1
+    lsls    r1, r1, #21
+    bics    r0, r1
+    str     r0, [r5, #4]
+    b       reset_done
+reset_all_flags:
+    ldr     r5, sidecar_address_ptr
+    movs    r0, #0
+    str     r0, [r5, #4]
+reset_done:
+    movs    r1, #0
+    movs    r2, #0
+    movs    r3, #0
+    b       send
+
+@ ROM catalogue defaults for 7..27, including corrected ID17=400ms.
+@ CFG6 hooks advanced IDs except dead-stock 10/25/26.
+.balign 2
+compact_defaults_u16:
+    .hword 3200  @ ID 7
+    .hword 7000  @ ID 8 (host milliseconds, 700 stock polls * 10)
+    .hword 5000  @ ID 9
+    .hword 1000  @ ID 10
+    .hword 160  @ ID 11
+    .hword 120  @ ID 12
+    .hword 100  @ ID 13
+    .hword 800  @ ID 14
+    .hword 200  @ ID 15
+    .hword 1000  @ ID 16
+    .hword 400  @ ID 17 (true stock pre-measure wait, 0x08012A5C)
+    .hword 400  @ ID 18
+    .hword 100  @ ID 19
+    .hword 25000  @ ID 20 (true milliseconds; 1250 stock ticks × 20ms)
+    .hword 3000  @ ID 21
+    .hword 500  @ ID 22 (true milliseconds; 25 stock ticks × 20ms)
+    .hword 3  @ ID 23
+    .hword 1000  @ ID 24
+    .hword 30000  @ ID 25
+    .hword 300  @ ID 26
+    .hword 3  @ ID 27
+
+.balign 2
+compact_bounds_u16:
+    .hword 100, 10000  @ ID 7
+    .hword 1000, 50000  @ ID 8 (host milliseconds; exact multiples of 10)
+    .hword 500, 15000  @ ID 9
+    .hword 100, 5000  @ ID 10
+    .hword 1, 255  @ ID 11
+    .hword 1, 255  @ ID 12
+    .hword 1, 255  @ ID 13
+    .hword 100, 5000  @ ID 14
+    .hword 10, 2000  @ ID 15
+    .hword 100, 5000  @ ID 16
+    .hword 1, 2000  @ ID 17 (paired Kalico bounds)
+    .hword 50, 2000  @ ID 18
+    .hword 10, 1000  @ ID 19
+    .hword 5000, 60000  @ ID 20 (true milliseconds, multiple of 20)
+    .hword 500, 10000  @ ID 21
+    .hword 100, 2000  @ ID 22 (true milliseconds, multiple of 20)
+    .hword 1, 10  @ ID 23
+    .hword 100, 10000  @ ID 24
+    .hword 1000, 60000  @ ID 25
+    .hword 50, 5000  @ ID 26
+    .hword 1, 10  @ ID 27
+
+op_arm3:
+    @ body length = 3 common + payload(21) = 24
+    ldrb    r0, [r4, #1]
+    cmp     r0, #24
+    bne     status_bad
+    bl      validate_slot
+    bl      internal_ptr
+    mov     r7, r2
+    bl      internal_tag_valid
+    cmp     r0, #0
+    beq.w   status_no_tag
+    bl      rfh_key_guard
+    cmn     r0, #1
+    beq.w   status_busy
+    str     r0, [sp, #4]
+
+    mov     r0, r7
+    bl      clear_full
+    mov     r0, r7
+    bl      neighbor_ptr
+    mov     r6, r1                  @ neighbor
+
+    @ key0 -> target +12..17
+    add.w   r0, r4, #7
+    add.w   r1, r7, #12
+    movs    r2, #6
+copy_key0:
+    ldrb    r3, [r0]
+    strb    r3, [r1]
+    adds    r0, r0, #1
+    adds    r1, r1, #1
+    subs    r2, r2, #1
+    bne     copy_key0
+
+    @ key1+key2 -> neighbor +4..15
+    add.w   r0, r4, #13
+    add.w   r1, r6, #4
+    movs    r2, #12
+copy_key12:
+    ldrb    r3, [r0]
+    strb    r3, [r1]
+    adds    r0, r0, #1
+    adds    r1, r1, #1
+    subs    r2, r2, #1
+    bne     copy_key12
+
+    ldr     r0, neigh_magic_word
+    str     r0, [r6, #16]
+    movs    r0, #3
+    strb    r0, [r7, #8]           @ mode=3 keys
+    movs    r0, #0
+    strb    r0, [r7, #9]           @ hitmask
+    strb    r0, [r7, #10]          @ okmask
+    strb    r0, [r7, #11]          @ failmask
+    movs    r0, #0
+    strh    r0, [r7, #18]
+    ldr     r0, magic_word
+    str     r0, [r7, #4]           @ arm LAST
+
+    add.w   r2, r7, #62
+    movs    r3, #4
+    movs    r1, #0
+    ldr     r0, [sp, #4]
+    msr     PRIMASK, r0
+    b       send
+
+op_clear:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #6
+    bne     status_bad
+    bl      validate_slot
+    bl      internal_ptr
+    mov     r6, r2
+    bl      rfh_key_guard
+    cmn     r0, #1
+    beq.w   status_busy
+    str     r0, [sp, #4]
+    mov     r0, r6
+    bl      clear_full
+    ldr     r0, [sp, #4]
+    msr     PRIMASK, r0
+    movs    r1, #0
+    movs    r2, #0
+    movs    r3, #0
+    b       send
+
+status_no_tag:
+    movs    r1, #2
+    b       send_empty
+status_busy:
+    movs    r1, #7
+    b       send_empty
+status_bad:
+    movs    r1, #1
+send_empty:
+    movs    r2, #0
+    movs    r3, #0
+send:
+    movs    r0, #0x57
+    bl      SEND_RESPONSE
+    add     sp, #8
+    pop     {r5-r7, lr}
+    b.w     STOCK_DONE
+
+@ 0x7A build identity, same layout as OpenCFS (docs/spec/03 and 13 there):
+@ magic "K2OH", format 1, variant, bench level, flags, revision[12],
+@ Creality version[12] (copied from the base image at +0x200 by the builder).
+@ Kalico applies runtime values only when this answers with "K2OH".
+op_identity:
+    push    {r5-r7, lr}
+    sub     sp, #8
+    ldrb    r0, [r4, #1]
+    cmp     r0, #3
+    bne     identity_bad
+    adr     r2, identity_payload
+    movs    r3, #32
+    movs    r1, #0
+    b       send_identity
+identity_bad:
+    movs    r1, #1
+    movs    r2, #0
+    movs    r3, #0
+send_identity:
+    movs    r0, #0x7A
+    bl      SEND_RESPONSE
+    add     sp, #8
+    pop     {r5-r7, lr}
+    b.w     STOCK_DONE
+
+.balign 4
+.global identity_payload
+identity_payload:
+    .ascii  "K2OH"          @ magic
+    .byte   1               @ format
+    .byte   4               @ variant: 4 = patched Creality application
+    .byte   0               @ bench level: none
+    .byte   0x02            @ flags: bit1 parameter page never written
+    .ascii  "v323-cfg6\0\0\0" @ revision[12]
+.global identity_creality_version
+identity_creality_version:
+    .space  12              @ Creality version[12], filled by the builder
+
+stock_51:
+    b.w     STOCK_51
+stock_invalid:
+    b.w     STOCK_INVALID
+
+@ -----------------------------------------------------------------------
+@ Common override helpers used ONLY from the original stock RFID tasks.
+@ -----------------------------------------------------------------------
+
+find_override_by_uid:
+    @ r0 = pointer to 4-byte UID. Return r0 = matching armed record or zero.
+    ldr     r1, internal_base
+    movs    r2, #4
+find_loop:
+    ldr     r3, [r1, #4]
+    ldr     ip, magic_word
+    cmp     r3, ip
+    bne     find_next
+    ldrb    r3, [r1, #8]
+    cmp     r3, #3
+    bne     find_next
+    ldrb    r3, [r1, #60]
+    cmp     r3, #4
+    bne     find_next
+    ldrb    r3, [r1, #61]
+    cmp     r3, #0
+    bne     find_next
+    ldrb    r3, [r1, #74]
+    cmp     r3, #8
+    bne     find_next
+    ldrb    r3, [r0, #0]
+    ldrb    ip, [r1, #62]
+    cmp     r3, ip
+    bne     find_next
+    ldrb    r3, [r0, #1]
+    ldrb    ip, [r1, #63]
+    cmp     r3, ip
+    bne     find_next
+    ldrb    r3, [r0, #2]
+    ldrb    ip, [r1, #64]
+    cmp     r3, ip
+    bne     find_next
+    ldrb    r3, [r0, #3]
+    ldrb    ip, [r1, #65]
+    cmp     r3, ip
+    bne     find_next
+    mov     r0, r1
+    bx      lr
+find_next:
+    add.w   r1, r1, #RECORD_SIZE
+    subs    r2, r2, #1
+    bne     find_loop
+    movs    r0, #0
+    bx      lr
+
+key_ptr_for_index:
+    @ r0=target record, r1=index 0..2 -> r0=KeyA pointer or zero.
+    cmp     r1, #0
+    bne     key_not0
+    add.w   r0, r0, #12
+    bx      lr
+key_not0:
+    push    {r4, lr}
+    mov     r4, r1
+    bl      neighbor_ptr
+    ldr     r2, [r1, #16]
+    ldr     r3, neigh_magic_word
+    cmp     r2, r3
+    bne     key_bad_neighbor
+    cmp     r4, #1
+    ite     eq
+    addeq.w r0, r1, #4
+    addne.w r0, r1, #10
+    pop     {r4, pc}
+key_bad_neighbor:
+    movs    r0, #0
+    pop     {r4, pc}
+
+disarm_preserve_result:
+    @ Failure: preserve masks 9..11, wipe target key and all helper scratch.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    movs    r6, #0
+    str     r6, [r4, #4]
+    strb    r6, [r4, #8]
+    str     r6, [r4, #12]
+    str     r6, [r4, #16]
+    movs    r5, #3
+disarm_fail_next:
+    mov     r0, r4
+    bl      neighbor_ptr
+    mov     r4, r1
+    str     r6, [r4, #4]
+    str     r6, [r4, #8]
+    str     r6, [r4, #12]
+    str     r6, [r4, #16]
+    subs    r5, r5, #1
+    bne     disarm_fail_next
+    pop     {r4-r6, pc}
+
+disarm_preserve_capture:
+    @ Success after index2: preserve masks and CAP1/CAP2, wipe only keys/markers.
+    push    {r4, lr}
+    mov     r4, r0
+    movs    r3, #0
+    str     r3, [r4, #4]
+    strb    r3, [r4, #8]
+    str     r3, [r4, #12]
+    str     r3, [r4, #16]
+    mov     r0, r4
+    bl      neighbor_ptr
+    str     r3, [r1, #4]
+    str     r3, [r1, #8]
+    str     r3, [r1, #12]
+    str     r3, [r1, #16]
+    pop     {r4, pc}
+
+capture_result:
+    @ r0=target, r1=index, r2=16-byte legacy destination.
+    push    {r4-r7, lr}
+    mov     r4, r0
+    mov     r5, r1
+    mov     r6, r2
+    cmp     r5, #0
+    beq     capture_block4
+    cmp     r5, #1
+    bne     capture_done
+    @ index1/block5: save RGBA bytes 0..3 in CAP2 +12.
+    mov     r0, r4
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr
+    ldr     r2, [r6]
+    str     r2, [r1, #12]
+    b       capture_done
+capture_block4:
+    @ CAP1 = two records ahead, CAP2 = three records ahead.
+    mov     r0, r4
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr
+    mov     r7, r1
+    mov     r0, r7
+    bl      neighbor_ptr
+    mov     r4, r1
+    ldr     r0, cap1_magic_word
+    str     r0, [r7, #4]
+    ldmia   r6!, {r0-r2}
+    add.w   r7, r7, #8
+    stmia   r7!, {r0-r2}
+    ldr     r0, [r6]
+    ldr     r2, cap2_magic_word
+    str     r2, [r4, #4]
+    str     r0, [r4, #8]
+capture_done:
+    pop     {r4-r7, pc}
+
+update_result:
+    @ r0=target, r1=index, r2=success bool. Clobbers r3/ip.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    mov     r5, r1
+    mov     r6, r2
+    movs    r3, #1
+    lsl.w   r3, r3, r5
+    ldrb    ip, [r4, #9]
+    orr.w   ip, ip, r3
+    strb    ip, [r4, #9]
+    cbz     r6, update_fail
+    ldrb    ip, [r4, #10]
+    orr.w   ip, ip, r3
+    strb    ip, [r4, #10]
+    cmp     r5, #2
+    bne     update_done
+    mov     r0, r4
+    bl      disarm_preserve_capture
+    ldr     r0, remain_latch_magic_word
+    str     r0, [r4, #12]          @ pre-geometry K2RL latch
+    b       update_done
+update_fail:
+    ldrb    ip, [r4, #11]
+    orr.w   ip, ip, r3
+    strb    ip, [r4, #11]
+    mov     r0, r4
+    bl      disarm_preserve_result
+update_done:
+    pop     {r4-r6, pc}
+
+@ -----------------------------------------------------------------------
+@ Stock UID-consistency wrapper used only by the spool-positioning state
+@ machine at 0x08012DDC.
+@
+@ ABI is memcmp(a,b,len). The stock comparison is always executed first.
+@ A mismatch is suppressed only when:
+@   - len is exactly the four-byte MIFARE UID used by this state machine;
+@   - an API7 target record has hitmask=07, okmask=07, failmask=00;
+@   - CAP1/CAP2 contain the K2C3/K2D3 legacy-capture markers;
+@   - the completed record is the stock task's current active logical slot;
+@   - that completed target's current cached UID matches either compared UID.
+@
+@ This makes a completed third-party stock-task capture terminal for the
+@ current read cycle, while leaving Creality reads and genuine RF failures
+@ untouched. No stock record, odometer field, motor state or RFID tag is
+@ modified here.
+@ -----------------------------------------------------------------------
+.thumb_func
+uid_compare_wrapper:
+    push    {r4-r7, lr}
+    sub     sp, #12
+    mov     r4, r0                  @ uid A
+    mov     r5, r1                  @ uid B
+    mov     r6, r2                  @ length
+    bl      STOCK_MEMCMP
+    str     r0, [sp]
+    cmp     r6, #4
+    beq     uidcmp_quality_four
+    mov     r0, r8
+    bl      sgf_invalidate_compare
+    b       uidcmp_quality_done
+uidcmp_quality_four:
+    mov     r1, r0
+    mov     r0, r8
+    mov     r2, r4
+    mov     r3, r5
+    bl      sgf_compare
+uidcmp_quality_done:
+    ldr     r0, [sp]
+    cbz     r0, uidcmp_return
+    cmp     r6, #4
+    bne     uidcmp_return
+
+    ldr     r6, internal_base
+    movs    r7, #4
+    movs    r0, #0
+    str     r0, [sp, #4]           @ logical record index
+uidcmp_scan:
+    @ Only the record for the stock task's current active logical slot may
+    @ terminate its UID consistency retry.
+    ldr     r0, state_base
+    ldrb    r0, [r0, #2]           @ STOCK_STATE.active_slot_raw
+    ldr     r2, [sp, #4]
+    cmp     r0, r2
+    bne     uidcmp_next
+
+    ldrb    r0, [r6, #9]           @ hitmask
+    cmp     r0, #7
+    bne     uidcmp_next
+    ldrb    r0, [r6, #10]          @ okmask
+    cmp     r0, #7
+    bne     uidcmp_next
+    ldrb    r0, [r6, #11]          @ failmask
+    cmp     r0, #0
+    bne     uidcmp_next
+
+    @ Require the two legacy-capture markers as well. This deliberately
+    @ excludes secure-backend result masks and any partial/stale scratch.
+    mov     r0, r6
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr            @ target+2 = CAP1
+    ldr     r0, [r1, #4]
+    ldr     r2, cap1_magic_word
+    cmp     r0, r2
+    bne     uidcmp_next
+    mov     r0, r1
+    bl      neighbor_ptr            @ target+3 = CAP2
+    ldr     r0, [r1, #4]
+    ldr     r2, cap2_magic_word
+    cmp     r0, r2
+    bne     uidcmp_next
+
+    add.w   r0, r6, #62            @ cached four-byte UID
+    mov     r1, r4
+    movs    r2, #4
+    bl      STOCK_MEMCMP
+    cbz     r0, uidcmp_accept
+
+    add.w   r0, r6, #62
+    mov     r1, r5
+    movs    r2, #4
+    bl      STOCK_MEMCMP
+    cbz     r0, uidcmp_accept
+
+uidcmp_next:
+    ldr     r0, [sp, #4]
+    adds    r0, r0, #1
+    str     r0, [sp, #4]
+    add.w   r6, r6, #RECORD_SIZE
+    subs    r7, r7, #1
+    bne     uidcmp_scan
+
+uidcmp_return:
+    ldr     r0, [sp]
+    add     sp, #12
+    pop     {r4-r7, pc}
+
+uidcmp_accept:
+    movs    r0, #0
+    add     sp, #12
+    pop     {r4-r7, pc}
+
+@ -----------------------------------------------------------------------
+@ Stock message-validation wrapper used by the five-attempt read-message loop
+@ at 0x08012E62.
+@
+@ ABI is identical to 0x0801A670 (reader, reader_slot, max_attempts).
+@ The original stock validator always runs first.
+@
+@ If stock returns success, preserve it unchanged.
+@ If stock returns failure, convert it to success only when the active logical
+@ slot now contains a complete legacy API7 capture:
+@   hitmask=07, okmask=07, failmask=00, K2C3/K2D3 markers.
+@
+@ This terminates only the redundant "read message" retry loop after a
+@ third-party capture has already succeeded. No motor state, stock record,
+@ remaining/odometer state, EEPROM, or RFID tag is modified.
+@ -----------------------------------------------------------------------
+.thumb_func
+msg_validate_wrapper:
+    @ RH1 C tail preserves AAPCS callee registers, including OEM S16/S17.
+    @ The validator and bounded RTOS yield execute only in the OEM RF thread.
+    b.w     rfh_validate
+
+@ -----------------------------------------------------------------------
+@ Remaining helpers for a completed third-party API7 capture.
+@
+@ The stock RFID positioning code already computes circumference_percent and
+@ area_percent before calling STOCK_REMAIN_INIT(slot, area_percent). For a
+@ third-party tag the only missing input is the Creality ASCII nominal-length
+@ field. Keep the stock geometric area_percent and seed a type-4 runtime with
+@ the reference Creality nominal length of 330 m.
+@
+@ No tag or EEPROM write occurs. A later RFID scan recalibrates the initial
+@ percent from the stock geometry again.
+@ -----------------------------------------------------------------------
+capture_complete_record:
+    @ r0=target record. Return r0=1 for complete legacy API7 capture.
+    push    {r4-r7, lr}
+    mov     r4, r0
+    ldrb    r0, [r4, #9]
+    cmp     r0, #7
+    bne     caprec_no
+    ldrb    r0, [r4, #10]
+    cmp     r0, #7
+    bne     caprec_no
+    ldrb    r0, [r4, #11]
+    cmp     r0, #0
+    bne     caprec_no
+
+    mov     r0, r4
+    bl      neighbor_ptr
+    mov     r0, r1
+    bl      neighbor_ptr
+    ldr     r0, [r1, #4]
+    ldr     r2, cap1_magic_word
+    cmp     r0, r2
+    bne     caprec_no
+    mov     r0, r1
+    bl      neighbor_ptr
+    ldr     r0, [r1, #4]
+    ldr     r2, cap2_magic_word
+    cmp     r0, r2
+    bne     caprec_no
+
+    movs    r0, #1
+    pop     {r4-r7, pc}
+caprec_no:
+    movs    r0, #0
+    pop     {r4-r7, pc}
+
+capture_complete_slot:
+    @ r0=logical slot. Live-capture checker requiring stock active slot match.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     capslot_no
+
+    ldr     r5, state_base
+    ldrb    r5, [r5, #2]
+    cmp     r5, r4
+    bne     capslot_no
+
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    mov     r0, r5
+    bl      capture_complete_record
+    pop     {r4-r6, pc}
+capslot_no:
+    movs    r0, #0
+    pop     {r4-r6, pc}
+
+.thumb_func
+native_legacy_type4_ready_slot:
+    @ Only the authenticated OEM-record path at the existing geometry callsite.
+    @ r9 is its stock native-record-valid result; do not infer it from the brand.
+    push    {r3-r7, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     native_type4_no
+    ldr     r0, hw_flag_ptr
+    ldrb    r0, [r0]
+    cmp     r0, #0
+    bne     native_type4_no
+    cmp.w   r9, #0
+    beq     native_type4_no
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    ldrb    r0, [r5, #75]
+    cmp     r0, #4
+    bne     native_type4_no
+    @ Conservative stock length shape: 0ddd metres, at least 10 m.
+    ldrb    r0, [r5, #44]
+    cmp     r0, #48
+    bne     native_type4_no
+    movs    r7, #0
+    movs    r6, #45
+native_type4_length_digit:
+    ldrb    r0, [r5, r6]
+    subs    r0, r0, #48
+    cmp     r0, #9
+    bhi     native_type4_no
+    movs    r1, #10
+    muls    r7, r1
+    adds    r7, r7, r0
+    adds    r6, r6, #1
+    cmp     r6, #48
+    blo     native_type4_length_digit
+    cmp     r7, #10
+    blo     native_type4_no
+    ldr     r0, remain_percent_base
+    ldrb    r0, [r0, r4]
+    cmp     r0, #1
+    blo     native_type4_no
+    cmp     r0, #100
+    bhi     native_type4_no
+    mov     r0, r4
+    bl      STOCK_REMAIN_VALID
+    cbz     r0, native_type4_no
+    add.w   r1, r5, #20
+    movs    r2, #40
+    bl      STOCK_MEMCMP
+    cbnz    r0, native_type4_no
+    movs    r0, #1
+    pop     {r3-r7, pc}
+native_type4_no:
+    movs    r0, #0
+    pop     {r3-r7, pc}
+
+thirdparty_ready_slot:
+    @ r0=logical slot. Accept either live complete capture or pre-geometry K2RL.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     thirdready_no
+
+    mov     r0, r4
+    bl      capture_complete_slot
+    cbnz    r0, thirdready_yes
+
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    ldr     r0, [r5, #12]
+    ldr     r1, remain_latch_magic_word
+    cmp     r0, r1
+    bne     thirdready_no
+thirdready_yes:
+    movs    r0, #1
+    pop     {r4-r6, pc}
+thirdready_no:
+    movs    r0, #0
+    pop     {r4-r6, pc}
+
+clear_remaining_latch:
+    @ r0=logical slot. Clear only K2RL if present.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    cmp     r4, #4
+    bcs     clearlatch_done
+    ldr     r5, internal_base
+    movs    r6, #RECORD_SIZE
+    muls    r6, r4
+    adds    r5, r5, r6
+    ldr     r0, [r5, #12]
+    ldr     r1, remain_latch_magic_word
+    cmp     r0, r1
+    bne     clearlatch_done
+    movs    r0, #0
+    str     r0, [r5, #12]
+clearlatch_done:
+    pop     {r4-r6, pc}
+
+.thumb_func
+remaining_gate_wrapper:
+    push    {r4, lr}
+    bl      STOCK_REMAIN_GATE
+    cmp     r0, #1
+    beq     remain_gate_return
+    @ HW0 initialization already ran atomically at the geometry store hook.
+    movs    r0, #0
+remain_gate_return:
+    pop     {r4, pc}
+
+remaining_runtime_ptr:
+    @ r0=slot -> r0=REMAIN_RUNTIME + slot*100
+    movs    r1, #100
+    muls    r0, r1
+    ldr     r1, remain_runtime_ptr
+    adds    r0, r0, r1
+    bx      lr
+
+.thumb_func
+remaining_init_wrapper:
+    push    {r4-r7, lr}
+    mov     r4, r0
+    mov     r5, r1
+    sub     sp, #4
+    mrs     r0, PRIMASK
+    str     r0, [sp]
+    cpsid   i
+    b       atomic_init_body
+
+atomic_init_body:
+    ldr     r0, hw_flag_ptr
+    ldrb    r0, [r0]
+    cmp     r0, #1
+    beq.w   atomic_init_stock
+    cmp     r0, #0
+    bne.w   atomic_init_done
+    mov     r0, r4
+    bl      sgf_preserve_runtime
+    cmp     r0, #0
+    bne.w   atomic_init_done
+    movs    r7, #0
+    mov     r0, r4
+    bl      thirdparty_ready_slot
+    cbnz    r0, atomic_init_ready
+    mov     r0, r4
+    bl      native_legacy_type4_ready_slot
+    cmp     r0, #0
+    beq.w   atomic_init_done
+    movs    r7, #1
+atomic_init_ready:
+    cmp     r5, #255
+    bne     atomic_init_validate
+    ldr     r0, remain_percent_base
+    ldrb    r5, [r0, r4]
+atomic_init_validate:
+    cmp     r5, #1
+    blo     atomic_init_done
+    cmp     r5, #100
+    bhi     atomic_init_done
+    mov     r0, r4
+    bl      remaining_runtime_ptr
+    mov     r6, r0
+    ldrb    r0, [r6, #23]
+    cbz     r0, atomic_init_new
+    ldrb    r0, [r6, #99]
+    cmp     r0, #4
+    bne     atomic_init_done
+    ldrb    r0, [r6, #22]
+    cmp     r0, #1
+    beq     atomic_init_preserve
+atomic_init_new:
+    cmp     r7, #1
+    beq     atomic_init_native
+    movs    r0, #0
+    str     r0, [r6, #0]
+    mov     r0, r4
+    bl      sgf_total
+    cmp     r0, #0
+    ite     eq
+    ldreq   r1, default_total_mm
+    movne   r1, r0
+    movs    r0, #0
+    str     r1, [r6, #4]
+    str     r0, [r6, #8]
+    str     r0, [r6, #12]
+    str     r0, [r6, #16]
+    strb    r5, [r6, #20]
+    strb    r0, [r6, #21]
+    strb    r0, [r6, #22]
+    movs    r1, #1
+    strb    r1, [r6, #23]
+    movs    r1, #4
+    strb    r1, [r6, #99]
+    mov     r0, r4
+    mov     r1, r5
+    bl      REMAIN_SET
+    mov     r0, r4
+    bl      clear_remaining_latch
+    b       atomic_init_done
+
+atomic_init_native:
+    @ RAM-only equivalent of STOCK_REMAIN_INIT for validated native type4.
+    movs    r0, #RECORD_SIZE
+    muls    r0, r4, r0
+    ldr     r1, internal_base
+    adds    r1, r1, r0
+    add.w   r2, r6, #24
+    movs    r3, #19
+atomic_native_copy:
+    ldr     r0, [r1], #4
+    str     r0, [r2], #4
+    subs    r3, r3, #1
+    bne     atomic_native_copy
+    movs    r0, #0
+    str     r0, [r6, #0]
+    strb    r5, [r6, #20]
+    movs    r0, #1
+    strb    r0, [r6, #23]
+    movs    r0, #0
+    movs    r2, #69
+atomic_native_length:
+    ldrb    r1, [r6, r2]
+    subs    r1, r1, #48
+    movs    r3, #10
+    muls    r0, r3
+    adds    r0, r0, r1
+    adds    r2, r2, #1
+    cmp     r2, #72
+    blo     atomic_native_length
+    movw    r1, #1000
+    muls    r0, r1
+    str     r0, [r6, #4]
+    b       atomic_init_done
+
+atomic_init_preserve:
+    mov     r0, r4
+    mov     r1, r6
+    bl      legacy_type4_publish_atomic
+atomic_init_done:
+    movs    r0, #0
+    ldr     r3, [sp]
+    msr     PRIMASK, r3
+    add     sp, #4
+    pop     {r4-r7, pc}
+atomic_init_stock:
+    @ Restore the incoming IRQ mask before the original logger/initializer.
+    ldr     r3, [sp]
+    msr     PRIMASK, r3
+    add     sp, #4
+    mov     r0, r4
+    mov     r1, r5
+    bl      STOCK_REMAIN_INIT
+    pop     {r4-r7, pc}
+
+.thumb_func
+remaining_valid_wrapper:
+    @ Used only by CMD_RFID_REMAINING at 0x0801BF9E.
+    @ Preserve stock validity first; additionally accept our live type-4
+    @ runtime when the Creality 40-byte record is intentionally absent.
+    push    {r4-r6, lr}
+    mov     r4, r0
+    bl      STOCK_REMAIN_VALID
+    cbnz    r0, remain_valid_done
+
+    mov     r0, r4
+    bl      remaining_runtime_ptr
+    mov     r5, r0
+    ldrb    r0, [r5, #23]
+    cbz     r0, remain_valid_no
+    ldrb    r0, [r5, #99]
+    cmp     r0, #4
+    bne     remain_valid_no
+    ldr     r0, [r5, #4]
+    movw    r6, #10000
+    cmp     r0, r6
+    blo     remain_valid_no
+    ldrb    r0, [r5, #20]
+    cmp     r0, #1
+    blo     remain_valid_no
+    cmp     r0, #100
+    bhi     remain_valid_no
+
+    mov     r0, r5                  @ caller only tests zero/non-zero
+    pop     {r4-r6, pc}
+
+remain_valid_no:
+    movs    r0, #0
+remain_valid_done:
+    pop     {r4-r6, pc}
+
+@ -----------------------------------------------------------------------
+@ Legacy backend wrappers. Same ABI as 0x0801A39E.
+@ fifth argument (destination pointer) is at entry_sp[0].
+@ -----------------------------------------------------------------------
+.thumb_func
+legacy_read0_wrapper:
+    mov.w   ip, #0
+    b       legacy_common
+.thumb_func
+legacy_read1_wrapper:
+    mov.w   ip, #1
+    b       legacy_common
+.thumb_func
+legacy_read2_wrapper:
+    mov.w   ip, #2
+    b       legacy_common
+
+legacy_common:
+    push    {r4-r7, lr}
+    sub     sp, #20
+    mov     r4, r0                  @ reader
+    mov     r5, r1                  @ UID*
+    mov     r6, r2                  @ stock KeyA*
+    mov     r7, r3                  @ block
+    str     ip, [sp, #8]            @ read index
+    mov     r0, r5
+    bl      find_override_by_uid
+    str     r0, [sp, #4]            @ armed record or zero
+    cbz     r0, legacy_stock_key
+    ldr     r1, [sp, #8]
+    bl      key_ptr_for_index
+    cbz     r0, legacy_stock_key
+    mov     r2, r0
+    b       legacy_call
+legacy_stock_key:
+    mov     r2, r6
+legacy_call:
+    str     r2, [sp, #16]
+    ldr     r0, [sp, #4]
+    mov     r1, r5
+    bl      sgf_auth_epoch
+    str     r0, [sp, #12]
+    ldr     r2, [sp, #16]
+    ldr     ip, [sp, #40]           @ original fifth argument
+    str     ip, [sp, #0]
+    mov     r0, r4
+    mov     r1, r5
+    mov     r3, r7
+    bl      LEGACY_AUTH_READ
+    mov     r6, r0                  @ preserve result
+    ldr     r0, [sp, #4]
+    cbz     r0, legacy_return
+    ldr     r1, [sp, #8]
+    cmp     r6, #0
+    bne     legacy_failed
+    ldr     r2, [sp, #0]
+    bl      capture_result
+    ldr     r0, [sp, #4]
+    ldr     r1, [sp, #8]
+    movs    r2, #1
+    b       legacy_update
+legacy_failed:
+    movs    r2, #0
+legacy_update:
+    push    {r0-r3}
+    cmp     r6, #0
+    it      eq
+    orreq.w r1, r1, #256
+    mov     r2, r5
+    ldr     r3, [sp, #28]
+    bl      sgf_auth_result
+    pop     {r0-r3}
+    bl      update_result
+legacy_return:
+    mov     r0, r6
+    add     sp, #20
+    pop     {r4-r7, pc}
+
+@ -----------------------------------------------------------------------
+@ Secure/FM15L013 backend wrapper. Same ABI as 0x08022082.
+@ entry_sp[0]=stock KeyA*, entry_sp[4]=UID*.
+@ index is command-0xFF84 (FF84/FF85/FF86 => 0/1/2).
+@ -----------------------------------------------------------------------
+.thumb_func
+alt_read_wrapper:
+    push    {r4-r7, lr}
+    sub     sp, #12
+    mov     r4, r0                  @ command
+    mov     r5, r1                  @ encrypted output
+    mov     r6, r2                  @ aux
+    mov     r7, r3                  @ RFID MCU slot token
+    ldr     r0, [sp, #36]           @ original UID*
+    bl      find_override_by_uid
+    str     r0, [sp, #8]            @ armed record or zero
+    cbz     r0, alt_stock_key
+    movw    r1, #0xFF84
+    subs    r1, r4, r1
+    bl      key_ptr_for_index
+    cbz     r0, alt_stock_key
+    mov     ip, r0
+    b       alt_prepare
+alt_stock_key:
+    ldr     ip, [sp, #32]           @ original stock KeyA*
+alt_prepare:
+    str     ip, [sp, #0]
+    ldr     ip, [sp, #36]
+    str     ip, [sp, #4]
+    mov     r0, r4
+    mov     r1, r5
+    mov     r2, r6
+    mov     r3, r7
+    bl      ALT_AUTH_READ
+    mov     r6, r0
+    ldr     r0, [sp, #8]
+    cbz     r0, alt_return
+    movw    r1, #0xFF84
+    subs    r1, r4, r1
+    movw    r2, #0x9000
+    cmp     r6, r2
+    ite     eq
+    moveq   r2, #1
+    movne   r2, #0
+    bl      update_result
+alt_return:
+    mov     r0, r6
+    add     sp, #12
+    pop     {r4-r7, pc}
+
+@ -----------------------------------------------------------------------
+@ v3.14 runtime-parameter wrappers for stock hardcoded callsites.
+@ These preserve the stock ABI/register expectations and fall back to the
+@ descriptor default when the v2 clone has not been created yet.
+@ -----------------------------------------------------------------------
+.balign 4
+state_base:       .word STOCK_STATE
+box_operating_state_ptr: .word BOX_OPER_STATE
+v322_motor_candidate_ptr: .word 0x2000057E
+v322_task_candidate_ptr:  .word 0x20003904
+internal_base:    .word INTERNAL_RECORD
+hw_flag_ptr:      .word HW_FLAG
+block_table_ptr:  .word BLOCK_TABLE
+magic_word:       .word OVERRIDE_MAGIC
+neigh_magic_word: .word NEIGH_MAGIC
+cap1_magic_word:  .word CAP1_MAGIC
+cap2_magic_word:  .word CAP2_MAGIC
+remain_runtime_ptr: .word REMAIN_RUNTIME
+default_total_mm:   .word 330000
+remain_percent_base: .word 0x20003974
+remain_latch_magic_word: .word REMAIN_LATCH_MAGIC
+config_root_ptr:       .word CONFIG_ROOT
+sidecar_address_ptr:   .word SIDECAR_BASE
+sidecar_magic_word:    .word SIDECAR_MAGIC
+config_expected_ptr:   .word 0x200037E2
+config_offsets:        .byte 1, 2, 3, 5, 6, 7
+@ The six-speed defaults below are currently UNREFERENCED by this handler.
+@ Retain for exact v3.22 binary layout until all relocation safety is proven.
+config_defaults:       .byte 255, 100, 200, 155, 255, 80
+.balign 4
+@ API7: bit3=three-key override, bit5=state, bit6=stock capture, bit7=internal.
+info_payload: .byte 7, 2, 2, 0xE8, 3, 16
+
+.thumb_func
+heap_init_sidecar_wrapper:
+    push    {r4, lr}
+    bl      STOCK_HEAP_INIT
+    push    {r0-r3}
+    mrs     r4, APSR
+    push    {r4, r5}
+    ldr     r0, sidecar_address_ptr
+    movs    r1, #0
+    str     r1, [r0]
+    str     r1, [r0, #4]
+    movw    r0, #0x6F28
+    movt    r0, #0x2000
+    movw    r2, #448
+sgf_boot_clear:
+    str     r1, [r0], #4
+    subs    r2, r2, #4
+    bne     sgf_boot_clear
+    pop     {r4, r5}
+    msr     APSR_nzcvq, r4
+    pop     {r0-r3}
+    pop     {r4, pc}
+@ v3.23 timing hooks: ID7 true ms; ID8 host ms / 10 -> stock 10ms polls.
+@ Each replaces exactly one stock MOVW.
+@ Keep original registers/flags and original defaults when no override is set.
+@ DO NOT use MOVS before config_v2_get_value (would clobber APSR).
+.thumb_func
+cfg7_r0_wrapper:
+    push    {r1-r3, lr}
+    mov.w   r0, #7
+    bl      config_v2_get_value
+    pop     {r1-r3, pc}
+
+.thumb_func
+cfg8_r1_wrapper:
+    push    {r0, r2, r3, lr}
+    mov.w   r0, #8
+    bl      config_v2_get_value
+    mov.w   r2, #10             @ STOCK polls every 10ms, host config true ms
+    udiv    r1, r0, r2         @ exact because SET accepts multiples of 10
+    pop     {r0, r2, r3, pc}
+
+@ -----------------------------------------------------------------------
+@ CFG5 isolated LAB: stock feed total and odometer stall effective hooks.
+@ ID20 original: 0x08032C72 movw r7,#1250; host true ms /20.
+@ ID22 original: 0x08032CEC adds r5,#1 ; cmp r5,#25;
+@ replace BOTH halfwords via a 4-byte BL and reproduce the flags of CMP.
+@ This makes ID22 a stall-threshold override, not live filament accounting.
+@ -----------------------------------------------------------------------
+.thumb_func
+cfg20_r7_wrapper:
+    push.w  {r0-r6, lr}
+    mov.w   r0, #20
+    bl      config_v2_get_value
+    mov.w   r1, #20
+    udiv    r7, r0, r1
+    pop.w   {r0-r6, pc}
+
+.thumb_func
+cfg22_cmp_wrapper:
+    push.w  {r0-r4, r6, r7, lr}
+    adds    r5, r5, #1
+    mov.w   r0, #22
+    bl      config_v2_get_value
+    mov.w   r1, #20
+    udiv    r0, r0, r1
+    cmp     r5, r0              @ exact stock CPSR (C,Z,N,V) used by next BLO
+    pop.w   {r0-r4, r6, r7, pc}
+
+@ EXPERIMENTAL TYPE4 LIVE GATE. Keep original secure-element behavior.
+@ This wrapper is called ONLY from the manager-loop task gate; it does
+@ not affect original stock RFID record-authorisation gates.
+@ With FM15L013 absent, allow valid type4 PRINT plus expired-mode2 entry.
+@ Sequential tests reach stock cleanup; concurrent RTOS writers are unproven.
+@ No type7 promotion or host busy-guard removal.
+.thumb_func
+geometry_percent_store_wrapper:
+    @ Replaces exactly one STRB.W: preserve operands and APSR.
+    push.w  {r0-r3, r5-r7, lr}
+    vpush   {d0-d7}
+    sub     sp, #16
+    mrs     r0, PRIMASK
+    str     r0, [sp]
+    mrs     r0, APSR
+    str     r0, [sp, #4]
+    vmrs    r0, FPSCR
+    str     r0, [sp, #8]
+    str     r4, [sp, #12]
+    cpsid   i
+    mov     r0, r8
+    mov     r1, r4
+    bl      sgf_geometry_percent
+    mov     r4, r0
+    ldr     r0, hw_flag_ptr
+    ldrb    r0, [r0]
+    cmp     r0, #0
+    bne     geometry_store_original
+    cmp.w   r8, #4
+    bhs     geometry_store_original
+    mov     r0, r8
+    bl      remaining_runtime_ptr
+    ldrb    r1, [r0, #23]
+    cmp     r1, #1
+    bne     geometry_store_original
+    ldrb    r1, [r0, #99]
+    cmp     r1, #4
+    bne     geometry_store_original
+    ldrb    r1, [r0, #22]
+    cmp     r1, #1
+    beq     geometry_store_init
+geometry_store_original:
+    strb.w  r4, [r11, #0x58]
+geometry_store_init:
+    ldr     r0, hw_flag_ptr
+    ldrb    r0, [r0]
+    cmp     r0, #0
+    bne     geometry_store_finish
+    mov     r0, r8
+    mov     r1, r4
+    bl      remaining_init_wrapper
+geometry_store_finish:
+    ldr     r0, [sp, #8]
+    vmsr    FPSCR, r0
+    ldr     r4, [sp, #12]
+    ldr     r0, [sp]
+    msr     PRIMASK, r0
+    ldr     r0, [sp, #4]
+    msr     APSR_nzcvq, r0
+    add     sp, #16
+    vpop    {d0-d7}
+    pop.w   {r0-r3, r5-r7, pc}
+
+.thumb_func
+type4_usage_gate_wrapper:
+    push.w  {r1-r7, lr}
+    sub     sp, #8
+    bl      rfh_tick
+    mrs     r0, PRIMASK
+    str     r0, [sp]
+    cpsid   i
+    bl      STOCK_REMAIN_GATE
+    cmp     r0, #1
+    beq     type4_atomic_return
+    cmp     r0, #0
+    bne     type4_atomic_deny
+    ldr     r1, state_base
+    ldrb    r4, [r1, #2]
+    cmp     r4, #4
+    bhs     type4_atomic_deny
+    movs    r2, #100
+    muls    r2, r4, r2
+    ldr     r5, remain_runtime_ptr
+    adds    r5, r5, r2
+    ldrb    r2, [r5, #23]
+    cmp     r2, #1
+    bne     type4_atomic_deny
+    ldrb    r2, [r5, #99]
+    cmp     r2, #4
+    bne     type4_atomic_deny
+    ldr     r2, [r5, #4]
+    movw    r1, #10000
+    cmp     r2, r1
+    blo     type4_atomic_deny
+    movw    r1, #0x8480
+    movt    r1, #0x001E
+    cmp     r2, r1
+    bhi     type4_atomic_deny
+    ldrb    r2, [r5, #20]
+    cmp     r2, #1
+    blo     type4_atomic_deny
+    cmp     r2, #100
+    bhi     type4_atomic_deny
+    ldrb    r6, [r5, #22]
+    cmp     r6, #1
+    beq     type4_atomic_print
+    cmp     r6, #2
+    bne     type4_atomic_deny
+    ldr     r7, [r5, #8]
+    bl      STOCK_TICK_NOW
+    subs    r0, r0, r7
+    movw    r1, #30000
+    cmp     r0, r1
+    bls     type4_atomic_deny
+    mov     r0, r4
+    bl      stock_end_without_log
+    b       type4_atomic_deny
+type4_atomic_print:
+    mov     r0, r4
+    mov     r1, r5
+    bl      legacy_type4_account_atomic
+type4_atomic_deny:
+    @ Legacy work has already executed atomically; skip the old task call.
+    movs    r0, #0
+type4_atomic_return:
+    ldr     r3, [sp]
+    msr     PRIMASK, r3
+    add     sp, #8
+    pop.w   {r1-r7, pc}
+
+.thumb_func
+stock_end_without_log:
+    push    {r4-r6, lr}
+    mov     r5, r0
+    b.w     STOCK_END_BODY
+
+.thumb_func
+legacy_type4_account_atomic:
+    push    {r3-r7, lr}
+    mov     r4, r0
+    mov     r5, r1
+    bl      STOCK_ODOMETER
+    vldr    s1, [r5, #12]
+    vsub.f32 s2, s0, s1
+    vmov    r1, s2
+    ubfx    r2, r1, #23, #8
+    cmp     r2, #255
+    beq     type4_account_done
+    movw    r2, #0
+    movt    r2, #0x4120       @ float10, same stock threshold
+    cmp     r1, r2
+    bge     type4_account_delta
+    ldrb    r0, [r5, #21]
+    cbz     r0, type4_account_done
+    b       type4_account_publish
+type4_account_delta:
+    vcvt.u32.f32 s2, s2
+    vmov    r6, s2
+    movw    r2, #0x8480
+    movt    r2, #0x001E
+    cmp     r6, r2
+    bhi     type4_account_done
+    ldr     r0, [r5, #0]
+    adds    r0, r0, r6
+    bcs     type4_account_done
+    str     r0, [r5, #0]
+    vmov    s3, r6
+    vcvt.f32.u32 s3, s3
+    vadd.f32 s1, s1, s3
+    vstr    s1, [r5, #12]
+    ldr     r0, state_base
+    ldr     r1, [r0, #0x1C]
+    adds    r1, r1, r6
+    str     r1, [r0, #0x1C]
+type4_account_publish:
+    movs    r0, #0
+    strb    r0, [r5, #21]
+    mov     r0, r4
+    mov     r1, r5
+    bl      legacy_type4_publish_atomic
+type4_account_done:
+    pop     {r3-r7, pc}
+
+.thumb_func
+legacy_type4_publish_atomic:
+    push    {r3-r7, lr}
+    mov     r4, r0
+    mov     r5, r1
+    ldr     r2, [r5, #4]
+    movw    r0, #10000
+    cmp     r2, r0
+    blo     type4_publish_done
+    movw    r0, #0x8480
+    movt    r0, #0x001E
+    cmp     r2, r0
+    bhi     type4_publish_done
+    ldrb    r1, [r5, #20]
+    cmp     r1, #1
+    blo     type4_publish_done
+    cmp     r1, #100
+    bhi     type4_publish_done
+    ldr     r0, [r5, #0]
+    cmp     r0, r2
+    bhs     type4_publish_zero
+    movs    r3, #100
+    muls    r0, r3
+    udiv    r0, r0, r2
+    cmp     r1, r0
+    bls     type4_publish_zero
+    subs    r1, r1, r0
+    b       type4_publish_store
+type4_publish_zero:
+    movs    r1, #0
+type4_publish_store:
+    ldr     r0, state_base
+    strb    r1, [r0, #3]
+    mov     r7, r1
+    cbnz    r7, type4_publish_compare
+    movs    r7, #1
+type4_publish_compare:
+    ldr     r0, remain_percent_base
+    ldrb    r0, [r0, r4]
+    cmp     r0, r7
+    beq     type4_publish_done
+    mov     r0, r4
+    bl      REMAIN_SET
+type4_publish_done:
+    pop     {r3-r7, pc}
+
+@ CFG6 experimental advanced stock execution wrappers.
+.equ STOCK_HUB_SPEED, 0x0801E164
+.equ STOCK_DELAY,     0x0802EE28
+
+.macro CFG6_MOVW_R1 symbol,param_id
+.thumb_func
+\symbol:
+    push    {r0, r2, r3, lr}
+    mov.w   r0, #\param_id
+    bl      config_v2_get_value
+    mov     r1, r0
+    pop     {r0, r2, r3, pc}
+.endm
+
+.macro CFG6_MOVW_R5 symbol,param_id
+.thumb_func
+\symbol:
+    push.w  {r0-r4, lr}
+    mov.w   r0, #\param_id
+    bl      config_v2_get_value
+    mov     r5, r0
+    pop.w   {r0-r4, pc}
+.endm
+
+.macro CFG6_MOVW_R7 symbol,param_id
+.thumb_func
+\symbol:
+    push.w  {r0-r6, lr}
+    mov.w   r0, #\param_id
+    bl      config_v2_get_value
+    mov     r7, r0
+    pop.w   {r0-r6, pc}
+.endm
+
+@ Call the untouched stock callee with the configured argument and
+@ original ABI, including all other argument registers and LR.
+.macro CFG6_TAILCALL symbol,param_id,stock_func
+.thumb_func
+\symbol:
+    push.w  {r1-r3, lr}
+    mov.w   r0, #\param_id
+    bl      config_v2_get_value
+    pop.w   {r1-r3, lr}
+    b.w     \stock_func
+.endm
+
+CFG6_MOVW_R1 cfg9_r1_wrapper,9
+CFG6_MOVW_R5 cfg14_r5_wrapper,14
+CFG6_MOVW_R7 cfg18_r7_wrapper,18
+CFG6_MOVW_R1 cfg21_r1_wrapper,21
+
+CFG6_TAILCALL rfid_seek_speed_call_wrapper,11,STOCK_HUB_SPEED
+CFG6_TAILCALL rfid_measure_speed_call_wrapper,12,STOCK_HUB_SPEED
+CFG6_TAILCALL rfid_reposition_speed_call_wrapper,13,STOCK_HUB_SPEED
+CFG6_TAILCALL rfid_seek_settle_call_wrapper,15,STOCK_DELAY
+CFG6_TAILCALL rfid_post_auth_wait_call_wrapper,16,STOCK_DELAY
+.thumb_func
+rfid_pre_measure_settle_call_wrapper:
+    push.w  {r0-r3, r12, lr}
+    sub     sp, #8
+    mrs     r0, APSR
+    str     r0, [sp]
+    mov     r0, r8
+    bl      sgf_begin
+    mov     r0, r8
+    bl      rfh_begin
+    ldr     r0, [sp]
+    msr     APSR_nzcvq, r0
+    add     sp, #8
+    pop.w   {r0-r3, r12, lr}
+    push.w  {r1-r3, lr}
+    mov.w   r0, #17
+    bl      config_v2_get_value
+    pop.w   {r1-r3, lr}
+    b.w     STOCK_DELAY
+CFG6_TAILCALL rfid_neighbor_settle_call_wrapper,19,STOCK_DELAY
+
+@ ID23 replaces adds r4,#1 / cmp r4,#3; flags after CMP preserved.
+.thumb_func
+rfid_neighbor_retry_cmp_wrapper:
+    push.w  {r0-r3, r5-r7, lr}
+    adds    r4, r4, #1
+    mov.w   r0, #23
+    bl      config_v2_get_value
+    cmp     r4, r0
+    pop.w   {r0-r3, r5-r7, pc}
+
+@ ID24 replaces cmp.w r5,#1000 (same flags, unchanged r5).
+.thumb_func
+reverse_detooth_timeout_cmp_wrapper:
+    push.w  {r0-r4, r6, r7, lr}
+    mov.w   r0, #6
+    bl      config_v2_get_value
+    cmp     r0, #0
+    beq     cfg6_detooth_disabled
+    mov.w   r0, #24
+    bl      config_v2_get_value
+    cmp     r5, r0
+    b       cfg6_detooth_compare_done
+cfg6_detooth_disabled:
+    cmp     r5, r5     @ Z=1: stock BLS branches over de-tooth action
+cfg6_detooth_compare_done:
+    pop.w   {r0-r4, r6, r7, pc}
+
+@ ID27 replaces movs r7,#3 / ldrb r2,[r0,#5].
+@ movs r7,r7 retains the original carry/overflow flags.
+.thumb_func
+cfg27_load_retry_setup:
+    push.w  {r0-r6, lr}
+    mov.w   r0, #27
+    bl      config_v2_get_value
+    mov     r7, r0
+    pop.w   {r0-r6, lr}
+    movs    r7, r7
+    ldrb    r2, [r0, #5]
+    bx      lr
+
+
+@ ID27: true pretension-cycle loop at 0x08012616.
+@ Replaces CMP r4,#3 + BLO 0x080125B6 with a 4-byte B.W (not BL).
+@ Preserve LR/flags; branch to original loop start or exit.
+.thumb_func
+cfg27_load_retry_cmp_wrapper:
+    push.w  {r0-r3, r5-r7, lr}
+    mov.w   r0, #27
+    bl      config_v2_get_value
+    cmp     r4, r0
+    pop.w   {r0-r3, r5-r7, lr}
+    blo.w   0x080125B6
+    b.w     0x0801261A
+
+
+@ RDG2: read-only, fixed 64-byte snapshot. Request 0x57 [0x15, slot].
+@ No global writes, calls, floating-point operations or RF activity under mask.
+.section .text.handler,"ax",%progbits
+.p2align 2
+.thumb_func
+op_diag2_read:
+    ldrb    r0, [r4, #1]
+    cmp     r0, #5
+    bne.w   status_bad
+    ldrb    r6, [r4, #5]
+    cmp     r6, #4
+    bhs.w   status_bad
+    mov     r0, r6
+    bl      remaining_runtime_ptr
+    mov     r7, r0
+    sub     sp, #72             @ payload64, incoming mask/control8
+    mrs     r0, PRIMASK
+    str     r0, [sp, #64]
+    mrs     r0, CONTROL
+    str     r0, [sp, #68]
+    cpsid   i
+
+    movw    r0, #0x4452
+    movt    r0, #0x3247          @ "RDG2"
+    str     r0, [sp, #0]
+    strb    r6, [sp, #4]
+    movw    r1, #0x01F0
+    movt    r1, #0x2000
+    ldrb    r0, [r1, #2]
+    strb    r0, [sp, #5]
+    ldr     r0, [r1]
+    str     r0, [sp, #40]
+    ldr     r0, [r1, #28]
+    str     r0, [sp, #52]
+    movw    r1, #0x37D0
+    movt    r1, #0x2000
+    ldrb    r0, [r1, #2]
+    strb    r0, [sp, #6]
+    movw    r1, #0
+    movt    r1, #0x2000
+    ldrb    r0, [r1]
+    strb    r0, [sp, #7]
+    ldrb    r0, [r7, #23]
+    strb    r0, [sp, #8]
+    ldrb    r0, [r7, #99]
+    strb    r0, [sp, #9]
+    ldrb    r0, [r7, #22]
+    strb    r0, [sp, #10]
+    ldrb    r0, [r7, #21]
+    strb    r0, [sp, #11]
+    ldr     r0, [r7]
+    str     r0, [sp, #12]
+    ldr     r0, [r7, #4]
+    str     r0, [sp, #16]
+    ldr     r0, [r7, #12]
+    str     r0, [sp, #20]
+    movw    r1, #0x01AC
+    movt    r1, #0x2000
+    ldr     r0, [r1]
+    str     r0, [sp, #24]
+    ldrb    r0, [r7, #20]
+    strb    r0, [sp, #28]
+
+    movw    r2, #0x391C
+    movt    r2, #0x2000
+    add.w   r3, r2, r6
+    ldrb.w  r0, [r3, #0x58]
+    strb    r0, [sp, #29]
+    ldrb    r0, [r3, #2]
+    strb    r0, [sp, #30]
+    ldrh    r0, [r2]
+    strh    r0, [sp, #32]        @ manager flag and selected slot
+    ldrb    r0, [r2, #2]
+    strb    r0, [sp, #34]
+    ldrb    r0, [r2, #3]
+    strb    r0, [sp, #35]
+    ldrb    r0, [r2, #4]
+    strb    r0, [sp, #36]
+    ldrb    r0, [r2, #5]
+    strb    r0, [sp, #37]
+
+    movs    r0, #76
+    muls    r0, r6, r0
+    movw    r2, #0x4460
+    movt    r2, #0x2000
+    adds    r2, r2, r0
+    ldrb    r0, [r2, #75]
+    strb    r0, [sp, #31]
+    ldrb    r0, [r2, #20]
+    strb    r0, [sp, #57]
+    ldrb    r0, [r7, #44]
+    strb    r0, [sp, #58]
+    ldr     r0, [r2, #12]        @ never expose key scratch contents
+    movw    r1, #0x324B
+    movt    r1, #0x4C52
+    cmp     r0, r1
+    ite     eq
+    moveq   r0, #1
+    movne   r0, #0
+    strb    r0, [sp, #56]
+    movs    r0, #0
+    strb    r0, [sp, #59]        @ reserved, initialized
+
+    ldr     r0, [r7, #8]
+    str     r0, [sp, #48]
+    movw    r1, #0x09E4
+    movt    r1, #0x2000
+    ldr     r0, [r1]
+    str     r0, [sp, #44]
+    ldr     r0, [sp, #64]
+    strb    r0, [sp, #38]
+    ldr     r0, [sp, #68]
+    strb    r0, [sp, #39]
+    mrs     r0, IPSR
+    strh    r0, [sp, #60]
+    mrs     r0, PRIMASK
+    strb    r0, [sp, #62]
+    movs    r0, #2
+    strb    r0, [sp, #63]
+    ldr     r0, [sp, #64]
+    msr     PRIMASK, r0          @ restore before stock transport
+
+    movs    r0, #0x57
+    movs    r1, #0
+    mov     r2, sp
+    movs    r3, #64
+    bl      SEND_RESPONSE
+    add     sp, #72
+    add     sp, #8
+    pop     {r5-r7, lr}
+    b.w     STOCK_DONE
+
+@ SGF1 raw capture replaces VMOV r0,s16, returning exactly its original bits.
+.thumb_func
+sgf_capture_wrapper:
+    push.w  {r1-r3, r12, lr}
+    sub     sp, #12
+    mrs     r1, APSR
+    str     r1, [sp]
+    vmov    r0, s16
+    str     r0, [sp, #4]
+    mov     r1, r8
+    mov     r2, r5
+    mov     r3, r9
+    bl      sgf_capture
+    ldr     r0, [sp, #4]
+    ldr     r1, [sp]
+    msr     APSR_nzcvq, r1
+    add     sp, #12
+    pop.w   {r1-r3, r12, pc}
+
+.thumb_func
+op_family:
+    sub     sp, #64
+    mov     r0, r4
+    mov     r1, sp
+    cmp     r5, #0x20
+    bhs     rh_command
+    bl      sgf_command
+    b       family_result
+rh_command:
+    bl      rfh_command
+family_result:
+    cmp     r0, #0
+    bmi     sgf_error
+    mov     r3, r0
+    movs    r1, #0
+    mov     r2, sp
+    b       sgf_send
+sgf_error:
+    rsbs    r1, r0, #0
+    movs    r2, #0
+    movs    r3, #0
+sgf_send:
+    movs    r0, #0x57
+    bl      SEND_RESPONSE
+    add     sp, #64
+    add     sp, #8
+    pop     {r5-r7, lr}
+    b.w     STOCK_DONE
+
+handler_end:
+.size handler_start, .-handler_start

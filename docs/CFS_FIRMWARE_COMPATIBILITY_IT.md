@@ -1,3 +1,16 @@
+# Current R3 reference
+
+The current SGF1/RH1 R3 image is
+[`a6dec25c…`](../firmware/cfg6-spool-profiles/README.md), 185900 bytes,
+for CFS G32 / cfs0_000_153. It retains the CFG6/API7/RDG2 contracts below and
+adds SGF1, SLOT_LENGTH and RH1. Use the complete matching
+[Kalico branch](https://github.com/MzTechnology97/kalico-k2pro/tree/k2-pro-openhost),
+including box_spool_profiles. Vendor geometry is host RAM configuration.
+See [calibration](CFS_SPOOL_CALIBRATION.md) and [R3 hardware scope](../firmware/cfg6-spool-profiles/HARDWARE-R3.md).
+
+The following dated RDG2 section describes the retained fallback image,
+not the new R3 image or its per-UID nominal length.
+
 # Compatibilità firmware CFS — CFG6 RDG2
 
 [English](CFS_FIRMWARE_COMPATIBILITY.md) · [Validazione](CFG6_RDG2_VALIDATION.md) · [Firmware attuale](../firmware/cfg6-rdg2/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-RDG2.bin)

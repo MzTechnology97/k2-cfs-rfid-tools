@@ -1,4 +1,5 @@
 """RDG2 ARM read-only/ABI, coherent snapshot and payload decoder verification."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import hashlib
 import importlib.util
@@ -13,9 +14,9 @@ from paths import ROOT, BUILD, CANDIDATE_IMAGE, HOST_MODULE, RESULTS
 D = BUILD
 IMAGE = CANDIDATE_IMAGE.read_bytes()
 STACK = 0x2000E000
-ENTRY = 0x0803AE38
-SEND = 0x0801BAF2
-DONE = 0x0801C808
+ENTRY = code(0x0803AE38)
+SEND = code(0x0801BAF2)
+DONE = code(0x0801C808)
 
 
 class Snapshot(t.rem.NativeArm):
@@ -71,7 +72,7 @@ class Snapshot(t.rem.NativeArm):
         elif address == DONE:
             self.returned = True
             cpu.emu_stop()
-        elif address in t.FORBIDDEN_LOCKED or address in (0x0801AA14, 0x0801B730):
+        elif address in t.FORBIDDEN_LOCKED or address in (code(0x0801AA14), code(0x0801B730)):
             raise AssertionError(('unexpected backend/helper entry', hex(address)))
 
     def request(self, requested=None, frame_len=5, sub=0x15, check_ram=True):

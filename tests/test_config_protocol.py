@@ -4,9 +4,10 @@
     emulate_v3_23.py IMAGE.bin
 
 Needs arm-none-eabi-nm (for handler.elf, left by build-v3_23.py) and
-the unicorn Python package. Addresses are the builder's nominal ones
-(application at 0x08010000), as in emulate_v3_22.py.
+the unicorn Python package. The single image is mapped at its actual base
+0x08003000; nominal build symbols are converted explicitly at load time.
 """
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 import json
 import re
 import struct
@@ -21,11 +22,10 @@ from unicorn.arm_const import (UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0,
 
 from paths import BUILD
 HERE = BUILD
-BASE = 0x08010000
-SEND_RESPONSE = 0x0801BAF2
-STOCK_INVALID = 0x0801C7F8
-STOCK_51 = 0x0801C704
-RETURN = 0x0803F001
+BASE = ACTUAL_BASE
+SEND_RESPONSE = code(0x0801BAF2)
+STOCK_INVALID = code(0x0801C7F8)
+STOCK_51 = code(0x0801C704)
 SIDECAR = (0x20006EE8, 0x20006F28)
 STACK = (0x2000DF00, 0x2000E100)
 
@@ -34,11 +34,12 @@ nm = subprocess.check_output(
     ["arm-none-eabi-nm", "-n", str(HERE / "handler.elf")], text=True)
 SYM = {z[2]: int(z[0], 16) for line in nm.splitlines()
        if len(z := line.split()) == 3 and re.fullmatch("[0-9a-f]+", z[0])}
+SYM = physical_symbols(SYM)
 
 
 def cpu():
     u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
-    u.mem_map(0x08000000, 0x40000)
+    u.mem_map(0x08000000, 0x80000)
     u.mem_write(BASE, image)
     u.mem_map(0x20000000, 0x10000)
     # Stock config root -> speed table, as in emulate_v3_22.py.
