@@ -1,4 +1,5 @@
 """Additional candidate ABI, RAM-init, unload and container checks; no hardware."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import hashlib
 import importlib.util
@@ -11,7 +12,7 @@ from paths import ROOT, BUILD, BASE_IMAGE, CANDIDATE_IMAGE, RESULTS
 D = BUILD
 IMAGE = CANDIDATE_IMAGE.read_bytes()
 REF = BASE_IMAGE.read_bytes()
-SYMS = json.loads((D / 'symbols.json').read_text())
+SYMS = physical_symbols(json.loads((D / 'symbols.json').read_text()))
 
 
 def view(a):
@@ -97,7 +98,7 @@ def abi():
                 assert a.u.reg_read(UC_ARM_REG_SP) == 0x2000ee00
                 min_sp = min(min_sp, *(r[2] for r in a.trace))
                 # Public calls made under the mask must enter with an aligned stack.
-                public = {t.old.ODOMETER, t.old.CLOCK, 0x0803393c, 0x0801245c, 0x080123e4}
+                public = {t.old.ODOMETER, t.old.CLOCK, code(0x0803393c), code(0x0801245c), code(0x080123e4)}
                 assert all(sp % 8 == 0 for pc, _, sp in a.trace if pc in public)
                 count += 1
     return {'cases': count, 'maximum_observed_stack_bytes_geometry': 0x2000ee00 - min_sp}

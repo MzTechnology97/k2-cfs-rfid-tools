@@ -204,7 +204,7 @@ def main():
       'handler_addr':'0x%08X'%HANDLER_ADDR,
       'nominal_total_mm':330000,
       'spool_family_protocol':'SGF1',
-      'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False},
+      'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False,'indirect_code_targets':'physical, nominal minus 0xD000, Thumb bit set'},
       'spool_family_ram':{'slots':4,'profiles':4,'base':'0x20006F28','bytes':448,'heap_start':'0x200070E8','boot_cleared':True},
       'initial_percent_source':'SGF1 bound family and trustworthy raw measure; stock fallback without binding; active runtime preserved',
       'runtime_type':4,

@@ -105,3 +105,7 @@ The unchanged CFG6 sidecar occupies0x20006EE8..0x20006F28. New4×64 slot records
 Raw/auth/UID hooks use integer operations only. The geometry hook preserves general registers, S0..S31/FPSCR expectations and PRIMASK around bounded computation. IRQ tests are modeled; they do not establish wall-clock latency, NMI/DMA behavior or actual RTOS stack margins.
 
 Background research: [OpenCFS preload/RFID specification](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/05-preload-rfid.md) and [multi-vendor decoder design](https://github.com/MzTechnology97/OpenCFS-Firmware/blob/main/docs/spec/11-multi-vendor-tags.md). OpenCFS is a separate reconstruction; this candidate retains the patched OEM API7 reader.
+
+## Candidate R2 artifact status
+
+The SGF1/RH1 R2 BIN SHA is `27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046`. It supersedes the withdrawn RH1 BIN SHA `b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158`, whose C handoff helpers used nominal rather than physical flash addresses. The wire protocol is unchanged. The source manifest identifies the exact R2 filename and offline validation boundary; hardware validation and vendor calibration remain pending.

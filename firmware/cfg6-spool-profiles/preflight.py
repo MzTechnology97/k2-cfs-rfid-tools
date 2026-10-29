@@ -19,6 +19,7 @@ checks={
  'new_code_in_reserved_bank':'0x20006F28u' in c and '0x20007028u' in c,
  'rh1_boot_disabled':'0x20007088u' in rh and 'sizeof(Handoff)==96' in rh,
  'rh1_dispatch':all(x in s for x in ['cmp     r5, #0x1C','cmp     r5, #0x25','bl      rfh_command']),
+ 'rh1_indirect_physical_macro':'#define NOMINAL_CODE_BIAS 0xD000u' in rh and '((addr)-NOMINAL_CODE_BIAS)|1u' in rh,
  'rh1_scan_thread_only':'b.w     rfh_validate' in s and 'bl      rfh_tick' in s,
  'no_candidate_installed':True,
 }
@@ -35,6 +36,18 @@ with tempfile.TemporaryDirectory() as td:
  checks['within_approved_rh1_flash_policy']=end<=0x0803d800
  checks['no_unresolved_runtime']=not subprocess.check_output(['arm-none-eabi-nm','-u',str(elf)],text=True).strip()
  checks['no_allocated_c_globals']=not any(re.search(r' [BbDd] ',line) for line in syms.splitlines())
-result={'pass':all(checks.values()),'checks':checks,'image_end':hex(end),'policy_limit':'0x0803D800','note':'Static and emulated evidence only; no MCU timing/stack qualification.'}
+ # BL and PC-relative literal loads move with the nominal coordinate system.
+ # An indirect BLX pointer does not: inspect emitted literal VALUES explicitly.
+ targets={'validator':0x0801A670,'enqueue':0x0801233C,'cleanup':0x08012358,
+          'select':0x0801959E,'delay':0x0802EE28,'hub_gpio':0x0801B79C,'entry_gpio':0x0801B78C}
+ disassembly=subprocess.check_output(['arm-none-eabi-objdump','-d',str(elf)],text=True)
+ pools={}
+ for address,value in re.findall(r'^\s*([0-9a-f]+):\s+[0-9a-f]{8}\s+\.word\s+0x([0-9a-f]+)',disassembly,re.M):
+  pools.setdefault(int(value,16),[]).append(hex(int(address,16)))
+ indirect_targets={name:{'nominal':hex(nominal|1),'physical':hex((nominal-0xd000)|1),
+                        'literal_pools':pools.get((nominal-0xd000)|1,[])} for name,nominal in targets.items()}
+ checks['rh1_all_seven_indirect_targets_physical']=all(t['literal_pools'] for t in indirect_targets.values())
+ checks['rh1_no_nominal_indirect_literals']=all((nominal|1) not in pools for nominal in targets.values())
+result={'pass':all(checks.values()),'checks':checks,'image_end':hex(end),'policy_limit':'0x0803D800','indirect_code_targets':indirect_targets,'actual_app_base':'0x08003000','nominal_code_bias':'0xD000','note':'Static and emulated evidence only; no MCU timing/stack qualification.'}
 Path(args.out).write_text(json.dumps(result,indent=2)+'\n');print(json.dumps(result,indent=2))
 raise SystemExit(0 if result['pass'] else 1)

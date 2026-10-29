@@ -1,11 +1,12 @@
 """ABI differential checks for the two new CFG5 stock callsite hooks.
-Offline Unicorn (Cortex-M3) on the CFS linked-address image; no hardware.
+Offline Unicorn on the actual-base CFS image; no hardware.
 """
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import json,struct
 from unicorn import Uc,UC_ARCH_ARM,UC_MODE_THUMB,UC_HOOK_CODE
 from unicorn.arm_const import *
-BASE=0x08010000
+BASE=ACTUAL_BASE
 from paths import BASE_IMAGE, CANDIDATE_IMAGE
 stock=BASE_IMAGE.read_bytes()
 trial=CANDIDATE_IMAGE.read_bytes()
@@ -13,7 +14,7 @@ REGS=(UC_ARM_REG_R0,UC_ARM_REG_R1,UC_ARM_REG_R2,UC_ARM_REG_R3,UC_ARM_REG_R4,UC_A
       UC_ARM_REG_R7,UC_ARM_REG_R8,UC_ARM_REG_R9,UC_ARM_REG_R10,UC_ARM_REG_R11,UC_ARM_REG_R12,UC_ARM_REG_SP)
 def run(image,addr,slot=None,value=None,r5=24):
  uc=Uc(UC_ARCH_ARM,UC_MODE_THUMB)
- uc.mem_map(0x08000000,0x40000)
+ uc.mem_map(0x08000000,0x80000)
  uc.mem_write(BASE,image)
  uc.mem_map(0x20000000,0x10000)
  uc.mem_write(0x20000014,struct.pack("<I",0x200037E2))
@@ -29,20 +30,20 @@ def run(image,addr,slot=None,value=None,r5=24):
   uc.reg_write(reg,0x100+idx*0x1234)
  uc.reg_write(UC_ARM_REG_R5,r5)
  uc.reg_write(UC_ARM_REG_SP,0x2000E000)
- uc.reg_write(UC_ARM_REG_LR,0x0803D001)
+ uc.reg_write(UC_ARM_REG_LR,RETURN)
  uc.reg_write(UC_ARM_REG_APSR,0xA0000000)
  hit=[]
  def hook(cpu,where,size,_):
   if where==addr+4:
    hit.append(True);cpu.emu_stop()
  uc.hook_add(UC_HOOK_CODE,hook)
- uc.emu_start(addr|1,0x0803D001,count=200)
+ uc.emu_start(addr|1,RETURN,count=200)
  assert hit,("did not return",hex(addr))
  return {r:uc.reg_read(r) for r in REGS},uc.reg_read(UC_ARM_REG_APSR)&0xf0000000
 
 results=[]
-for spec in (("feed_total",0x08032C72,20,UC_ARM_REG_R7,1250,30000,1500),
-             ("odometer_stall",0x08032CEC,22,UC_ARM_REG_R5,25,600,25)):
+for spec in (("feed_total",code(0x08032C72),20,UC_ARM_REG_R7,1250,30000,1500),
+             ("odometer_stall",code(0x08032CEC),22,UC_ARM_REG_R5,25,600,25)):
  name,addr,id,output,original,override,expected=spec
  for start_r5 in (23,24,25,26):
   before,bflags=run(stock,addr,r5=start_r5)

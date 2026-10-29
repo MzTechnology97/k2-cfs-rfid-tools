@@ -1,8 +1,8 @@
 {
   "schema": 1,
   "status": "candidate-offline-validated-hardware-pending",
-  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-CANDIDATE.bin",
-  "sha256": "b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158",
+  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R2-CANDIDATE.bin",
+  "sha256": "27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046",
   "size": 185784,
   "revision": "v323-cfg6",
   "protocol": "SGF1",
@@ -33,5 +33,11 @@
   "host_key_handoff": true,
   "handoff_boot_enabled": false,
   "build_policy_nominal_end": "0x0803D800",
-  "build_policy_is_loader_certification": false
+  "build_policy_is_loader_certification": false,
+  "candidate_revision": "R2",
+  "physical_application_base": "0x08003000",
+  "nominal_analysis_base": "0x08010000",
+  "native_function_pointer_delta": "-0xD000",
+  "withdrawn_sha256": "b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158",
+  "offline_execution": "single physical image, no nominal alias; hardware peripherals and RF replies modeled"
 }

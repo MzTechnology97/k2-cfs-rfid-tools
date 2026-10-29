@@ -3,6 +3,7 @@
 RF reader operations and RTOS context switches are modeled; the original message
 validator, API7 wrappers, command dispatcher and quality hooks execute as ARM.
 """
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 import json,struct
 from test_spool_family import FamilyArm,SYMS,UID,u32,bits,ROOT
 from test_accounting import AuditArm
@@ -42,20 +43,20 @@ class HandoffArm(FamilyArm):
         self.now=value
         self.u.mem_write(0x200009e4,u32(value))
     def on_code(self,cpu,address,size,user):
-        if address==0x08012358:self.cleanup_calls+=1
-        if address in (0x0801b78c,0x0801b79c):
-            cpu.reg_write(UC_ARM_REG_R0,int(not self.pin_present) if address==0x0801b78c else int(self.hub_empty))
+        if address==code(0x08012358):self.cleanup_calls+=1
+        if address in (code(0x0801b78c),code(0x0801b79c)):
+            cpu.reg_write(UC_ARM_REG_R0,int(not self.pin_present) if address==code(0x0801b78c) else int(self.hub_empty))
             self.ret(cpu);return
         if self.native_validator:
-            if address==0x0801a4a0:
+            if address==code(0x0801a4a0):
                 self.trace.append((address,cpu.reg_read(UC_ARM_REG_PRIMASK),cpu.reg_read(UC_ARM_REG_SP)))
                 return
-            if address==0x0801a670:
+            if address==code(0x0801a670):
                 AuditArm.on_code(self,cpu,address,size,user);return
-            if address in (0x080102e2,0x0801959e,0x0801914c,0x080198c4,0x0802d074):
+            if address in (code(0x080102e2),code(0x0801959e),code(0x0801914c),code(0x080198c4),code(0x0802d074)):
                 assert not cpu.reg_read(UC_ARM_REG_PRIMASK)
                 cpu.reg_write(UC_ARM_REG_R0,0);self.ret(cpu);return
-            if address==0x0801a39e:
+            if address==code(0x0801a39e):
                 assert not cpu.reg_read(UC_ARM_REG_PRIMASK),'RF attempted while IRQs masked'
                 block=cpu.reg_read(UC_ARM_REG_R3);idx=block-4
                 key=bytes(cpu.mem_read(cpu.reg_read(UC_ARM_REG_R2),6))
@@ -67,9 +68,9 @@ class HandoffArm(FamilyArm):
                     data=(b'PETG HF'+bytes(9)) if idx==0 else bytes(range(16))
                     cpu.mem_write(dest,data);cpu.reg_write(UC_ARM_REG_R0,0)
                 self.ret(cpu);return
-            if address in (0x0801e166,0x0801e198,0x08011c5a,0x08012aca,0x08013060):
+            if address in (code(0x0801e166),code(0x0801e198),code(0x08011c5a),code(0x08012aca),code(0x08013060)):
                 raise AssertionError(('Motor/reposition call inside auth handoff',hex(address)))
-        if address==0x0802ee28 and self.cooperative:
+        if address==code(0x0802ee28) and self.cooperative:
             assert not cpu.reg_read(UC_ARM_REG_PRIMASK),'Thread waited with IRQs masked'
             self.wait_delays+=1;self.paused=True;cpu.emu_stop();return
         super().on_code(cpu,address,size,user)

@@ -1,4 +1,5 @@
 """Explain CMD03 255 using the exact candidate instructions, without hardware."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import hashlib
 import json
@@ -8,7 +9,7 @@ import test_accounting as t
 from paths import ROOT, BUILD, CANDIDATE_IMAGE, RESULTS
 D = BUILD
 IMAGE = CANDIDATE_IMAGE.read_bytes()
-SYMS = json.loads((D / 'symbols.json').read_text())
+SYMS = physical_symbols(json.loads((D / 'symbols.json').read_text()))
 RF_MANAGER = 0x2000391C
 MARKERS = RF_MANAGER + 2
 

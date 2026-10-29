@@ -1,12 +1,13 @@
 """Geometry, actual OEM odometer and CMD03 harness."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 import struct
 from unicorn.arm_const import *
 from arm_base import Arm, START, GATE_CALLSITE, ODOMETER
 
-GEOMETRY_STORE = 0x0801337C
-GEOMETRY_DONE = 0x080133A8
-CMD03 = 0x0801BF66
-SEND = 0x0801BAF2
+GEOMETRY_STORE = code(0x0801337C)
+GEOMETRY_DONE = code(0x080133A8)
+CMD03 = code(0x0801BF66)
+SEND = code(0x0801BAF2)
 INTERNAL = 0x20004460
 RECORD_TABLE = 0x20003978
 PERCENT = 0x20003974
@@ -23,7 +24,7 @@ class NativeArm(Arm):
     def __init__(self, image, slot, *, vendor="native", secure=0,
                  length=b"0330", kind=4, marker=1, native_valid=1):
         super().__init__(image, slot)
-        self.scale = struct.unpack_from("<f", image, 0x080188B8 - 0x08010000)[0]
+        self.scale = struct.unpack_from("<f", image, code(0x080188B8) - ACTUAL_BASE)[0]
         self.vendor = vendor
         self.native_valid = native_valid
         self.record = record(length)
@@ -50,7 +51,7 @@ class NativeArm(Arm):
             self.returned = True
             cpu.emu_stop()
             return
-        if address == 0x0801B890:
+        if address == code(0x0801B890):
             cpu.reg_write(UC_ARM_REG_R0, 0)  # No physical slot-error response.
             self.ret(cpu)
             return

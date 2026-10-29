@@ -12,7 +12,10 @@
 #define CONTROL ((volatile uint8_t *)0x20000024u)
 #define TICK (*(volatile uint32_t *)0x200009E4u)
 #define HW (*(volatile uint8_t *)0x20000000u)
-#define FN(addr,type) ((type)((addr)|1u))
+#define NOMINAL_CODE_BIAS 0xD000u
+/* Analysis/assembler coordinates are nominal; an indirect Thumb pointer is
+ * absolute and must use the application actual base 0x08003000. */
+#define FN(addr,type) ((type)(((addr)-NOMINAL_CODE_BIAS)|1u))
 typedef struct {
     uint32_t session,token,request,uid,lease_tick,wait_tick,wait_ms,lease_ms;
     uint32_t last_request;

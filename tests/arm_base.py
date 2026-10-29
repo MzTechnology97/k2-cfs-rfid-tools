@@ -1,27 +1,27 @@
 """Shared ARM harness; no hardware transport."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 import struct
 from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE
 from unicorn.arm_const import *
 
-BASE = 0x08010000
-RETURN = 0x0803F001
-START = 0x0801A8AC
-END = 0x0801A940
-UNLOAD = 0x0801A9B8
-TASK = 0x0801AC94
-GATE_CALLSITE = 0x08013684
+BASE = ACTUAL_BASE
+START = code(0x0801A8AC)
+END = code(0x0801A940)
+UNLOAD = code(0x0801A9B8)
+TASK = code(0x0801AC94)
+GATE_CALLSITE = code(0x08013684)
 STATE = 0x200001F0
 ROWS = 0x20004590
 BOX_STATE = 0x200037D2
-LOG = 0x0802D074
-ODOMETER = 0x0801B730
-CLOCK = 0x0802A4D2
+LOG = code(0x0802D074)
+ODOMETER = code(0x0801B730)
+CLOCK = code(0x0802A4D2)
 
 
 class Arm:
     def __init__(self, image, slot):
         self.u = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
-        self.u.mem_map(0x08000000, 0x40000)
+        self.u.mem_map(0x08000000, 0x80000)
         self.u.mem_write(BASE, image)
         self.u.mem_map(0x20000000, 0x10000)
         self.u.reg_write(UC_ARM_REG_CPSR, 0x33)
@@ -47,7 +47,7 @@ class Arm:
         cpu.reg_write(UC_ARM_REG_PC, cpu.reg_read(UC_ARM_REG_LR))
 
     def on_code(self, cpu, address, _size, _user):
-        if address in (RETURN & ~1, 0x0801367A, 0x08013690):
+        if address in (RETURN & ~1, code(0x0801367A), code(0x08013690)):
             self.events.append({"stop": hex(address)})
             self.returned = True
             cpu.emu_stop()
@@ -65,8 +65,8 @@ class Arm:
             self.events.append({"actual_stock_task": hex(address)})
         elif address == END:
             self.events.append({"actual_stock_end": hex(address)})
-        elif address in (0x0801A83E, 0x0801A878, 0x0801A39E,
-                         0x08022082, 0x0801A4A0):
+        elif address in (code(0x0801A83E), code(0x0801A878), code(0x0801A39E),
+                         code(0x08022082), code(0x0801A4A0)):
             raise AssertionError("Unexpected entry to RFID backend: %s" % hex(address))
 
     def call(self, address, r0=None):

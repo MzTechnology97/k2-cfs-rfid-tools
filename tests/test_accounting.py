@@ -3,6 +3,7 @@
 Interrupt writers/readers are modeled and deferred while PRIMASK is set.
 This does not model DMA, NMI, HardFault or real interrupt latency.
 """
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import argparse
 import copy
@@ -32,10 +33,10 @@ def factory(arch, mode):
 
 
 old.Uc = factory
-DIRECT_TASK = 0x0801AC94
-FORBIDDEN_LOCKED = {0x0802D074, 0x0802EE28, 0x0801A940,
-                    0x0801A83E, 0x0801A878, 0x0801A39E,
-                    0x08022082, 0x08022A42, 0x0801C814, 0x0801BAF2}
+DIRECT_TASK = code(0x0801AC94)
+FORBIDDEN_LOCKED = {code(0x0802D074), code(0x0802EE28), code(0x0801A940),
+                    code(0x0801A83E), code(0x0801A878), code(0x0801A39E),
+                    code(0x08022082), code(0x08022A42), code(0x0801C814), code(0x0801BAF2)}
 
 
 class AuditArm(rem.NativeArm):
@@ -241,7 +242,7 @@ def main():
     folder = BUILD
     image = CANDIDATE_IMAGE.read_bytes()
     reference = BASE_IMAGE.read_bytes()
-    symbols = json.loads((folder / 'symbols.json').read_text())
+    symbols = physical_symbols(json.loads((folder / 'symbols.json').read_text()))
     functional = [rem.scenario(image, slot, vendor, secure, True, 'atomic')
                   for slot in range(4)
                   for vendor, secure in [('native', 0), ('native', 1), ('thirdparty', 0)]]

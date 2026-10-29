@@ -1,4 +1,5 @@
 """Execute SGF1 candidate ARM; emulate RF transport only, never access hardware."""
+from arm_addresses import code, physical_symbols, ACTUAL_BASE, RETURN
 from pathlib import Path
 import hashlib,json,struct,sys
 ROOT=Path(__file__).resolve().parents[1]
@@ -7,7 +8,7 @@ import test_accounting as old
 from arm_base import START,END,GATE_CALLSITE,RETURN
 from unicorn.arm_const import *
 IMAGE=(ROOT/'work/build/candidate.bin').read_bytes()
-SYMS=json.loads((ROOT/'work/build/symbols.json').read_text())
+SYMS=physical_symbols(json.loads((ROOT/'work/build/symbols.json').read_text()))
 SLOT_RAM=0x20006f28
 CAT=0x20007028
 FRAME=0x2000d000
@@ -24,24 +25,24 @@ class FamilyArm(old.AuditArm):
         self.tag_uid=bytes(value)
         self.u.mem_write(0x20004460+self.slot*76+62,self.tag_uid)
     def on_code(self,cpu,address,size,user):
-        if address==0x0801a670:
+        if address==code(0x0801a670):
             cpu.reg_write(UC_ARM_REG_R0,1);self.ret(cpu);return
-        if self.tail_mode and address in (0x0801b150,0x0801b334,0x08012444,0x08012488,0x0801e198,0x0801a27a,0x08011c5a):
+        if self.tail_mode and address in (code(0x0801b150),code(0x0801b334),code(0x08012444),code(0x08012488),code(0x0801e198),code(0x0801a27a),code(0x08011c5a)):
             self.ret(cpu);return
         if self.heap_mode:
-            if address in (0x08027886,0x0802a584,0x08031d66,0x0802d57e):
+            if address in (code(0x08027886),code(0x0802a584),code(0x08031d66),code(0x0802d57e)):
                 self.ret(cpu);return
-            if address==0x0802d5e0:
+            if address==code(0x0802d5e0):
                 self.heap_seen.append((cpu.reg_read(UC_ARM_REG_R0),cpu.reg_read(UC_ARM_REG_R1)))
                 self.ret(cpu);return
-        if address==0x0801c808:
+        if address==code(0x0801c808):
             self.returned=True;cpu.emu_stop();return
-        if address==0x0801baf2 and cpu.reg_read(UC_ARM_REG_R0)==0x57:
+        if address==code(0x0801baf2) and cpu.reg_read(UC_ARM_REG_R0)==0x57:
             ptr=cpu.reg_read(UC_ARM_REG_R2);n=cpu.reg_read(UC_ARM_REG_R3)
             assert not cpu.reg_read(UC_ARM_REG_PRIMASK)
             self.reply=(cpu.reg_read(UC_ARM_REG_R1),bytes(cpu.mem_read(ptr,n)) if n else b'')
             self.ret(cpu);return
-        if address==0x0801a39e:
+        if address==code(0x0801a39e):
             block=cpu.reg_read(UC_ARM_REG_R3);idx=block-4
             dest=struct.unpack('<I',cpu.mem_read(cpu.reg_read(UC_ARM_REG_SP),4))[0]
             assert 0<=idx<=2 and dest==0x2000b100
@@ -56,7 +57,7 @@ class FamilyArm(old.AuditArm):
             data=(b'PETG HF'+bytes(9)) if idx==0 else bytes(range(16))
             cpu.mem_write(dest,data)
             cpu.reg_write(UC_ARM_REG_R0,int(idx==self.fail_index));self.ret(cpu);return
-        if address==0x0802ee28: # A modeled delay; no wait or motor operation.
+        if address==code(0x0802ee28): # A modeled delay; no wait or motor operation.
             self.ret(cpu);return
         super().on_code(cpu,address,size,user)
     def command(self,payload):
@@ -114,7 +115,7 @@ class FamilyArm(old.AuditArm):
             self.u.reg_write(UC_ARM_REG_S16,bits(0));self.u.reg_write(UC_ARM_REG_S17,bits(c))
             self.u.reg_write(UC_ARM_REG_S20,bits(100))
             self.u.mem_write(0x2000ee0c,struct.pack('<II',self.slot//2,self.slot%2))
-            self.tail_mode=True;self.call(0x08012e66,0);self.tail_mode=False
+            self.tail_mode=True;self.call(code(0x08012e66),0);self.tail_mode=False
             self.last_tail_r9=self.u.reg_read(UC_ARM_REG_R9)
         else:
             self.u.reg_write(UC_ARM_REG_R8,self.slot);self.u.reg_write(UC_ARM_REG_R5,status)
