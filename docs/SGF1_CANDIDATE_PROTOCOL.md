@@ -109,3 +109,7 @@ Background research: [OpenCFS preload/RFID specification](https://github.com/MzT
 ## Candidate R2 artifact status
 
 The SGF1/RH1 R2 BIN SHA is `27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046`. It supersedes the withdrawn RH1 BIN SHA `b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158`, whose C handoff helpers used nominal rather than physical flash addresses. The wire protocol is unchanged. The source manifest identifies the exact R2 filename and offline validation boundary; hardware validation and vendor calibration remain pending.
+
+## Candidate R3 artifact status
+
+R3 SHA is `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8`, size185900. It preserves the wire contract and wraps the two original UID-getter observations when legacy metadata has a missing length. R2 could decode Bambu via RH1 but its real flags0x02 did not permit geometry binding; R3 retains the strict same-UID proof and BIND requirements. The previous R2 status above records historical evidence, not the current artifact.

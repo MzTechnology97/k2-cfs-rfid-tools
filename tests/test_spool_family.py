@@ -19,7 +19,7 @@ def bits(x):return struct.unpack('<I',struct.pack('<f',x))[0]
 class FamilyArm(old.AuditArm):
     def __init__(self,slot=1):
         self.reply=None;self.auth=[];self.fail_index=None;self.epoch_race=False;self.heap_mode=False;self.heap_seen=[];self.tail_mode=False
-        super().__init__(IMAGE,slot,vendor='thirdparty')
+        super().__init__(IMAGE,slot,vendor='thirdparty',kind=0)
         self.set_uid(UID)
     def set_uid(self,value):
         self.tag_uid=bytes(value)

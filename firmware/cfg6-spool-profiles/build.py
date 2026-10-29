@@ -112,6 +112,8 @@ def main():
       (0x080225D0,'alt_read_wrapper'),
       (0x08022604,'alt_read_wrapper'),
       (0x08022638,'alt_read_wrapper'),
+      (0x08012B78,'legacy_uid_observation'),
+      (0x08012DD2,'legacy_uid_observation'),
       (0x08012DDC,'uid_compare_wrapper'),
       (0x08012E62,'msg_validate_wrapper'),
       (0x08013112,'sgf_capture_wrapper'),
@@ -141,7 +143,9 @@ def main():
       (0x08012616,'cfg27_load_retry_cmp_wrapper'),
     ]
     patches = core_patches + TIMING_HOOKS + (advanced_patches if ENABLE_ADVANCED_HOOKS else []) + [(0x0802A5F2,'heap_init_sidecar_wrapper')]
-    assert len(patches)==34 and len(set(x[0] for x in patches))==34
+    assert len(patches)==36 and len(set(x[0] for x in patches))==36
+    assert base[0x08012B78-APP_BASE:0x08012B7C-APP_BASE] == bytes.fromhex('07f0c8fd')
+    assert base[0x08012DD2-APP_BASE:0x08012DD6-APP_BASE] == bytes.fromhex('07f09bfc')
     assert base[0x08013112-APP_BASE:0x08013116-APP_BASE] == bytes.fromhex('18ee100a')
     assert base[0x0801337C-APP_BASE:0x08013380-APP_BASE] == bytes.fromhex('8bf85840')
     for callsite, name in TIMING_HOOKS:
@@ -204,7 +208,7 @@ def main():
       'handler_addr':'0x%08X'%HANDLER_ADDR,
       'nominal_total_mm':330000,
       'spool_family_protocol':'SGF1',
-      'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False,'indirect_code_targets':'physical, nominal minus 0xD000, Thumb bit set'},
+      'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False,'indirect_code_targets':'physical, nominal minus 0xD000, Thumb bit set','legacy_uid_observation':'R3 two-callsite fallback; original zero, HW0, ATQA0400/SAK08, nonzero UID, metadata byte75 zero; byte75 preserved'},
       'spool_family_ram':{'slots':4,'profiles':4,'base':'0x20006F28','bytes':448,'heap_start':'0x200070E8','boot_cleared':True},
       'initial_percent_source':'SGF1 bound family and trustworthy raw measure; stock fallback without binding; active runtime preserved',
       'runtime_type':4,

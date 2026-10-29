@@ -64,3 +64,20 @@ The RH1 build-policy end is nominal 0x0803D800 (physical 0x08030800), approved a
 ## R2 native-call correction (29 October 2026)
 
 The application vector table and reset entry establish a physical load base of `0x08003000`, while the disassembly and linker use `0x08010000`. The C `FN` adapter now subtracts `0xD000` before setting the Thumb bit. The seven native calls (validator, enqueue, cleanup, RFID reader selection, delay, hub and inlet sensors) are checked as physical literal values by preflight. Relative assembly branches are unchanged. A single-image physical-base test executes original validator, enqueue, worker finalizer, cleanup and heap initialization; only hardware/RTOS boundaries are modeled. The exact earlier BIN SHA `b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158` fails the same physical regression and is withdrawn.
+
+## R3 UID-pair evidence (29 October 2026)
+
+The original first/second UID-getter callsites are nominal0x08012B78 and
+0x08012DD2 (physical0x08005B78 and0x08005DD2). Both follow successful RF
+presence confirmation and the descriptor copier0x0801A608. A nonzero RF result
+branches back to polling at0x08012B4E. Descriptor copying itself requires the
+reader selector0x0801959E to return0. The first call records the first passage;
+the second follows the subsequent confirmed passage via12BAC/12C0C/12DCC.
+
+The original getter0x0801A70C uses INTERNAL[slot]+75 as length. Hardware R2
+showed0, and executing copier/getter/comparator with this descriptor reproduced
+flags0x02 despite successful API7 authentication. R3 recovers a four-byte UID
+only at those two worker calls and under strict legacy metadata checks. It
+copies both observations rather than substituting a comparison length over
+unwritten buffers. It does not change byte75 globally, force equality, weaken
+quality flags or identify the manufacturer from a generic UID.

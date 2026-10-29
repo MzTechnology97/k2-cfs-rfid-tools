@@ -8,6 +8,7 @@ import json,struct
 from test_spool_family import FamilyArm,SYMS,UID,u32,bits,ROOT
 from test_accounting import AuditArm
 from arm_base import RETURN
+from arm_uid_observation import observe_pair
 from unicorn.arm_const import *
 SESSION=0x72683101
 KEYS=b''.join(bytes((0xa1+i,))*6 for i in range(3))
@@ -80,13 +81,10 @@ class HandoffArm(FamilyArm):
         self.u.mem_write(0x200001f0,bytes((0x80,0,self.slot,0)))
         self.u.mem_write(0x200037d2,b'\x01')
         self.u.mem_write(0x2000391c,b'\x04')
-        self.u.mem_write(0x2000b080,UID+UID)
-        self.u.reg_write(UC_ARM_REG_R8,self.slot)
-        self.u.reg_write(UC_ARM_REG_R1,0x2000b084)
-        self.u.reg_write(UC_ARM_REG_R2,4)
-        self.call(SYMS['uid_compare_wrapper'],0x2000b080)
-        self.u.mem_write(0x20004410+self.slot*16,b'\x04\x00'+UID+bytes(8)+b'\x08\x04')
+        self.native_validator=True
         self.u.mem_write(0x200001f8,b'\x04\x05\x06')
+        self.uid_pair=observe_pair(self,UID,length=0)
+        assert self.uid_pair['equal_branch'],self.uid_pair
         self.u.reg_write(UC_ARM_REG_R0,self.slot//2)
         self.u.reg_write(UC_ARM_REG_R1,self.slot%2)
         self.u.reg_write(UC_ARM_REG_R2,3)

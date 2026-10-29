@@ -166,3 +166,17 @@ unsigned rfh_validate(unsigned reader,unsigned reader_slot,unsigned attempts) {
     if(complete(s)){RH->result=2;return 0;}
     RH->result=result?5:1;return result;
 }
+
+/* Only the two successful OEM measurement observations call this wrapper.
+ * Legacy reader RAW byte15 is unpopulated on the supported four-byte tags.
+ * Preserve every original nonzero-length result; do not rewrite record byte75.
+ * Both actual UID buffers must be populated, never just the memcmp length. */
+unsigned legacy_uid_observation(unsigned reader,unsigned reader_slot,uint8_t *out) {
+    if(reader>=2 || reader_slot>=2 || !out)return 0;
+    unsigned count=FN(0x0801A70Cu,unsigned (*)(unsigned,unsigned,uint8_t *))(reader,reader_slot,out);
+    if(count || HW)return count;
+    uint32_t m=lock();volatile uint8_t *r=INTERNAL+(reader*2u+reader_slot)*76u;
+    uint32_t u=uid(reader*2u+reader_slot);
+    if(!r[75] && u) {for(unsigned i=0;i<4;++i)out[i]=r[62+i];count=4;}
+    unlock(m);return count;
+}

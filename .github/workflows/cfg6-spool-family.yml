@@ -34,5 +34,6 @@ jobs:
             work/build/slot-length-results.json
             work/build/rfid-handoff-results.json
             work/build/rfid-handoff-physical-results.json
+            work/build/uid-observation-results.json
             firmware/cfg6-spool-profiles/manifest.json
             work/test-results/sgf-*

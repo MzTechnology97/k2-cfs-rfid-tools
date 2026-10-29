@@ -18,6 +18,7 @@ run('family',[ROOT/'tests/test_spool_family.py'])
 run('slot_lengths',[ROOT/'tests/test_spool_lengths.py'])
 run('rfid_handoff',[ROOT/'tests/test_rfid_handoff.py'])
 run('rfid_handoff_physical',[ROOT/'tests/test_rfid_handoff_physical.py'])
+run('uid_observation',[ROOT/'tests/test_uid_observation.py'])
 run('accounting',[ROOT/'tests/test_accounting.py','--out',RESULTS/'sgf-accounting.json'])
 # Boundary comparisons are shared; only the stable-image hook-count assertion
 # is replaced by the candidate's own structural check below.
@@ -28,7 +29,7 @@ manifest=json.loads((ROOT/'firmware/cfg6-spool-profiles/manifest.json').read_tex
 boundaries={'init_cases':b.init_equivalence(),'unload_cases':b.unload_equivalence(),
             'abi':b.abi(),'failed_rescans':b.failed_rescans(),
             'container':inspect(CANDIDATE_IMAGE,expected_sha=manifest['sha256'],expected_size=manifest['size'])}
-assert len(json.loads((BUILD/'static-validation.json').read_text())['patches'])==34
+assert len(json.loads((BUILD/'static-validation.json').read_text())['patches'])==36
 (RESULTS/'sgf-boundaries.json').write_text(json.dumps(boundaries,indent=2))
 checks['boundaries']=True;print('PASS boundaries',flush=True)
 run('cmd03',[ROOT/'tests/test_cmd03.py'])

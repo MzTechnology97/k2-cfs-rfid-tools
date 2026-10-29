@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "status": "candidate-offline-validated-hardware-pending",
-  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R2-CANDIDATE.bin",
-  "sha256": "27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046",
-  "size": 185784,
+  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin",
+  "sha256": "a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8",
+  "size": 185900,
   "revision": "v323-cfg6",
   "protocol": "SGF1",
   "slot_count": 4,
@@ -34,10 +34,14 @@
   "handoff_boot_enabled": false,
   "build_policy_nominal_end": "0x0803D800",
   "build_policy_is_loader_certification": false,
-  "candidate_revision": "R2",
+  "candidate_revision": "R3",
   "physical_application_base": "0x08003000",
   "nominal_analysis_base": "0x08010000",
   "native_function_pointer_delta": "-0xD000",
   "withdrawn_sha256": "b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158",
-  "offline_execution": "single physical image, no nominal alias; hardware peripherals and RF replies modeled"
+  "offline_execution": "single physical image, no nominal alias; hardware peripherals and RF replies modeled",
+  "supersedes_r2_sha256": "27cd264f36a217a98552351578f37fb4060e3d631793cc801242c0deaa6ec046",
+  "uid_pair_missing_length_recovery": true,
+  "uid_getter_scope": "Only two successful RFID-worker observation callsites; original getter result zero, legacy backend, ATQA0400/SAK08 and nonzero UID4. Copy both UID buffers, preserve byte75 and comparison rules.",
+  "r2_reference_hardware_evidence": "RH1 handoff and PETG HF identification succeeded in24.54s; rawC509.916 but qualityflags2 because metadata75 was0. R3 requires separate hardware verification."
 }

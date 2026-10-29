@@ -8,6 +8,7 @@ from pathlib import Path
 import argparse,hashlib,json,struct,subprocess,sys,tempfile
 from unicorn import Uc,UC_ARCH_ARM,UC_MODE_THUMB,UC_MODE_MCLASS,UC_HOOK_CODE
 from unicorn.arm_const import *
+from arm_uid_observation import observe_pair
 ROOT=Path(__file__).resolve().parents[1]
 BIAS=0xD000
 ACTUAL_BASE=0x08003000
@@ -17,7 +18,7 @@ UID=bytes.fromhex('01020304')
 SESSION=0x72683201
 KEYS=b''.join(bytes((0xa1+i,))*6 for i in range(3))
 TARGETS={'validator':0x0801A670,'enqueue':0x0801233C,'cleanup':0x08012358,
-         'select':0x0801959E,'delay':0x0802EE28,'hub_gpio':0x0801B79C,'entry_gpio':0x0801B78C}
+         'select':0x0801959E,'delay':0x0802EE28,'hub_gpio':0x0801B79C,'entry_gpio':0x0801B78C,'uid_getter':0x0801A70C}
 def code(nominal):
     assert 0x08010000<=nominal<0x08080000,hex(nominal)
     return nominal-BIAS
@@ -50,7 +51,7 @@ class PhysicalArm:
         self.u.reg_write(UC_ARM_REG_FPSCR,0)
         self.u.mem_write(0x200001F0,b'\x40\x00\x04\x00')
         self.u.mem_write(0x2000391C,b'\x01')
-        r=bytearray(76);r[60:62]=b'\x04\x00';r[62:66]=UID;r[74]=8;r[75]=4
+        r=bytearray(76);r[60:62]=b'\x04\x00';r[62:66]=UID;r[74]=8;r[75]=0
         self.u.mem_write(0x20004460+slot*76,bytes(r))
         self.u.mem_write(0x2000391E+slot,b'\x01')
         self.row=0x20004590+slot*100
@@ -62,7 +63,7 @@ class PhysicalArm:
         self.reply=None;self.returned=False;self.cooperative=False;self.paused=False
         self.auth_stock=0;self.auth_override=[];self.validator_calls=0
         self.cleanup_calls=0;self.enqueue_calls=0;self.delay_calls=0;self.pin_calls=[]
-        self.pin_present=True;self.hub_empty=True;self.heap_mode=False;self.heap_seen=[]
+        self.pin_present=True;self.hub_empty=True;self.heap_mode=False;self.heap_seen=[];self.select_failure=False;self.uid_getter_calls=0
         self.minimum_sp=0x20010000
         self.u.hook_add(UC_HOOK_CODE,self.on_code)
     def set_time(self,value):self.now=value;self.u.mem_write(0x200009E4,u32(value))
@@ -87,6 +88,7 @@ class PhysicalArm:
                 self.ret(cpu);return
         if address==code(TARGETS['enqueue']):self.enqueue_calls+=1
         if address==code(TARGETS['cleanup']):self.cleanup_calls+=1
+        if address==code(0x0801A70C):self.uid_getter_calls+=1
         if address==code(TARGETS['validator']):
             assert not cpu.reg_read(UC_ARM_REG_PRIMASK)
             self.validator_calls+=1  # Execute original OEM instructions.
@@ -96,7 +98,7 @@ class PhysicalArm:
             self.ret(cpu);return
         if address in {code(x) for x in (0x080102E2,0x0801959E,0x0801914C,0x080198C4,0x0802D074)}:
             assert not cpu.reg_read(UC_ARM_REG_PRIMASK)
-            cpu.reg_write(UC_ARM_REG_R0,0);self.ret(cpu);return
+            cpu.reg_write(UC_ARM_REG_R0,int(self.select_failure) if address==code(0x0801959E) else 0);self.ret(cpu);return
         if address==code(0x0801A39E):
             assert not cpu.reg_read(UC_ARM_REG_PRIMASK),'RF backend under IRQ mask'
             idx=cpu.reg_read(UC_ARM_REG_R3)-4
@@ -143,11 +145,9 @@ class PhysicalArm:
         self.u.reg_write(UC_ARM_REG_R8,self.slot);self.call('rfid_pre_measure_settle_call_wrapper')
         self.u.mem_write(0x200001F0,bytes((0x80,0,self.slot,0)))
         self.u.mem_write(0x200037D2,b'\x01');self.u.mem_write(0x2000391C,bytes((4,self.slot)))
-        self.u.mem_write(0x2000B080,UID+UID)
-        self.u.reg_write(UC_ARM_REG_R8,self.slot);self.u.reg_write(UC_ARM_REG_R1,0x2000B084);self.u.reg_write(UC_ARM_REG_R2,4)
-        self.call('uid_compare_wrapper',0x2000B080)
-        self.u.mem_write(0x20004410+self.slot*16,b'\x04\x00'+UID+bytes(8)+b'\x08\x04')
         self.u.mem_write(0x200001F8,b'\x04\x05\x06')
+        self.uid_pair=observe_pair(self,UID,length=getattr(self,'uid_length',0))
+        assert self.uid_pair['equal_branch'],self.uid_pair
         self.u.reg_write(UC_ARM_REG_R0,self.slot//2);self.u.reg_write(UC_ARM_REG_R1,self.slot%2);self.u.reg_write(UC_ARM_REG_R2,3)
         self.u.reg_write(UC_ARM_REG_SP,0x2000E000);self.u.reg_write(UC_ARM_REG_LR,RETURN)
     def validate(self,action='keys',stale_checks=False):
@@ -210,6 +210,8 @@ def qualify(image,symbols):
         result,offers=a.validate(stale_checks=True)
         assert result==0 and a.auth_stock==3 and a.auth_override==[0,1,2]
         assert a.validator_calls==2 and len(offers)==1
+        assert a.uid_pair['getter_returns']==[4,4] and a.uid_pair['record_byte75']==0
+        assert a.uid_pair['compare_status']==1
         q=a.finish();assert q['phase']==4 and q['result']==2 and q['request']==123
         assert not q['flags']&4 and a.u.mem_read(0x20000025,1)[0]==0
         assert a.u.mem_read(0x20000030+slot,1)[0]==0
@@ -235,14 +237,14 @@ def qualify(image,symbols):
 BASELINE_COMMIT='81b82dd79ceefb46e86b7aebf79c532f7eb53bc7'
 BASELINE_SHA='b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158'
 
-def historical_baseline():
+def historical_baseline(commit=BASELINE_COMMIT,expected_sha=BASELINE_SHA):
     """Rebuild the exact defective release; missing history is a test failure."""
     names=['handler.S','spool_family.c','rfid_handoff.c','build.py','preflight.py','link.ld']
     with tempfile.TemporaryDirectory(prefix='cfs-rh1-b7cd-') as temporary:
         folder=Path(temporary);source=folder/'firmware/cfg6-spool-profiles';source.mkdir(parents=True)
         for name in names:
             artifact='firmware/cfg6-spool-profiles/'+name
-            command=['git','-C',str(ROOT),'show',BASELINE_COMMIT+':'+artifact]
+            command=['git','-C',str(ROOT),'show',commit+':'+artifact]
             fetched=subprocess.run(command,capture_output=True)
             assert fetched.returncode==0,('mandatory historical source unavailable',artifact,fetched.stderr.decode(errors='replace'))
             (source/name).write_bytes(fetched.stdout)
@@ -251,7 +253,7 @@ def historical_baseline():
         assert built.returncode==0,('mandatory b7cd reconstruction failed',(built.stdout+built.stderr)[-4000:])
         image=(folder/'baseline.bin').read_bytes()
         symbols=json.loads((folder/'build/symbols.json').read_text())
-        assert hashlib.sha256(image).hexdigest()==BASELINE_SHA,'historical reconstruction is not the exact b7cd firmware'
+        assert hashlib.sha256(image).hexdigest()==expected_sha,'historical reconstruction SHA differs from the pinned firmware'
         return image,symbols
 
 def run():

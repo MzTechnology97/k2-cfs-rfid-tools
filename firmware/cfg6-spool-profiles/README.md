@@ -1,4 +1,4 @@
-# CFG6 SGF1 + RH1 — vendor geometry and single-cycle RFID candidate R2
+# CFG6 SGF1 + RH1 — vendor geometry and single-cycle RFID candidate R3
 
 **Candidate firmware. Hardware validation and real Bambu geometry calibration are pending.** The hardware-verified [RDG2 release](../cfg6-rdg2/README.md) remains the maintained installable image. This source does not change the live Helper catalog.
 
@@ -7,6 +7,25 @@ The exact build is identified by [manifest.json](manifest.json), including its S
 ## R2 correction and withdrawn image
 
 The earlier RH1 image SHA `b7cd0ab36011af9cd5af8f1ae4932008110a8fbdd174086c1a0043f2f5010158` is withdrawn. Seven indirect calls in the handoff extension used nominal analysis addresses instead of physical flash addresses. R2 corrects each target by `-0xD000`, verifies all seven literal values statically, and runs the tests with one image mapped at `0x08003000`. RAM, UID bytes and register values are not automatically translated. The physical regression rejects the exact withdrawn BIN at its first incorrect indirect call. Earlier nominal-address test passes do not qualify that image for hardware use.
+
+## R3 UID-pair measurement correction
+
+The reference CM5 accepted R2 and completed one PETG HF RH1 read in24.54s, but
+its raw measurement had flags0x02 rather than0x13. Passive metadata showed
+record byte75=0. The original UID getter uses that byte as its length, so it
+returned0 without copying either observed UID; a zero-length comparison could
+not prove a consistent revolution. The earlier tests supplied byte75=4.
+
+R3 wraps only the two getter calls in the original worker, both reached after
+successful RF detection and descriptor copying. If the original getter returns
+zero, recovery is limited to the legacy backend, ATQA0400/SAK08, a valid slot
+and a nonzero four-byte UID. Each observation is copied into its actual caller
+buffer and returns length4. Byte75, generic getter callers, the UID comparator
+and BIND quality thresholds remain unchanged. Different UID observations still
+invalidate geometry. Unsupported metadata retain the original behavior.
+
+R3 remains a candidate until separately tested on the machine. No Bambu curve
+is enabled before actual calibration.
 
 ## Behavior
 
