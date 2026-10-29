@@ -77,10 +77,12 @@ def main():
     ap.add_argument('--base',required=True)
     ap.add_argument('--out',required=True)
     ap.add_argument('--build-dir',default=str(pathlib.Path(__file__).resolve().parents[2]/'work/build'))
+    ap.add_argument('--precise-remaining',action='store_true',help='Build the separate R4 read-only millimetre extension')
     args=ap.parse_args()
+    defines=['-DSGF_PRECISE_REMAINING=1'] if args.precise_remaining else []
     here=pathlib.Path(__file__).resolve().parent
     build=pathlib.Path(args.build_dir).resolve(); build.mkdir(parents=True,exist_ok=True)
-    approval=subprocess.run(['python3',str(here/'preflight.py'),'--base',args.base,'--out',str(build/'preflight.json')],capture_output=True,text=True)
+    approval=subprocess.run(['python3',str(here/'preflight.py'),'--base',args.base,'--out',str(build/'preflight.json')]+(['--precise-remaining'] if args.precise_remaining else []),capture_output=True,text=True)
     if approval.returncode:
         raise SystemExit('BUILD PRECHECK FAILED; no BIN generated.\n'+approval.stdout+approval.stderr)
     base=pathlib.Path(args.base).read_bytes()
@@ -89,9 +91,9 @@ def main():
     off=HANDLER_ADDR-APP_BASE
 
     obj=build/'handler.o'; elf=build/'handler.elf'; raw=build/'handler.bin'
-    run('arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',obj,here/'handler.S')
+    run('arm-none-eabi-gcc',*defines,'-c','-mcpu=cortex-m3','-mthumb','-ffreestanding','-nostdlib','-o',obj,here/'handler.S')
     cobj=build/'spool_family.o'
-    run('arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=softfp','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-fstack-usage','-nostdlib','-o',cobj,here/'spool_family.c')
+    run('arm-none-eabi-gcc',*defines,'-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=softfp','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-fstack-usage','-nostdlib','-o',cobj,here/'spool_family.c')
     rhobj=build/'rfid_handoff.o'
     run('arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfloat-abi=soft','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-fstack-usage','-nostdlib','-o',rhobj,here/'rfid_handoff.c')
     run('arm-none-eabi-ld','-T',here/'link.ld','-o',elf,obj,cobj,rhobj)
@@ -208,6 +210,10 @@ def main():
       'handler_addr':'0x%08X'%HANDLER_ADDR,
       'nominal_total_mm':330000,
       'spool_family_protocol':'SGF1',
+      'precise_remaining':{'enabled':args.precise_remaining,'subcommand':'0x1D',
+          'snapshot_magic':'SGP1','snapshot_bytes':72,'retained_ram_added':0,
+          'extra_reply_stack_bytes':8 if args.precise_remaining else 0,
+          'legacy_protocol_unchanged':True,'raw_measurement_must_match_runtime_anchor':True},
       'rfid_handoff':{'protocol':'RH1','commands':'0x20..0x25','base':'0x20007088','bytes':96,'boot_disabled':True,'state_bytes':40,'rf_in_command_thread':False,'indirect_code_targets':'physical, nominal minus 0xD000, Thumb bit set','legacy_uid_observation':'R3 two-callsite fallback; original zero, HW0, ATQA0400/SAK08, nonzero UID, metadata byte75 zero; byte75 preserved'},
       'spool_family_ram':{'slots':4,'profiles':4,'base':'0x20006F28','bytes':448,'heap_start':'0x200070E8','boot_cleared':True},
       'initial_percent_source':'SGF1 bound family and trustworthy raw measure; stock fallback without binding; active runtime preserved',

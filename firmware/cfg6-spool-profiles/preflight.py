@@ -3,7 +3,8 @@
 from pathlib import Path
 import argparse,hashlib,json,subprocess,tempfile,re
 p=Path(__file__).resolve().parent
-a=argparse.ArgumentParser();a.add_argument('--base',required=True);a.add_argument('--out',required=True);args=a.parse_args()
+a=argparse.ArgumentParser();a.add_argument('--base',required=True);a.add_argument('--out',required=True);a.add_argument('--precise-remaining',action='store_true');args=a.parse_args()
+defines=['-DSGF_PRECISE_REMAINING=1'] if args.precise_remaining else []
 base=Path(args.base).read_bytes();s=(p/'handler.S').read_text();b=(p/'build.py').read_text();c=(p/'spool_family.c').read_text();rh=(p/'rfid_handoff.c').read_text()
 compiler=subprocess.check_output(['arm-none-eabi-gcc','-dumpfullversion'],text=True).strip()
 checks={
@@ -28,8 +29,8 @@ checks={
 assert all(checks.values()),checks
 with tempfile.TemporaryDirectory() as td:
  td=Path(td);obj=td/'handler.o';co=td/'family.o';elf=td/'candidate.elf'
- subprocess.run(['arm-none-eabi-gcc','-c','-mcpu=cortex-m3','-mthumb','-o',str(obj),str(p/'handler.S')],check=True)
- subprocess.run(['arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=softfp','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-nostdlib','-o',str(co),str(p/'spool_family.c')],check=True)
+ subprocess.run(['arm-none-eabi-gcc',*defines,'-c','-mcpu=cortex-m3','-mthumb','-o',str(obj),str(p/'handler.S')],check=True)
+ subprocess.run(['arm-none-eabi-gcc',*defines,'-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=softfp','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-nostdlib','-o',str(co),str(p/'spool_family.c')],check=True)
  ro=td/'handoff.o'
  subprocess.run(['arm-none-eabi-gcc','-c','-Os','-std=c11','-mcpu=cortex-m4','-mthumb','-mfloat-abi=soft','-ffreestanding','-fno-builtin','-fno-unwind-tables','-fno-asynchronous-unwind-tables','-fno-stack-protector','-nostdlib','-o',str(ro),str(p/'rfid_handoff.c')],check=True)
  subprocess.run(['arm-none-eabi-ld','-T',str(p/'link.ld'),'-o',str(elf),str(obj),str(co),str(ro)],check=True)

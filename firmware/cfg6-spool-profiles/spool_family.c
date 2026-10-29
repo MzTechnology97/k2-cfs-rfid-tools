@@ -170,6 +170,35 @@ static void snapshot(unsigned s,uint8_t *o) {
     }
     put32(o+56,TICK);o[60]=1;o[61]=HW;o[62]=MANAGER[0];o[63]=BOX;
 }
+#ifdef SGF_PRECISE_REMAINING
+/* Read-only extension. Reuse only a raw measurement which still identifies
+ * the active geometry anchor. Failed/racing rereads fall back to host cache.
+ * No new SRAM, counter reset, RF operation or vendor inference is introduced. */
+static void precise_snapshot(unsigned s,uint8_t *o) {
+    volatile Slot *p=ROWS+s;volatile uint8_t *r=runtime(s);
+    put32(o,0x31504753u);o[7]=0;put32(o+64,0);put32(o+68,0);
+    if(!bound(s,p)||!usable(s,p)||!valid_runtime(r)||
+       p->applied_generation!=p->generation||
+       p->raw_bits<0x42480000u||p->raw_bits>0x44fa0000u)return;
+    volatile Geometry *g=CATALOG+p->profile-1;
+    uint32_t total=get32(r+4);
+    if(!g->revision||g->revision!=p->revision||total!=selected_total(s,g)||
+       g->full10<g->core10+100||r[20]!=percent(p->raw_bits,g))return;
+    union{uint32_t bits;float f;}raw={.bits=p->raw_bits};
+    float c=raw.f,core=g->core10*0.1f,full=g->full10*0.1f;
+    uint32_t initial;
+    if(c<=core)initial=0;
+    else if(c>=full)initial=total;
+    else {
+        /* Factored areas avoid subtracting two almost equal squares. */
+        float ratio=((c-core)*(c+core))/((full-core)*(full+core));
+        initial=(uint32_t)(ratio*(float)total+0.5f);
+        if(initial>total)initial=total;
+    }
+    uint32_t used=get32(r);
+    put32(o+64,initial);put32(o+68,used>=initial?0:initial-used);o[7]=1;
+}
+#endif
 static void length_snapshot(unsigned s,uint8_t *o) {
     uint32_t u=uid(s);volatile Length *l=LENGTHS+s;
     put32(o,0x314c4753u);o[4]=s;o[5]=u && l->uid==u && l->total;
@@ -189,10 +218,18 @@ int sgf_command(const uint8_t *f,uint8_t *o) {
     }
     if((sub==0x17 && f[1]!=5)||(sub==0x18 && f[1]!=19)||
        (sub==0x19 && f[1]!=5)||(sub==0x1a && f[1]!=19)||
-       (sub==0x1b && f[1]!=5)||(sub==0x1c && f[1]!=15)||sub<0x17||sub>0x1c)return -1;
+       (sub==0x1b && f[1]!=5)||(sub==0x1c && f[1]!=15)||
+#ifdef SGF_PRECISE_REMAINING
+       (sub==0x1d && f[1]!=5)||sub<0x17||sub>0x1d)return -1;
+#else
+       sub<0x17||sub>0x1c)return -1;
+#endif
     unsigned n=f[5];if((sub==0x18||sub==0x19)?(n<1||n>4):n>=4)return -1;
     uint32_t m=lock();int rc=-1;
     if(sub==0x17){snapshot(n,o);rc=64;goto done;}
+#ifdef SGF_PRECISE_REMAINING
+    if(sub==0x1d){snapshot(n,o);precise_snapshot(n,o);rc=72;goto done;}
+#endif
     if(sub==0x19){catalog(n,o);rc=20;goto done;}
     if(sub==0x1b){length_snapshot(n,o);rc=16;goto done;}
     if(!idle()){rc=-7;goto done;}

@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Build and qualify the separate SGF1 candidate offline. No device operations."""
 from pathlib import Path
-import subprocess,sys,json,os,hashlib,runpy,contextlib,io
+import subprocess,sys,json,os,hashlib,runpy,contextlib,io,argparse
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tests'))
 from paths import BUILD,RESULTS,CANDIDATE_IMAGE
 RESULTS.mkdir(parents=True,exist_ok=True)
+ap=argparse.ArgumentParser()
+ap.add_argument('--precision',action='store_true',help='Qualify the separate R4 candidate')
+args=ap.parse_args()
+variant=ROOT/'firmware'/('cfg6-precise-remaining' if args.precision else 'cfg6-spool-profiles')
+manifest_path=variant/'manifest.json'
 checks={}
 def run(name,args):
     p=subprocess.run([sys.executable,*map(str,args)],cwd=ROOT,capture_output=True,text=True)
@@ -13,13 +18,20 @@ def run(name,args):
     if p.returncode:raise RuntimeError(name+' failed:\n'+(p.stdout+p.stderr)[-5000:])
     checks[name]=True;print('PASS',name,flush=True)
 run('base',[ROOT/'scripts/prepare_base.py'])
-run('build',[ROOT/'firmware/cfg6-spool-profiles/build.py','--base',ROOT/'work/base-pinned.bin','--out',CANDIDATE_IMAGE,'--build-dir',BUILD])
-manifest=json.loads((ROOT/'firmware/cfg6-spool-profiles/manifest.json').read_text())
-published=ROOT/'firmware/cfg6-spool-profiles'/manifest['file']
+if args.precision:
+    r3=ROOT/'work/precision-r3-compat.bin'
+    run('r3_compat_build',[ROOT/'firmware/cfg6-spool-profiles/build.py','--base',ROOT/'work/base-pinned.bin','--out',r3,'--build-dir',ROOT/'work/precision-r3-compat'])
+    original=json.loads((ROOT/'firmware/cfg6-spool-profiles/manifest.json').read_text())
+    assert r3.read_bytes()==(ROOT/'firmware/cfg6-spool-profiles'/original['file']).read_bytes()
+    checks['r3_byte_compatible']=True
+run('build',[variant/'build.py','--base',ROOT/'work/base-pinned.bin','--out',CANDIDATE_IMAGE,'--build-dir',BUILD])
+manifest=json.loads(manifest_path.read_text())
+published=variant/manifest['file']
 assert CANDIDATE_IMAGE.read_bytes()==published.read_bytes(), 'Published R3 BIN differs from rebuilt image'
 checks['published_artifact']=True
 run('family',[ROOT/'tests/test_spool_family.py'])
 run('runout_calibration',[ROOT/'tests/test_runout_calibration.py'])
+if args.precision:run('precise_remaining',[ROOT/'tests/test_precise_remaining.py'])
 run('slot_lengths',[ROOT/'tests/test_spool_lengths.py'])
 run('rfid_handoff',[ROOT/'tests/test_rfid_handoff.py'])
 run('rfid_handoff_physical',[ROOT/'tests/test_rfid_handoff_physical.py'])
@@ -30,7 +42,7 @@ run('accounting',[ROOT/'tests/test_accounting.py','--out',RESULTS/'sgf-accountin
 import test_accounting as a
 import test_boundaries as b
 from test_container import inspect
-manifest=json.loads((ROOT/'firmware/cfg6-spool-profiles/manifest.json').read_text())
+manifest=json.loads(manifest_path.read_text())
 boundaries={'init_cases':b.init_equivalence(),'unload_cases':b.unload_equivalence(),
             'abi':b.abi(),'failed_rescans':b.failed_rescans(),
             'container':inspect(CANDIDATE_IMAGE,expected_sha=manifest['sha256'],expected_size=manifest['size'])}
@@ -54,6 +66,6 @@ for name in ['odometer','timing_abi','advanced_abi','config_protocol']:
     checks[name]=True;print('PASS',name,flush=True)
 result={'passed':True,'checks':checks,'sha256':hashlib.sha256(CANDIDATE_IMAGE.read_bytes()).hexdigest(),
         'size':CANDIDATE_IMAGE.stat().st_size,'no_hardware_access':True,
-        'candidate_only':True,'stable_rdg2_unchanged':True,'actual_app_base':'0x08003000','nominal_flash_alias':False,'gpr_or_ram_translation':False}
-(RESULTS/'sgf-summary.json').write_text(json.dumps(result,indent=2)+'\n')
+        'candidate_only':True,'stable_rdg2_unchanged':True,'precision_extension':args.precision,'actual_app_base':'0x08003000','nominal_flash_alias':False,'gpr_or_ram_translation':False}
+(RESULTS/('precision-summary.json' if args.precision else 'sgf-summary.json')).write_text(json.dumps(result,indent=2)+'\n')
 print(json.dumps(result,indent=2))
