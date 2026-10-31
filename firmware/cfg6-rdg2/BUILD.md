@@ -39,7 +39,7 @@ contract, heap reservation, and the nominal source origin at `0x08010000`;
 the physical application load address remains `0x08003000`.
 
 Optional host integration uses a separate Kalico checkout pinned to
-`1d7673da14a4860aa188e9b0ef563c5d97d80428`:
+`d21c8521c7845c00f677f29c7b3721ff23b715c3`:
 
 ```sh
 python3 tests/run_offline.py --kalico /path/to/pinned/kalico
