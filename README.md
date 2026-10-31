@@ -13,8 +13,8 @@ spool geometry in RAM, while retaining CFG6, API7 and RDG2 interfaces.
 | Image | `cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin` |
 | Size | 185900 bytes |
 | SHA-256 | `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8` |
-| Runtime identity | K2OH / v323-cfg6, CONFIG API2, features0xE3 |
-| Additional interfaces | SGF1 with slot length, RH1 version1; existing API7/RDG2 retained |
+| Runtime identity | K2OH / v323-cfg6, CONFIG API2, features 0xE3 |
+| Additional interfaces | SGF1 with slot length, RH1 version 1; existing API7/RDG2 retained |
 | Host | [Kalico k2-pro-openhost](https://github.com/MzTechnology97/kalico-k2pro/tree/k2-pro-openhost) with `box_spool_profiles` |
 
 The runtime identity is shared by earlier images. Use the image SHA to identify
@@ -23,16 +23,16 @@ The published image is checked against a rebuild with the qualified compiler.
 
 ## Reference results
 
-Two Bambu PETG HF spools in physical slots2/4 decoded through one RH1 request
-each, in24.60s/20.47s. Both measurements returned flags0x13 with matching UID
-proof, while the original metadata byte75 remained0. R3 fills both observed
+Two Bambu PETG HF spools in physical slots 2/4 decoded through one RH1 request
+each, in 24.60s/20.47s. Both measurements returned flags 0x13 with matching UID
+proof, while the original metadata byte 75 remained 0. R3 fills both observed
 UID buffers when the supported legacy getter lacks its length.
 
 The reference host profile is now `bambu = 1, 284.7, 508.3`, with
 circumferences in mm. The effective core was inferred from a physical runout:
-slot4 consumed19655mm of327000mm nominal after the original12% scan estimate,
-but still reported6%. It predicts6.005% for that retained scan; slot2 remains
-full. The physical cardboard diameter about83mm gave the earlier260.8mm
+slot 4 consumed 19655mm of 327000mm nominal after the original 12% scan estimate,
+but still reported 6%. It predicts 6.005% for that retained scan; slot 2 remains
+full. The physical cardboard diameter about 83mm gave the earlier 260.8mm
 coefficient and is retained as history. The new coefficient awaits another
 physical cycle and was saved without changing RAM during printing.
 
