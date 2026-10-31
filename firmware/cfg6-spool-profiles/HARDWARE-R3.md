@@ -1,6 +1,6 @@
 # R3 reference hardware validation — 29 October 2026
 
-R3 BIN SHA-256: `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8`, 185900 bytes. Tested with Kalico code commit `04b2a73c1684637cec9e3ade9b9f2ba7ff6c37fe` on the reference CFS G32/CM5. This records the tested RFID/geometry scope; the source and wire contracts are unchanged.
+R3 BIN SHA-256: `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8`, 185900 bytes. Tested with Kalico code commit `89918b046f18a0a04561ba29ca626d01fb2793c1` on the reference CFS G32/CM5. This records the tested RFID/geometry scope; the source and wire contracts are unchanged.
 
 | Reference | Physical slot | Raw circumference | Measurement | RH1 job time |
 |---|---:|---:|---|---:|

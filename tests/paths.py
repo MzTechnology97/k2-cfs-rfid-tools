@@ -10,4 +10,4 @@ CURRENT_IMAGE = ROOT / 'firmware/cfg6-rdg2/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-R
 CANDIDATE_IMAGE = BUILD / 'candidate.bin'
 HOST_MODULE = ROOT / 'host/kalico/box_rfid_diag.py'
 KALICO = Path(os.environ.get('CFS_KALICO_ROOT', str(ROOT / 'work/kalico')))
-KALICO_COMMIT = '1d7673da14a4860aa188e9b0ef563c5d97d80428'
+KALICO_COMMIT = 'd21c8521c7845c00f677f29c7b3721ff23b715c3'

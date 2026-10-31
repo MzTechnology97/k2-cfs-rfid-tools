@@ -30,7 +30,7 @@
   "physical_application_base": "0x08003000",
   "qualified_compiler": "Debian arm-none-eabi-gcc 12.2.1",
   "paired_kalico_branch": "feature/cfs-precise-remaining-20261029",
-  "paired_kalico_commit": "d3e32c4e992875c363523daec78931cc778deaeb",
+  "paired_kalico_commit": "ef8d3bce6af78523013d04fc7ff8767c91e585f6",
   "paired_kalico_pr": "https://github.com/MzTechnology97/kalico-k2pro/pull/107",
   "paired_host_file_sha256": {
     "box_spool_profiles.py": "ddc783e7a41659b56aba3492b30f28ff74f90eabf470a805a34b4c5f195765ef",
