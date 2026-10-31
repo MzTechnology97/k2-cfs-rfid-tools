@@ -9,7 +9,12 @@ image = ROOT / 'firmware/cfg6-rdg2' / manifest['file']
 # Maintain an exact allow-list: current R3 and the retained RDG2 fallback.
 r3_manifest = json.loads((ROOT / 'firmware/cfg6-spool-profiles/manifest.json').read_text())
 r3_image = ROOT / 'firmware/cfg6-spool-profiles' / r3_manifest['file']
-assert set((ROOT / 'firmware').rglob('*.bin')) == {image, r3_image}
+precision_manifest = json.loads((ROOT / 'firmware/cfg6-precise-remaining/manifest.json').read_text())
+precision_image = ROOT / 'firmware/cfg6-precise-remaining' / precision_manifest['file']
+assert set((ROOT / 'firmware').rglob('*.bin')) == {image, r3_image, precision_image}
+assert hashlib.sha256(precision_image.read_bytes()).hexdigest() == precision_manifest['sha256']
+assert precision_image.stat().st_size == precision_manifest['size']
+assert precision_manifest['hardware_verified'] is False
 assert hashlib.sha256(r3_image.read_bytes()).hexdigest() == r3_manifest['sha256']
 assert r3_image.stat().st_size == r3_manifest['size']
 assert not list((ROOT / 'firmware').glob('v3.*'))
@@ -38,5 +43,5 @@ for row in evidence['samples']:
 assert evidence['samples'][-1]['table_percent'] == 34
 assert all(value == 0 for key,value in evidence['last_session_link_deltas'].items()
            if key not in ('tx_frames', 'rx_frames'))
-print(json.dumps({'passed':True,'only_r3_and_rdg2_installable_images':True,
+print(json.dumps({'passed':True,'only_known_reference_and_precision_images':True,
                   'relative_document_links_valid':True,'hardware_evidence_matches_artifact':True}))

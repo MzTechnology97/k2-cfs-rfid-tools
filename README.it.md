@@ -66,3 +66,7 @@ nella storia per le regressioni.
 
 Lavoro indipendente di interoperabilità e reverse engineering, non affiliato
 con Creality, Bambu Lab o QIDI.
+
+## Candidato R4 per il residuo preciso
+
+[R4-PRECISION1](firmware/cfg6-precise-remaining/README.md) aggiunge una lettura passiva in millimetri. La prova hardware e ancora da eseguire; R3 resta il riferimento. [Procedura](docs/CFS_PRECISE_REMAINING.md).

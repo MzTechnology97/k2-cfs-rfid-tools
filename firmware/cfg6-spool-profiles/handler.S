@@ -3,6 +3,11 @@
 .cpu cortex-m3
 .fpu fpv4-sp-d16
 
+#ifdef SGF_PRECISE_REMAINING
+.equ FAMILY_REPLY_BYTES, 72
+#else
+.equ FAMILY_REPLY_BYTES, 64
+#endif
 .equ SEND_RESPONSE,      0x0801BAF2
 .equ LEGACY_AUTH_READ,   0x0801A39E
 .equ ALT_AUTH_READ,      0x08022082
@@ -113,7 +118,11 @@ handler_start:
     beq.w   op_diag2_read
     cmp     r5, #0x16
     blo.w   status_bad
+#ifdef SGF_PRECISE_REMAINING
+    cmp     r5, #0x1D
+#else
     cmp     r5, #0x1C
+#endif
     bls.w   op_family
     cmp     r5, #0x20
     blo.w   status_bad
@@ -2246,7 +2255,7 @@ sgf_capture_wrapper:
 
 .thumb_func
 op_family:
-    sub     sp, #64
+    sub     sp, #FAMILY_REPLY_BYTES
     mov     r0, r4
     mov     r1, sp
     cmp     r5, #0x20
@@ -2269,7 +2278,7 @@ sgf_error:
 sgf_send:
     movs    r0, #0x57
     bl      SEND_RESPONSE
-    add     sp, #64
+    add     sp, #FAMILY_REPLY_BYTES
     add     sp, #8
     pop     {r5-r7, lr}
     b.w     STOCK_DONE

@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "status": "offline-candidate-awaiting-hardware",
+  "file": "cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R4-PRECISION1-CANDIDATE.bin",
+  "sha256": "cc22f30adb5bf0ee471b73d21acb8789f9f8374b1cfe21c4bd405a8103d27099",
+  "size": 186344,
+  "hardware": "cfs0_050_G32",
+  "application": "cfs0_000_153",
+  "candidate_revision": "R4-PRECISION1",
+  "parent_r3_sha256": "a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8",
+  "r3_remains_reference": true,
+  "hardware_verified": false,
+  "automatic_flash": false,
+  "precise_remaining": {
+    "opcode": "0x57",
+    "subcommand": "0x1D",
+    "reply_magic": "SGP1",
+    "reply_bytes": 72,
+    "units": "integer millimetres; calibrated estimate, not physical accuracy guarantee",
+    "retained_ram_added": 0,
+    "extra_command_reply_stack_bytes": 8,
+    "legacy_percentage_and_sgf1_info_unchanged": true,
+    "valid_only_when_saved_measurement_matches_active_runtime": true,
+    "invalid_measurement_uses_host_cache_and_odometer": true
+  },
+  "cfg6_contract_preserved": true,
+  "tag_writes_added": false,
+  "eeprom_writes_added": false,
+  "build_policy_nominal_end": "0x0803D800",
+  "physical_application_base": "0x08003000",
+  "qualified_compiler": "Debian arm-none-eabi-gcc 12.2.1",
+  "paired_kalico_branch": "feature/cfs-precise-remaining-20261029",
+  "paired_kalico_commit": "d3e32c4e992875c363523daec78931cc778deaeb",
+  "paired_kalico_pr": "https://github.com/MzTechnology97/kalico-k2pro/pull/107",
+  "paired_host_file_sha256": {
+    "box_spool_profiles.py": "ddc783e7a41659b56aba3492b30f28ff74f90eabf470a805a34b4c5f195765ef",
+    "box_rfid_estimates.py": "fb6aeb633fc11f48d1c861510d02f3aeb55929cc4c462de8fba09a1010a7c276"
+  },
+  "offline_qualification": {
+    "checks": 20,
+    "precision_cases": 135,
+    "modeled_irq_boundaries": 956,
+    "max_observed_numerical_error_mm": 5,
+    "host_box_tests": 614,
+    "hardware_access": false
+  }
+}

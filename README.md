@@ -82,3 +82,7 @@ source history is retained for mandatory regression controls.
 
 Independent interoperability and reverse-engineering work; not affiliated with
 Creality, Bambu Lab or QIDI.
+
+## R4 precision candidate
+
+[Separate R4-PRECISION1 candidate](firmware/cfg6-precise-remaining/README.md) adds read-only millimetre remaining without changing R3 legacy behavior. Hardware validation is pending; R3 remains the reference.
