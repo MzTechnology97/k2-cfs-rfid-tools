@@ -6,7 +6,7 @@ prova dei due UID e geometria vendor in RAM. Mantiene CFG6, API7 e RDG2.
 
 [English](README.md) · [Firmware R3](firmware/cfg6-spool-profiles/cfs0_050_G32-cfs0_000_153-K2OH-CFG6-SGF1-RH1-R3-CANDIDATE.bin) · [SHA-256](firmware/cfg6-spool-profiles/SHA256SUMS.txt) · [Build](firmware/cfg6-spool-profiles/BUILD.md) · [Prove hardware](firmware/cfg6-spool-profiles/HARDWARE-R3.md) · [Come calibrare](docs/CFS_SPOOL_CALIBRATION.md)
 
-Il BIN è185900byte, SHA-256
+Il BIN è 185900 byte, SHA-256
 `a6dec25c74e7d259eec0387193548a0c3cc78ec9fc4ddc35824f0fe0965385b8`.
 Conserva il suffisso CANDIDATE del file effettivamente collaudato e le stesse
 identiche sequenze di byte. L'identità runtime v323-cfg6 non distingue R3 dalle
@@ -14,9 +14,9 @@ versioni precedenti; verificare lo SHA del file.
 
 ## Cosa è stato verificato
 
-Le due PETG HF Bambu degli slot fisici2/4 sono state lette in24,60s/20,47s,
-con una richiesta RH1 per bobina e flags0x13. I getter R3 copiano realmente i
-due UID anche quando la lunghezza originale è0; byte75 resta invariato.
+Le due PETG HF Bambu degli slot fisici 2/4 sono state lette in 24,60s/20,47s,
+con una richiesta RH1 per bobina e flags 0x13. I getter R3 copiano realmente i
+due UID anche quando la lunghezza originale è 0; byte 75 resta invariato.
 
 Il profilo host di riferimento è:
 ```ini
@@ -48,7 +48,7 @@ per installarla, acquisire i riferimenti e verificare il ricalcolo.
 
 I coefficienti sono modificabili nel file host e caricati in RAM; non richiedono
 un nuovo firmware. Il diametro è approssimato e il riferimento pieno deriva
-dalla bobina PETG HF da1kg provata. Per supporti o avvolgimenti diversi occorre
+dalla bobina PETG HF da 1kg provata. Per supporti o avvolgimenti diversi occorre
 una nuova verifica. Consumo e cambio automatico al runout sono stati osservati.
 Restano da provare inserimento/scollegamento fisico e margine reale di stack; le altre regressioni
 sono coperte offline.
